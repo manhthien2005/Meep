@@ -1,0 +1,40 @@
+# <type>(<scope>): <mô tả ngắn tiếng Việt — 50-72 chars, không dấu chấm cuối>
+
+# Body (tùy chọn) — tiếng Việt, giải thích TẠI SAO không phải LÀM GÌ
+# (diff đã cho biết làm gì rồi)
+
+
+# Footer (tùy chọn) — link issue
+# Refs #
+# Closes #
+
+# ----------------------------------------------------
+# HƯỚNG DẪN (xóa hết phần này trước khi save commit):
+#
+# Type (lowercase, English):
+#   feat     → tính năng mới
+#   fix      → sửa bug
+#   chore    → maintenance, deps update, config
+#   refactor → refactor không thêm feature/fix bug
+#   docs     → tài liệu
+#   test     → thêm/sửa test
+#   style    → format/lint, không ảnh hưởng logic
+#   perf     → cải thiện performance
+#   build    → build system, deps lock
+#   ci       → CI config
+#   revert   → revert commit trước
+#
+# Scope (tùy chọn, lowercase):
+#   auth, feed, post, friend, widget, deps, ...
+#
+# Examples:
+#   feat(auth): thêm đăng nhập Google qua Firebase Auth
+#   fix(feed): xử lý feed rỗng khi user chưa có bạn
+#   chore(deps): cập nhật firebase_core lên 3.10.0
+#   refactor(post): tách PostMapper ra file riêng
+#
+# Setup template (chạy 1 lần sau khi clone):
+#   git config commit.template .gitmessage
+#
+# Sau đó `git commit` (không có -m) sẽ mở editor với template này.
+# ----------------------------------------------------

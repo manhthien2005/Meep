@@ -1,0 +1,128 @@
+name: Deploy to Staging
+
+# Trigger sau khi PR merge vào develop:
+# - Build Flutter (Android APK debug để test)
+# - Deploy Cloud Functions lên Firebase staging
+# - Deploy Firebase Hosting (nếu có) lên preview channel
+#
+# CHƯA KÍCH HOẠT: cần anh fill GitHub Secrets:
+#   - FIREBASE_PROJECT_STAGING (vd "meep-dev-abc123")
+#   - FIREBASE_SERVICE_ACCOUNT_STAGING (JSON key)
+# Sau khi fill secrets, comment-out dòng `if: false` ở job `deploy-functions` để kích hoạt.
+
+on:
+  push:
+    branches: [develop]
+    # Chỉ trigger khi commit ảnh hưởng tới build/deploy — skip docs/.windsurf/.github-only changes
+    # để tiết kiệm CI minutes (GitHub Actions free tier 2000 phút/tháng).
+    paths:
+      - 'apps/mobile/**'
+      - 'firebase/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/develop-staging.yml'
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  build-flutter-android:
+    name: Build Android APK (debug)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.4'
+          channel: 'stable'
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build APK
+        run: flutter build apk --debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: meep-staging-apk-${{ github.sha }}
+          path: apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
+
+  deploy-functions:
+    name: Deploy Cloud Functions to staging
+    runs-on: ubuntu-latest
+    if: false  # XÓA dòng này khi anh đã fill GitHub Secrets staging
+    defaults:
+      run:
+        working-directory: firebase/functions
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: firebase/functions/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Deploy Functions
+        uses: w9jds/firebase-action@v13.20.1
+        with:
+          args: deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_STAGING }} --force
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STAGING }}
+          PROJECT_PATH: firebase
+
+  deploy-firestore-rules:
+    name: Deploy Firestore + Storage rules to staging
+    runs-on: ubuntu-latest
+    if: false  # XÓA dòng này khi anh đã fill GitHub Secrets staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Deploy rules
+        uses: w9jds/firebase-action@v13.20.1
+        with:
+          args: deploy --only firestore:rules,firestore:indexes,storage:rules --project ${{ secrets.FIREBASE_PROJECT_STAGING }} --force
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STAGING }}
+          PROJECT_PATH: firebase
+
+  notify-success:
+    name: Notify team
+    runs-on: ubuntu-latest
+    needs: [build-flutter-android]
+    if: success()
+    steps:
+      - name: Print summary
+        run: |
+          echo "## Staging deploy thành công" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Branch: \`develop\`" >> $GITHUB_STEP_SUMMARY
+          echo "- APK artifact: trong tab Actions, tải về để test" >> $GITHUB_STEP_SUMMARY
+          echo "- Functions/Rules: chưa kích hoạt (cần fill secrets)" >> $GITHUB_STEP_SUMMARY

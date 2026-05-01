@@ -1,0 +1,44 @@
+#!/usr/bin/env sh
+# Husky pre-commit hook
+# Chạy fast checks trước khi commit:
+# - dart format check (chỉ trên file staged)
+# - flutter analyze
+# - eslint cho TS files staged
+#
+# Heavy tests chạy trên CI, không local — giữ pre-commit nhanh.
+
+set -e
+
+# === Dart files staged ===
+DART_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.dart$' || true)
+if [ -n "$DART_FILES" ]; then
+  echo "→ Dart format check..."
+  cd apps/mobile
+  RELATIVE_FILES=$(echo "$DART_FILES" | sed 's|^apps/mobile/||' | grep -v '\.g\.dart$' | grep -v '\.freezed\.dart$' || true)
+  if [ -n "$RELATIVE_FILES" ]; then
+    echo "$RELATIVE_FILES" | xargs dart format --set-exit-if-changed
+    echo "✓ Dart format OK"
+  fi
+  cd ../..
+
+  # Note: flutter analyze chạy FULL project (không phải chỉ staged files).
+  # Acceptable cho codebase hiện tại; nếu pre-commit > 10s liên tục khi project lớn dần,
+  # cân nhắc split: chạy analyze chỉ trên file staged + skip nếu file không phải lib/test/.
+  echo "→ Flutter analyze..."
+  cd apps/mobile
+  flutter analyze --fatal-infos
+  cd ../..
+  echo "✓ Flutter analyze OK"
+fi
+
+# === TypeScript files staged in functions ===
+TS_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^firebase/functions/.*\.(ts|js)$' || true)
+if [ -n "$TS_FILES" ]; then
+  echo "→ ESLint trên staged TS files..."
+  cd firebase/functions
+  npm run lint
+  cd ../..
+  echo "✓ ESLint OK"
+fi
+
+echo "✓ Pre-commit checks passed"

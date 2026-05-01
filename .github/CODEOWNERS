@@ -1,0 +1,31 @@
+# CODEOWNERS — Meep
+# Mỗi PR cần approval từ CODEOWNERS tương ứng.
+# Anh là default reviewer cho mọi thứ. Khi tên 4 dev được fill in,
+# có thể chia ownership theo module để giảm bottleneck.
+#
+# Format: <pattern> @<github-username>
+# Docs: https://docs.github.com/en/repositories/managing-your-repositories-settings-and-security/customizing-your-repository/about-code-owners
+
+# Default — anh review tất cả nếu chưa có owner cụ thể
+* @ThienPDM
+
+# Module-specific (khi đã fill 4 tên dev thật, uncomment + replace placeholder)
+# /apps/mobile/lib/features/auth/      @ThienPDM @<DevName2>
+# /apps/mobile/lib/features/feed/      @<DevName2> @<DevName3>
+# /apps/mobile/lib/features/post/      @<DevName3>
+# /apps/mobile/lib/features/friend/    @<DevName4>
+# /apps/widget/                        @ThienPDM
+# /firebase/functions/                 @ThienPDM @<DevName2>
+# /firebase/firestore.rules            @ThienPDM
+# /firebase/storage.rules              @ThienPDM
+
+# Infra / config — chỉ leader review
+/.github/                              @ThienPDM
+/.husky/                               @ThienPDM
+/.windsurf/                            @ThienPDM
+/AGENTS.md                             @ThienPDM
+/CONTEXT.md                            @ThienPDM
+/commitlint.config.js                  @ThienPDM
+/package.json                          @ThienPDM
+/firebase/firebase.json                @ThienPDM
+/firebase/firestore.indexes.json       @ThienPDM

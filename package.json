@@ -1,0 +1,26 @@
+{
+  "name": "meep",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Meep — private photo sharing app for close friends (capstone project)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "commitlint": "commitlint --edit",
+    "lint:flutter": "cd apps/mobile && flutter analyze",
+    "lint:functions": "cd firebase/functions && npm run lint",
+    "format:flutter": "cd apps/mobile && dart format --set-exit-if-changed lib test",
+    "test:flutter": "cd apps/mobile && flutter test",
+    "test:functions": "cd firebase/functions && npm test",
+    "test:rules": "cd firebase/functions && npm run test:rules",
+    "test": "npm run test:flutter && npm run test:functions"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "husky": "^9.1.0"
+  }
+}

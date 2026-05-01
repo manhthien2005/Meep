@@ -1,0 +1,10 @@
+# TODO(setup): replace `<org>/<repo>` với GitHub path thật khi tạo repo (vd `meep-team/meep`).
+# Placeholder hiện tại sẽ làm GitHub Discussions/ADR link bị 404.
+blank_issues_enabled: false
+contact_links:
+  - name: Câu hỏi chung về dự án
+    url: https://github.com/<org>/<repo>/discussions
+    about: Dùng GitHub Discussions cho câu hỏi không phải bug/feature.
+  - name: Đề xuất ADR (Architectural Decision Record)
+    url: https://github.com/<org>/<repo>/blob/develop/docs/adr/README.md
+    about: Cho quyết định kiến trúc lớn — viết ADR thay vì issue.

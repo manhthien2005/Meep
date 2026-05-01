@@ -1,0 +1,203 @@
+name: Deploy to Production
+
+# Trigger sau khi PR merge vào deploy:
+# - Manual approval gate (anh approve qua GitHub Environments)
+# - Build Flutter (release APK + AAB)
+# - Deploy Cloud Functions production
+# - Deploy Firestore + Storage rules production
+# - Tag git release v0.X.Y
+# - Generate CHANGELOG từ Conventional Commits
+#
+# CHƯA KÍCH HOẠT: cần anh
+#   1. Tạo Firebase project meep-prod
+#   2. Fill GitHub Secrets:
+#      - FIREBASE_PROJECT_PROD
+#      - FIREBASE_SERVICE_ACCOUNT_PROD
+#      - ANDROID_KEYSTORE_BASE64 (signing key cho release APK)
+#      - ANDROID_KEYSTORE_PASSWORD
+#      - ANDROID_KEY_ALIAS
+#      - ANDROID_KEY_PASSWORD
+#   3. Tạo GitHub Environment "production" với required reviewer = anh
+#   4. Comment-out dòng `if: false` ở các job deploy
+
+on:
+  push:
+    branches: [deploy]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (vd v0.2.0)'
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  approval:
+    name: Manual approval (anh review)
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://console.firebase.google.com
+    steps:
+      - run: echo "Production deploy đã được approve."
+
+  build-flutter-release:
+    name: Build Flutter release
+    needs: approval
+    runs-on: ubuntu-latest
+    if: false  # XÓA khi đã fill secrets prod
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.4'
+          channel: 'stable'
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Decode signing keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+          cat > android/key.properties <<EOF
+          storeFile=release.keystore
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+
+      - name: Build release APK + AAB
+        run: |
+          flutter build apk --release
+          flutter build appbundle --release
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: meep-prod-${{ github.sha }}
+          path: |
+            apps/mobile/build/app/outputs/flutter-apk/app-release.apk
+            apps/mobile/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 90
+
+  deploy-functions-prod:
+    name: Deploy Cloud Functions production
+    needs: approval
+    runs-on: ubuntu-latest
+    if: false  # XÓA khi đã fill secrets prod
+    defaults:
+      run:
+        working-directory: firebase/functions
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: firebase/functions/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Deploy Functions
+        uses: w9jds/firebase-action@v13.20.1
+        with:
+          args: deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_PROD }} --force
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}
+          PROJECT_PATH: firebase
+
+  deploy-rules-prod:
+    name: Deploy Firestore + Storage rules production
+    needs: approval
+    runs-on: ubuntu-latest
+    if: false  # XÓA khi đã fill secrets prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Deploy rules
+        uses: w9jds/firebase-action@v13.20.1
+        with:
+          args: deploy --only firestore:rules,firestore:indexes,storage:rules --project ${{ secrets.FIREBASE_PROJECT_PROD }} --force
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}
+          PROJECT_PATH: firebase
+
+  tag-release:
+    name: Tag git release + generate changelog
+    needs: [approval]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            LAST_TAG=$(git tag --sort=-v:refname | head -n1 || echo "v0.0.0")
+            VERSION=$(echo "$LAST_TAG" | awk -F. -v OFS=. '{$NF = $NF + 1; print}')
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          LAST_TAG=$(git tag --sort=-v:refname | head -n1 || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" HEAD)
+          else
+            COMMITS=$(git log "$LAST_TAG..HEAD" --pretty=format:"- %s (%h)")
+          fi
+          echo "Changelog từ $LAST_TAG đến HEAD:"
+          echo "$COMMITS"
+          {
+            echo "changelog<<EOF"
+            echo "$COMMITS"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Meep ${{ steps.version.outputs.version }}
+          body: |
+            ## Thay đổi trong release này
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ---
+            Commit: ${{ github.sha }}
+          draft: false
+          prerelease: false

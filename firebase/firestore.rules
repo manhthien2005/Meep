@@ -1,0 +1,98 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===== Helpers =====
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthed() && request.auth.uid == uid;
+    }
+
+    // pair_id is the alphabetically-sorted "uidA_uidB"
+    function pairId(a, b) {
+      return a < b ? a + '_' + b : b + '_' + a;
+    }
+
+    function isFriend(uidA, uidB) {
+      return exists(
+        /databases/$(database)/documents/friendships/$(pairId(uidA, uidB))
+      );
+    }
+
+    // ===== /users/{uid} =====
+    match /users/{uid} {
+      allow read: if isAuthed();
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(
+          ['displayName', 'avatarUrl', 'createdAt']
+        );
+      allow update: if isOwner(uid);
+      allow delete: if false;  // no client delete; use a Function
+
+      match /private/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /notifications/{notifId} {
+        allow read: if isOwner(uid);
+        allow create, update, delete: if false;  // server-side only
+      }
+    }
+
+    // ===== /posts/{postId} =====
+    match /posts/{postId} {
+      allow read: if isAuthed() && (
+        isOwner(resource.data.authorId) ||
+        isFriend(request.auth.uid, resource.data.authorId)
+      );
+
+      allow create: if isOwner(request.resource.data.authorId)
+        && request.resource.data.keys().hasAll(
+          ['authorId', 'caption', 'imageUrl', 'createdAt']
+        )
+        && request.resource.data.caption is string
+        && request.resource.data.caption.size() <= 200
+        && request.resource.data.imageUrl is string;
+
+      allow update: if isOwner(resource.data.authorId)
+        && request.resource.data.authorId == resource.data.authorId;
+
+      allow delete: if isOwner(resource.data.authorId);
+    }
+
+    // ===== /friendships/{pairId} =====
+    match /friendships/{pid} {
+      // Both members can read; nobody else can.
+      allow read: if isAuthed() && (
+        request.auth.uid == resource.data.uidA ||
+        request.auth.uid == resource.data.uidB
+      );
+      // Server-side creation only (via friend_request acceptance Function).
+      allow create, update, delete: if false;
+    }
+
+    // ===== /friend_requests/{requestId} =====
+    match /friend_requests/{requestId} {
+      allow read: if isAuthed() && (
+        request.auth.uid == resource.data.fromUid ||
+        request.auth.uid == resource.data.toUid
+      );
+      allow create: if isOwner(request.resource.data.fromUid)
+        && request.resource.data.keys().hasAll(
+          ['fromUid', 'toUid', 'status', 'createdAt']
+        )
+        && request.resource.data.status == 'pending';
+      // Status transitions handled server-side.
+      allow update, delete: if false;
+    }
+
+    // ===== Default deny =====
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "<your-staging-project-id>",
+    "staging": "<your-staging-project-id>",
+    "prod": "<your-prod-project-id>"
+  },
+  "_comment": "Copy this file to .firebaserc and fill in real project IDs. Do NOT commit .firebaserc."
+}

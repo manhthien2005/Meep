@@ -1,0 +1,38 @@
+#!/usr/bin/env sh
+# Husky pre-push hook
+# Validate branch name format trước khi push.
+# Format: <type>/<DevName>/<short-desc>
+# Examples: feature/ThienPDM/auth-google, fix/KhoaLND/feed-empty
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Cho phép protected branches (chỉ leader push, không qua hook này)
+if echo "$BRANCH" | grep -qE '^(develop|deploy|main|master|HEAD)$'; then
+  echo "✓ Đang ở branch chính: $BRANCH"
+  exit 0
+fi
+
+PATTERN='^(feature|fix|chore|refactor|docs|test|style|perf|build|ci|revert)/[A-Z][a-zA-Z]+[A-Z]+/[a-z][a-z0-9-]*$'
+
+if ! echo "$BRANCH" | grep -qE "$PATTERN"; then
+  echo ""
+  echo "❌ Branch name '$BRANCH' không đúng format."
+  echo ""
+  echo "   Format yêu cầu: <type>/<DevName>/<short-desc>"
+  echo ""
+  echo "   Type cho phép: feature, fix, chore, refactor, docs, test, style, perf, build, ci, revert"
+  echo "   DevName: PascalCase + 3 chữ viết tắt cuối, vd ThienPDM, KhoaLND, HoaiNT"
+  echo "   Short-desc: lowercase, kebab-case, English, ít nhất 1 từ"
+  echo ""
+  echo "   Ví dụ tốt:"
+  echo "     feature/ThienPDM/auth-google-signin"
+  echo "     fix/KhoaLND/feed-empty-state"
+  echo "     chore/HoaiNT/bump-firebase-deps"
+  echo ""
+  echo "   Đổi tên branch: git branch -m <new-name>"
+  echo "   Bypass khẩn cấp: git push --no-verify (KHÔNG khuyến khích)"
+  echo ""
+  exit 1
+fi
+
+echo "✓ Branch name OK: $BRANCH"

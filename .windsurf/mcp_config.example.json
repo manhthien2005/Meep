@@ -1,0 +1,18 @@
+{
+  "_comment_1": "Sample MCP config for Meep. Windsurf reads MCPs from ~/.codeium/windsurf/mcp_config.json (USER-LEVEL, not workspace-level).",
+  "_comment_2": "To activate: copy this file to ~/.codeium/windsurf/mcp_config.json (Windows: C:\\Users\\<you>\\.codeium\\windsurf\\mcp_config.json), then restart Windsurf or click 'Refresh' on the MCPs panel in Cascade.",
+  "_comment_3": "Curated minimal set. See `AGENTS.md` §8 for what was DELIBERATELY left out (filesystem, github, memory, postgres) and why.",
+
+  "mcpServers": {
+    "context7": {
+      "_comment_1": "Up-to-date library documentation lookup from upstash/context7. Free tier, no API key needed.",
+      "_comment_2": "Useful when working with rapidly-evolving SDKs (Flutter, Firebase, Riverpod, freezed) — prevents the agent hallucinating outdated APIs.",
+      "_comment_3": "In a prompt, just say 'use context7' or the agent will call it automatically when relevant.",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    }
+  }
+}

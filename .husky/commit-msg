@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Husky commit-msg hook
+# Chạy commitlint trên message vừa viết, block commit nếu không đúng format.
+
+npx --no -- commitlint --edit "$1"

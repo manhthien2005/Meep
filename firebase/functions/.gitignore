@@ -1,0 +1,8 @@
+node_modules/
+lib/
+coverage/
+.firebase/
+*.log
+firebase-debug.log
+firebase-debug.*.log
+.eslintcache
