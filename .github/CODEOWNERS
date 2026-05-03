@@ -1,31 +1,39 @@
 # CODEOWNERS — Meep
 # Mỗi PR cần approval từ CODEOWNERS tương ứng.
-# Anh là default reviewer cho mọi thứ. Khi tên 4 dev được fill in,
-# có thể chia ownership theo module để giảm bottleneck.
+# Anh là default reviewer cho mọi thứ. Khi 3 dev khác có GitHub username,
+# anh chia ownership theo module để giảm bottleneck.
+#
+# QUAN TRỌNG — phân biệt 2 khái niệm:
+#   - Dev name (theo AGENTS.md convention): PascalCase + abbreviation, vd `ThienPDM`, `KhoaLND`.
+#     Dùng trong: branch name (`feature/ThienPDM/auth-google`), tài liệu team, commit author.
+#   - GitHub username (dùng TẠI FILE NÀY): login GitHub thực, vd `manhthien2005`.
+#     Dùng trong: CODEOWNERS, PR @mention, issue assignee.
+#   Hai cái này KHÔNG GIỐNG NHAU. Không copy dev name vào file này.
 #
 # Format: <pattern> @<github-username>
 # Docs: https://docs.github.com/en/repositories/managing-your-repositories-settings-and-security/customizing-your-repository/about-code-owners
+# Verify: `gh api /repos/manhthien2005/Meep/codeowners/errors` — trả về errors nếu có.
 
 # Default — anh review tất cả nếu chưa có owner cụ thể
-* @ThienPDM
+* @manhthien2005
 
-# Module-specific (khi đã fill 4 tên dev thật, uncomment + replace placeholder)
-# /apps/mobile/lib/features/auth/      @ThienPDM @<DevName2>
-# /apps/mobile/lib/features/feed/      @<DevName2> @<DevName3>
-# /apps/mobile/lib/features/post/      @<DevName3>
-# /apps/mobile/lib/features/friend/    @<DevName4>
-# /apps/widget/                        @ThienPDM
-# /firebase/functions/                 @ThienPDM @<DevName2>
-# /firebase/firestore.rules            @ThienPDM
-# /firebase/storage.rules              @ThienPDM
+# Module-specific (khi đã biết GitHub username 3 dev khác, uncomment + thay `<gh-username-N>`)
+# /apps/mobile/lib/features/auth/      @manhthien2005 @<gh-username-2>
+# /apps/mobile/lib/features/feed/      @<gh-username-2> @<gh-username-3>
+# /apps/mobile/lib/features/post/      @<gh-username-3>
+# /apps/mobile/lib/features/friend/    @<gh-username-4>
+# /apps/widget/                        @manhthien2005
+# /firebase/functions/                 @manhthien2005 @<gh-username-2>
+# /firebase/firestore.rules            @manhthien2005
+# /firebase/storage.rules              @manhthien2005
 
 # Infra / config — chỉ leader review
-/.github/                              @ThienPDM
-/.husky/                               @ThienPDM
-/.windsurf/                            @ThienPDM
-/AGENTS.md                             @ThienPDM
-/CONTEXT.md                            @ThienPDM
-/commitlint.config.js                  @ThienPDM
-/package.json                          @ThienPDM
-/firebase/firebase.json                @ThienPDM
-/firebase/firestore.indexes.json       @ThienPDM
+/.github/                              @manhthien2005
+/.husky/                               @manhthien2005
+/.windsurf/                            @manhthien2005
+/AGENTS.md                             @manhthien2005
+/CONTEXT.md                            @manhthien2005
+/commitlint.config.js                  @manhthien2005
+/package.json                          @manhthien2005
+/firebase/firebase.json                @manhthien2005
+/firebase/firestore.indexes.json       @manhthien2005
