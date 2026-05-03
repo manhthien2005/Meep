@@ -37,14 +37,16 @@ Chi tiết tech decisions: [`docs/adr/`](docs/adr/).
 
 ## Team
 
-4 dev student capstone. Branch + commit format track per dev.
+4 dev student capstone. Branch + commit format track per dev (PascalCase + abbrev).
 
-| Tên | Vai trò |
-|---|---|
-| `ThienPDM` | Leader, default CODEOWNERS |
-| `<DevName2>` | (cập nhật) |
-| `<DevName3>` | (cập nhật) |
-| `<DevName4>` | (cập nhật) |
+| Dev name | GitHub | Tên đầy đủ | Specialty |
+|---|---|---|---|
+| `ThienPDM` | [@manhthien2005](https://github.com/manhthien2005) | Phan Điền Mạnh Thiên | Leader, default CODEOWNERS |
+| `KhoaLND` | [@CatS1mp](https://github.com/CatS1mp) | Lê Ngọc Đăng Khoa | Open (BE/UI flexible) |
+| `NganTNK` | [@JanaKimmm](https://github.com/JanaKimmm) | Trần Nguyễn Kim Ngân | UI / Design |
+| `HanDHG` | [@katheramp](https://github.com/katheramp) | Đào Huỳnh Gia Hân | UI / Design |
+
+> **Phân biệt** — `Dev name` (PascalCase) dùng cho branch + commit (vd `feature/KhoaLND/...`). `GitHub username` dùng trong CODEOWNERS + PR @mention. Hai cái KHÔNG giống nhau, không cần match.
 
 ## Setup nhanh
 
