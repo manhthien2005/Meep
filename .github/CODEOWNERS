@@ -17,23 +17,46 @@
 # Default — anh review tất cả nếu chưa có owner cụ thể
 * @manhthien2005
 
-# Module-specific (khi đã biết GitHub username 3 dev khác, uncomment + thay `<gh-username-N>`)
-# /apps/mobile/lib/features/auth/      @manhthien2005 @<gh-username-2>
-# /apps/mobile/lib/features/feed/      @<gh-username-2> @<gh-username-3>
-# /apps/mobile/lib/features/post/      @<gh-username-3>
-# /apps/mobile/lib/features/friend/    @<gh-username-4>
-# /apps/widget/                        @manhthien2005
-# /firebase/functions/                 @manhthien2005 @<gh-username-2>
-# /firebase/firestore.rules            @manhthien2005
-# /firebase/storage.rules              @manhthien2005
+# ============================================================
+# Module-specific ownership
+# Phân chia theo specialty + giảm bottleneck. Multi-owner = ANY ONE owner approve được.
+# ============================================================
+
+# BE-heavy features (Firebase + Native Android logic): leader + KhoaLND (Open)
+/apps/mobile/lib/features/auth/             @manhthien2005 @CatS1mp
+/apps/mobile/lib/features/friend/           @manhthien2005 @CatS1mp
+/apps/mobile/lib/features/camera/           @manhthien2005 @CatS1mp
+/apps/mobile/lib/features/post/             @manhthien2005 @CatS1mp
+/apps/mobile/lib/features/space/            @manhthien2005 @CatS1mp
+/apps/mobile/lib/features/rollcall/         @manhthien2005 @CatS1mp
+/apps/mobile/lib/features/notification/     @manhthien2005 @CatS1mp
+
+# UI-heavy features (Figma → Flutter widgets): leader + NganTNK + HanDHG
+/apps/mobile/lib/features/feed/             @manhthien2005 @JanaKimmm @katheramp
+/apps/mobile/lib/features/profile/          @manhthien2005 @JanaKimmm @katheramp
+/apps/mobile/lib/features/reaction/         @manhthien2005 @JanaKimmm @katheramp
+/apps/mobile/lib/features/diary/            @manhthien2005 @JanaKimmm @katheramp
+
+# Native Android (Kotlin AppWidget) — leader only (specialized)
+/apps/widget/                               @manhthien2005
+
+# Cloud Functions (BE): leader + KhoaLND
+/firebase/functions/                        @manhthien2005 @CatS1mp
+
+# Security-sensitive (rules + indexes) — leader only
+/firebase/firestore.rules                   @manhthien2005
+/firebase/storage.rules                     @manhthien2005
+/firebase/firestore.indexes.json            @manhthien2005
+
+# Core architecture (DI, theme, error, routing) — leader only
+/apps/mobile/lib/core/                      @manhthien2005
 
 # Infra / config — chỉ leader review
-/.github/                              @manhthien2005
-/.husky/                               @manhthien2005
-/.windsurf/                            @manhthien2005
-/AGENTS.md                             @manhthien2005
-/CONTEXT.md                            @manhthien2005
-/commitlint.config.js                  @manhthien2005
-/package.json                          @manhthien2005
-/firebase/firebase.json                @manhthien2005
-/firebase/firestore.indexes.json       @manhthien2005
+/.github/                                   @manhthien2005
+/.husky/                                    @manhthien2005
+/.windsurf/                                 @manhthien2005
+/AGENTS.md                                  @manhthien2005
+/CONTEXT.md                                 @manhthien2005
+/commitlint.config.js                       @manhthien2005
+/package.json                               @manhthien2005
+/firebase/firebase.json                     @manhthien2005

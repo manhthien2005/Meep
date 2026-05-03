@@ -57,9 +57,9 @@ Snapshot từ GitHub Projects "Group by Assignee" view. Bao gồm:
 | Dev | Task closed | Velocity (size sum) | Highlight contribution |
 |---|---|---|---|
 | ThienPDM | <số> | <size sum> | <vd: feature auth Google, ADR-0003> |
-| <Dev2> | ... | ... | ... |
-| <Dev3> | ... | ... | ... |
-| <Dev4> | ... | ... | ... |
+| KhoaLND | <số> | <size sum> | <vd: feature friends, share photo> |
+| NganTNK | <số> | <size sum> | <vd: UI feed, profile screen> |
+| HanDHG | <số> | <size sum> | <vd: UI diary, reaction picker> |
 
 Bonus: link tới GitHub Insights → Contributors snapshot (số commit per dev) cho cross-check.
 
