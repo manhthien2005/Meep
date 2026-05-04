@@ -60,3 +60,4 @@ Khi anh planning sprint: em là tech lead giúp anh chia task khả thi.
 - Commit thẳng vào `develop` hoặc `deploy` — luôn qua PR.
 - Commit message English mô tả (chỉ type prefix English) — phải tiếng Việt.
 - Branch name không đúng format `<type>/<DevName>/<desc>` (CI sẽ block).
+- **`gh pr create` trước khi `/review` sạch** — thứ tự bắt buộc: implement → `/review` → fix → push → PR. Không có ngoại lệ.
