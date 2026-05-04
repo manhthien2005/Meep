@@ -29,6 +29,9 @@ String? authRedirect({
   return null;
 }
 
+// NOTE: mỗi khi currentUidProvider emit giá trị mới, provider này rebuild và tạo
+// GoRouter mới → navigation stack reset. Cho MVP M1 chấp nhận được (chỉ xảy ra
+// lúc login/logout). Post-MVP nên refactor sang RouterNotifier + refreshListenable.
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
   final authState = ref.watch(currentUidProvider);
