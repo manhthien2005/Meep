@@ -8,6 +8,8 @@ description: Self-review code before merging — 5 axes (correctness, readabilit
 
 Workflow for reviewing already-written code (your own commit / branch / PR) before merge.
 
+> ⚠️ **Thứ tự bắt buộc:** `/build` (implement + commit) → `/review` (self-review) → `gh pr create` (tạo PR). KHÔNG tạo PR trước khi `/review` sạch.
+
 ## Pre-flight
 
 1. **→ Invoke skill `code-review-five-axis`** — full 5-axis framework + checklist + severity levels + output format.

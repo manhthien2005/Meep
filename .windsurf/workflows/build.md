@@ -105,8 +105,15 @@ DON'T silently deviate — future-you's context will be confused.
    npm test -- --coverage
    npm run lint
    ```
-2. **Suggest `/review`** before merging.
-3. **Mark feature complete** in the todo file.
+2. **Run `/review` — MANDATORY before creating PR.** Do NOT open a PR until review is clean (no 🔴, 🟡 addressed or documented).
+3. **Only after `/review` passes** → create PR:
+   ```bash
+   git push origin <branch>
+   gh pr create --base develop --title "..." --body "..."
+   ```
+4. **Mark feature complete** in the todo file.
+
+> ⛔ Anti-pattern: `gh pr create` trước `/review` = skip quality gate. PR reviewer sẽ catch issues mà lẽ ra self-review phải catch trước.
 
 ## Output per task
 
@@ -123,4 +130,5 @@ DON'T silently deviate — future-you's context will be confused.
 | 5 consecutive "WIP" commits | Dirty history, can't revert |
 | Mix 3 features in one commit | Hard to review, no granular rollback |
 | Skip RED verify | Test might be testing the wrong thing |
+| `gh pr create` trước `/review` | Skip quality gate — reviewer catches issues bạn lẽ ra đã tự catch được |
 | "While I'm here" rename in 5 unrelated files | Scope creep |
