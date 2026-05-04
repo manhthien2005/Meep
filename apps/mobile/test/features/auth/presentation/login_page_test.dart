@@ -18,7 +18,10 @@ class _FakeAuthRepository implements AuthRepository {
   Stream<String?> watchUid() => Stream.value(_uid);
 
   @override
-  Future<void> signInWithEmail({required String email, required String password}) async {
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
     _uid = 'test-uid';
   }
 

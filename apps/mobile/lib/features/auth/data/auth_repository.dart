@@ -12,7 +12,10 @@ abstract class AuthRepository {
   Stream<String?> watchUid();
 
   /// Sign in with email + password. Throws [UnauthenticatedError] on bad creds.
-  Future<void> signInWithEmail({required String email, required String password});
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  });
 
   /// Sign in with Apple. Throws [UnauthenticatedError] on cancel.
   Future<void> signInWithApple();
