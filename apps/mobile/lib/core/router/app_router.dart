@@ -14,24 +14,32 @@ import 'package:meep/features/home/presentation/home_page.dart';
 
 part 'app_router.g.dart';
 
-@riverpod
+/// Pure redirect logic — testable without GoRouter.
+String? authRedirect({
+  required bool isLoading,
+  required bool isSignedIn,
+  required String location,
+}) {
+  if (isLoading) return null;
+  final onAuthRoute = location.startsWith('/login') ||
+      location.startsWith('/signup') ||
+      location == '/intro';
+  if (isSignedIn && onAuthRoute) return '/home';
+  if (!isSignedIn && !onAuthRoute) return '/intro';
+  return null;
+}
+
+@Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
   final authState = ref.watch(currentUidProvider);
 
   return GoRouter(
     initialLocation: '/intro',
-    redirect: (context, state) {
-      if (authState.isLoading) return null;
-
-      final isSignedIn = authState.valueOrNull != null;
-      final onAuthRoute = state.matchedLocation.startsWith('/login') ||
-          state.matchedLocation.startsWith('/signup') ||
-          state.matchedLocation == '/intro';
-
-      if (isSignedIn && onAuthRoute) return '/home';
-      if (!isSignedIn && !onAuthRoute) return '/intro';
-      return null;
-    },
+    redirect: (context, state) => authRedirect(
+      isLoading: authState.isLoading,
+      isSignedIn: authState.valueOrNull != null,
+      location: state.matchedLocation,
+    ),
     routes: [
       GoRoute(path: '/intro', builder: (_, __) => const IntroPage()),
       GoRoute(path: '/home', builder: (_, __) => const HomePage()),
