@@ -61,3 +61,4 @@ Khi anh planning sprint: em là tech lead giúp anh chia task khả thi.
 - Commit message English mô tả (chỉ type prefix English) — phải tiếng Việt.
 - Branch name không đúng format `<type>/<DevName>/<desc>` (CI sẽ block).
 - **`gh pr create` trước khi `/review` sạch** — thứ tự bắt buộc: implement → `/review` → fix → push → PR. Không có ngoại lệ.
+- **Commit file infra/config trên feature branch** — `.windsurf/`, `.github/`, `docs/adr/`, `scripts/` KHÔNG thuộc feature branch. Trước khi commit, kiểm tra `git branch --show-current`. Nếu đang ở `feature/*` mà muốn commit infra → stash → tạo branch `chore/<Dev>/<desc>` từ `develop` → commit ở đó.
