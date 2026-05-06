@@ -4,105 +4,107 @@ trigger: always_on
 
 # Dev Code Standards — Walking Skeleton Pattern
 
-Meep dùng **Walking Skeleton**: Leader tạo "bộ khung chạy được" trước mỗi sprint,
-FE và BE điền vào song song. App phải compile và chạy được ở mọi commit.
+Meep uses **Walking Skeleton**: the leader creates a runnable shell at the start of each
+sprint; FE and BE fill it in parallel. The app must compile and run at every commit.
 
-## Vai trò trong pattern
+## Role responsibilities
 
-| Vai trò | Làm gì | Không làm gì |
+| Role | Does | Does NOT do |
 |---|---|---|
 | **Leader** | Define freezed models + abstract interfaces + stub providers + wire router | Implement Firebase / UI screens |
-| **KhoaLND (BE)** | Implement Firebase repositories + controllers | Tự define model mới / đổi interface |
-| **HanDHG / NganTNK (FE)** | Implement UI screens dùng typed mock data | Call Firebase trực tiếp / tự bịa model |
+| **KhoaLND (BE)** | Implement Firebase repositories + controllers | Define new models / change interfaces unilaterally |
+| **HanDHG / NganTNK (FE)** | Implement UI screens using typed mock data | Call Firebase directly / invent ad-hoc models |
 
-## 3 rule không thương lượng
+## 3 non-negotiable rules
 
-### 1. Skeleton rule — App luôn chạy được
+### 1. Skeleton rule — App always runs
 
-Mọi commit phải compile sạch và app chạy được. Stub trả mock hoặc throw `UnimplementedError` — không để broken import, không comment-out code để bypass lỗi.
+Every commit must compile cleanly and the app must launch. Stubs return mock data or
+throw `UnimplementedError` — no broken imports, no commented-out code to bypass errors.
 
 ```dart
-// ✅ Stub đúng cách
+// ✅ Correct stub
 @Riverpod(keepAlive: true)
 AuthRepository authRepository(Ref ref) => throw UnimplementedError(
   'wire FirebaseAuthRepository in main.dart',
 );
 
-// ❌ Không để thế này
+// ❌ Never do this
 // import 'package:meep/features/auth/data/firebase_auth_repository.dart';
 ```
 
-### 2. Typed mock rule — FE dùng đúng freezed model
+### 2. Typed mock rule — FE uses the leader-defined freezed model
 
-FE mock data bằng đúng type do leader define. Không tự bịa `Map<String, dynamic>`.
-Dart compiler sẽ bắt mismatch tại compile time — không phải runtime.
+FE mock data must use the exact type defined by the leader. Never invent a
+`Map<String, dynamic>`. The Dart compiler catches mismatches at compile time — not runtime.
 
 ```dart
 // ✅ Typed mock
 final mockUser = UserProfile(
   uid: 'mock-uid',
-  displayName: 'Thiên',
+  displayName: 'Thien',
   username: 'thienpdm',
   createdAt: DateTime.now(),
 );
 
-// ❌ Bịa Map — compiler không bắt được mismatch
-final mockUser = {'name': 'Thiên', 'avatar': 'url'};
+// ❌ Ad-hoc map — compiler cannot catch mismatches
+final mockUser = {'name': 'Thien', 'avatar': 'url'};
 ```
 
-### 3. Freeze-before-FE rule — Model merge vào develop trước
+### 3. Freeze-before-FE rule — Models land on develop before FE starts
 
-Models (freezed) và interfaces (abstract class) phải có trên `develop` trước khi
-FE bắt đầu implement screen đó. FE không tự define model.
+Freezed models and abstract interfaces must be merged into `develop` before any FE dev
+begins implementing a screen that depends on them. FE devs do not define models.
 
-Thứ tự bắt buộc mỗi feature:
+Mandatory order per feature:
 ```
-Leader: define models + interfaces → merge vào develop
+Leader: define models + interfaces → merge into develop
     ↓
-FE và BE start song song (pull từ develop)
+FE and BE start in parallel (pull from develop)
     ↓
-Leader: wire real implementation trong main.dart
+Leader: wire real implementation in main.dart (integration)
 ```
 
 ## Ownership principle
 
-Mọi file agent tạo hoặc sửa đều là **code của dev đó**. Đọc và hiểu trước khi commit.
-Không accept file chưa đọc chỉ vì "agent viết chắc đúng rồi".
+Every file the agent creates or modifies is **that dev's code**. Read and understand it
+before committing. Do not accept a file just because "the agent probably got it right".
 
-Khi nhận task: đọc file liên quan trước, hiểu context, rồi mới prompt agent.
+When starting a task: read the relevant files first, understand the context, then prompt
+the agent.
 
-## Stub/placeholder standard
+## Stub / placeholder standard
 
-Mọi stub phải có TODO chỉ rõ ai làm, task nào:
+Every stub must have a TODO that identifies the assignee and task:
 
 ```dart
-// TODO(T8/HanDHG): implement IntroPage theo Figma — Trang giới thiệu
-// TODO(T2/KhoaLND): implement FirebaseAuthRepository — xem docs/specs/auth.md
+// TODO(T8/HanDHG): implement IntroPage per Figma — intro screen
+// TODO(T2/KhoaLND): implement FirebaseAuthRepository — see docs/specs/auth.md
 ```
 
-Format: `// TODO(<task-id>/<DevName>): <mô tả ngắn>`
+Format: `// TODO(<task-id>/<DevName>): <short description>`
 
-TODO không có `<task-id>/<DevName>` = **không hợp lệ** — sẽ bị flag trong review.
+A TODO without `<task-id>/<DevName>` is **invalid** and will be flagged in review.
 
-## Khi nào hỏi leader trước khi làm
+## When to ask the leader before proceeding
 
-Bắt buộc hỏi leader (không tự quyết) khi:
+Always ask the leader (do not decide unilaterally) when:
 
-- Muốn thêm field mới vào freezed model ảnh hưởng nhiều dev
-- Muốn thay đổi signature của abstract interface
-- Muốn thêm Firestore collection / index mới
-- Muốn thêm dependency (pub package) vào `pubspec.yaml`
-- Phát hiện contract không khớp với Figma (report, không tự sửa)
+- Adding a new field to a freezed model that affects multiple devs
+- Changing the signature of an abstract interface
+- Adding a new Firestore collection or index
+- Adding a new pub package dependency to `pubspec.yaml`
+- Discovering that the contract does not match Figma (report it — do not fix unilaterally)
 
-## Màn hình phức tạp — leader define thêm trước khi FE mock
+## Complex screens — leader defines extra context before FE mocks
 
-Một số patterns Figma không hiện rõ, cần leader quyết định trước:
+Some patterns are not visible in Figma and require a leader decision before FE starts:
 
-| Màn hình | Cần leader quyết định thêm |
+| Screen | Leader must decide first |
 |---|---|
 | Feed, Space | Fan-out vs query strategy → Firestore collection path |
 | Reaction | Optimistic UI contract → error rollback behavior |
-| Pagination | Cursor strategy → `startAfterDocument` field trong model |
+| Pagination | Cursor strategy → `startAfterDocument` field in model |
 
-Với các màn hình này: FE hỏi leader 30 phút trước khi bắt đầu mock.
-Với Auth, Profile, Diary, Camera UI: freezed model là đủ, FE start luôn.
+For these screens: FE checks with the leader (30 min sync) before starting to mock.
+For Auth, Profile, Diary, Camera UI: the freezed model is sufficient — FE can start immediately.
