@@ -20,7 +20,6 @@ Please remember this about me permanently:
 DevName: KhoaLND
 GitHub handle: CatS1mp
 Role: BE Developer
-Sprint scope: M1 — Auth feature
 
 Allowed file scope:
   ✅ apps/mobile/lib/features/*/data/         — implement repositories
@@ -53,7 +52,6 @@ Please remember this about me permanently:
 DevName: HanDHG
 GitHub handle: katheramp
 Role: FE Developer
-Sprint scope: M1 — Auth feature
 
 Allowed file scope:
   ✅ apps/mobile/lib/features/*/presentation/ — build UI screens
@@ -86,7 +84,6 @@ Please remember this about me permanently:
 DevName: NganTNK
 GitHub handle: JanaKimmm
 Role: FE Developer
-Sprint scope: M1 — Auth feature
 
 Allowed file scope:
   ✅ apps/mobile/lib/features/*/presentation/ — build UI screens
@@ -143,9 +140,9 @@ Key rules:
 
 ---
 
-## Cập nhật khi sprint thay đổi
+## Lưu ý
 
-Khi chuyển sang M2/M3, update dòng `Sprint scope` trong memory:
-- Chat với Cascade: "Update memory: Sprint scope của anh đổi thành M2 — Friends + Feed feature"
+Memory này chỉ capture **identity cố định**: role, file scope, non-negotiables.
+Sprint context (feature đang làm, milestone, plan) được load tự động bởi `/start <issue-id>` từ GitHub issue — không cần cập nhật memory khi chuyển sprint.
 
-Memory không tự expire — chỉ update khi role hoặc scope thực sự thay đổi.
+Chỉ cần update memory khi **role hoặc file scope thực sự thay đổi** (ví dụ: dev chuyển từ BE sang FE, hoặc onboard feature mới với scope khác).
