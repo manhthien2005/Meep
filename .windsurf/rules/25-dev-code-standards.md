@@ -1,0 +1,110 @@
+---
+trigger: always_on
+---
+
+# Dev Code Standards — Walking Skeleton Pattern
+
+Meep uses **Walking Skeleton**: the leader creates a runnable shell at the start of each
+sprint; FE and BE fill it in parallel. The app must compile and run at every commit.
+
+## Role responsibilities
+
+| Role | Does | Does NOT do |
+|---|---|---|
+| **Leader** | Define freezed models + abstract interfaces + stub providers + wire router | Implement Firebase / UI screens |
+| **KhoaLND (BE)** | Implement Firebase repositories + controllers | Define new models / change interfaces unilaterally |
+| **HanDHG / NganTNK (FE)** | Implement UI screens using typed mock data | Call Firebase directly / invent ad-hoc models |
+
+## 3 non-negotiable rules
+
+### 1. Skeleton rule — App always runs
+
+Every commit must compile cleanly and the app must launch. Stubs return mock data or
+throw `UnimplementedError` — no broken imports, no commented-out code to bypass errors.
+
+```dart
+// ✅ Correct stub
+@Riverpod(keepAlive: true)
+AuthRepository authRepository(Ref ref) => throw UnimplementedError(
+  'wire FirebaseAuthRepository in main.dart',
+);
+
+// ❌ Never do this
+// import 'package:meep/features/auth/data/firebase_auth_repository.dart';
+```
+
+### 2. Typed mock rule — FE uses the leader-defined freezed model
+
+FE mock data must use the exact type defined by the leader. Never invent a
+`Map<String, dynamic>`. The Dart compiler catches mismatches at compile time — not runtime.
+
+```dart
+// ✅ Typed mock
+final mockUser = UserProfile(
+  uid: 'mock-uid',
+  displayName: 'Thien',
+  username: 'thienpdm',
+  createdAt: DateTime.now(),
+);
+
+// ❌ Ad-hoc map — compiler cannot catch mismatches
+final mockUser = {'name': 'Thien', 'avatar': 'url'};
+```
+
+### 3. Freeze-before-FE rule — Models land on develop before FE starts
+
+Freezed models and abstract interfaces must be merged into `develop` before any FE dev
+begins implementing a screen that depends on them. FE devs do not define models.
+
+Mandatory order per feature:
+```
+Leader: define models + interfaces → merge into develop
+    ↓
+FE and BE start in parallel (pull from develop)
+    ↓
+Leader: wire real implementation in main.dart (integration)
+```
+
+## Ownership principle
+
+Every file the agent creates or modifies is **that dev's code**. Read and understand it
+before committing. Do not accept a file just because "the agent probably got it right".
+
+When starting a task: read the relevant files first, understand the context, then prompt
+the agent.
+
+## Stub / placeholder standard
+
+Every stub must have a TODO that identifies the assignee and task:
+
+```dart
+// TODO(T8/HanDHG): implement IntroPage per Figma — intro screen
+// TODO(T2/KhoaLND): implement FirebaseAuthRepository — see docs/specs/auth.md
+```
+
+Format: `// TODO(<task-id>/<DevName>): <short description>`
+
+A TODO without `<task-id>/<DevName>` is **invalid** and will be flagged in review.
+
+## When to ask the leader before proceeding
+
+Always ask the leader (do not decide unilaterally) when:
+
+- Adding a new field to a freezed model that affects multiple devs
+- Changing the signature of an abstract interface
+- Adding a new Firestore collection or index
+- Adding a new pub package dependency to `pubspec.yaml`
+- Discovering that the contract does not match Figma (report it — do not fix unilaterally)
+
+## Complex screens — leader defines extra context before FE mocks
+
+Some patterns are not visible in Figma and require a leader decision before FE starts:
+
+| Screen | Leader must decide first |
+|---|---|
+| Feed, Space | Fan-out vs query strategy → Firestore collection path |
+| Reaction | Optimistic UI contract → error rollback behavior |
+| Pagination | Cursor strategy → `startAfterDocument` field in model |
+
+For these screens: FE checks with the leader (30 min sync) before starting to mock.
+For Auth, Profile, Diary, Camera UI: the freezed model is sufficient — FE can start immediately.
