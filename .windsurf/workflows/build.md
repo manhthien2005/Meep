@@ -13,7 +13,14 @@ Implement task by task from `tasks/todo-<feature>.md`. Each task = one Red-Green
 1. **Invoke skills:** `tdd` (primary), `karpathy-guidelines`, plus `flutter-firebase-patterns` (if Flutter) or `nodejs-ts-backend` (if BE).
 2. **Read** `docs/plans/<feature>.md` and `tasks/todo-<feature>.md`.
 3. **Branch** must be a feature branch matching `<type>/<DevName>/<short-desc>` (vd `feature/ThienPDM/auth-google-signin`) — see `.windsurf/rules/20-stack-conventions.md`. NOT `develop` or `deploy`.
-4. **Identify** the next task: first `- [ ]` not ticked.
+   ```bash
+   git branch --show-current   # must NOT be develop or deploy
+   ```
+4. **Infra-file guard** — before touching ANY file under `.windsurf/`, `.github/`, `docs/adr/`, `scripts/`:
+   - Verify current branch is `chore/<DevName>/...` (not a `feature/` branch).
+   - If on a `feature/` branch → **STOP**. Stash changes, create `chore/<DevName>/<desc>` from `develop`, commit infra there, open a separate PR.
+   - Lesson: PR #27 mixed infra + feature → required painful cherry-pick to untangle.
+5. **Identify** the next task: first `- [ ]` not ticked.
 
 ## Per-task workflow
 
@@ -52,9 +59,13 @@ npm run lint
 Conventional Commits, ≤ 50-char subject, imperative:
 
 ```bash
+git branch --show-current          # confirm still on feature branch
+git diff --name-only --cached      # scan staged files before committing
 git add <specific files>
 git commit -m "feat(<scope>): <description>"
 ```
+
+**Before `git add`:** scan staged files. If any path starts with `.windsurf/`, `.github/`, `docs/adr/`, `scripts/` → do NOT add on a `feature/` branch. Move them to a `chore/` branch first.
 
 Allowed types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `perf`, `style`. Body (optional) explains **why**, not what.
 
