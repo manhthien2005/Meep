@@ -48,7 +48,7 @@ $updatedSection = $section -replace '- \[ \]', '- [x]'
 $newBody = $before + $updatedSection + $after
 
 # Write temp file (UTF-8 no BOM) and update issue
-$tempFile = [System.IO.Path]::GetTempFileName() + ".md"
+$tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString() + ".md")
 [System.IO.File]::WriteAllText($tempFile, $newBody, [System.Text.UTF8Encoding]::new($false))
 
 gh issue edit $IssueNum --repo $repo --body-file $tempFile 2>&1 | Out-Null

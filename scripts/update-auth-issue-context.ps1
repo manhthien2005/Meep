@@ -116,7 +116,7 @@ foreach ($num in ($issueMap.Keys | Sort-Object)) {
 
     $newBody = $body -replace [regex]::Escape($insertBeforePattern), ($issueMap[$num] + $insertBeforePattern)
 
-    $tempFile = [System.IO.Path]::GetTempFileName() + ".md"
+    $tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString() + ".md")
     [System.IO.File]::WriteAllText($tempFile, $newBody, [System.Text.UTF8Encoding]::new($false))
 
     gh issue edit $num --repo $repo --body-file $tempFile 2>&1 | Out-Null

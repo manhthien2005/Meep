@@ -11,7 +11,7 @@ $repo = "manhthien2005/Meep"
 
 function Update-Issue {
     param([int]$num, [string]$body)
-    $tempFile = [System.IO.Path]::GetTempFileName() + ".md"
+    $tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString() + ".md")
     [System.IO.File]::WriteAllText($tempFile, $body, [System.Text.UTF8Encoding]::new($false))
     gh issue edit $num --repo $repo --body-file $tempFile 2>&1 | Out-Null
     Remove-Item $tempFile -ErrorAction SilentlyContinue
