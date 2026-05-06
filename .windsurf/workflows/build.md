@@ -13,7 +13,14 @@ Implement task by task from `tasks/todo-<feature>.md`. Each task = one Red-Green
 1. **Invoke skills:** `tdd` (primary), `karpathy-guidelines`, plus `flutter-firebase-patterns` (if Flutter) or `nodejs-ts-backend` (if BE).
 2. **Read** `docs/plans/<feature>.md` and `tasks/todo-<feature>.md`.
 3. **Branch** must be a feature branch matching `<type>/<DevName>/<short-desc>` (vd `feature/ThienPDM/auth-google-signin`) — see `.windsurf/rules/20-stack-conventions.md`. NOT `develop` or `deploy`.
-4. **Identify** the next task: first `- [ ]` not ticked.
+   ```bash
+   git branch --show-current   # must NOT be develop or deploy
+   ```
+4. **Infra-file guard** — before touching ANY file under `.windsurf/`, `.github/`, `docs/adr/`, `scripts/`:
+   - Verify current branch is `chore/<DevName>/...` (not a `feature/` branch).
+   - If on a `feature/` branch → **STOP**. Stash changes, create `chore/<DevName>/<desc>` from `develop`, commit infra there, open a separate PR.
+   - Lesson: PR #27 mixed infra + feature → required painful cherry-pick to untangle.
+5. **Identify** the next task: first `- [ ]` not ticked.
 
 ## Per-task workflow
 
@@ -52,9 +59,13 @@ npm run lint
 Conventional Commits, ≤ 50-char subject, imperative:
 
 ```bash
+git branch --show-current          # confirm still on feature branch
+git diff --name-only --cached      # scan staged files before committing
 git add <specific files>
 git commit -m "feat(<scope>): <description>"
 ```
+
+**Before `git add`:** scan staged files. If any path starts with `.windsurf/`, `.github/`, `docs/adr/`, `scripts/` → do NOT add on a `feature/` branch. Move them to a `chore/` branch first.
 
 Allowed types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `perf`, `style`. Body (optional) explains **why**, not what.
 
@@ -105,13 +116,31 @@ DON'T silently deviate — future-you's context will be confused.
    npm test -- --coverage
    npm run lint
    ```
-2. **Run `/review` — MANDATORY before creating PR.** Do NOT open a PR until review is clean (no 🔴, 🟡 addressed or documented).
-3. **Only after `/review` passes** → create PR:
+
+2. **Tick issue checklist + set status to Review:**
+   ```bash
+   # Mark all acceptance criteria as done on GitHub issue
+   pwsh -File scripts/tick-issue-checklist.ps1 -IssueNum <issue-id>
+
+   # Move issue to "Review" on the project board
+   pwsh -File scripts/set-issue-status.ps1 -IssueNum <issue-id> -Status "Review"
+   ```
+
+3. **Run `/review` — MANDATORY before creating PR.** Do NOT open a PR until review is clean (no 🔴, 🟡 addressed or documented).
+
+4. **Only after `/review` passes** → create PR with auto-generated body:
    ```bash
    git push origin <branch>
-   gh pr create --base develop --title "..." --body "..."
+
+   # Generate PR body from commits + issue link (PowerShell on Windows)
+   $changes = (git log develop..HEAD --oneline) -replace '^', '- '
+   $prBody = "## Thay đổi`n$($changes -join "`n")`n`n## Issue liên quan`nCloses #<issue-id>`n`n## Checklist`n- [ ] Tests pass (flutter test / npm test)`n- [ ] flutter analyze / npm run lint clean`n- [ ] /review sạch (không còn 🔴)`n- [ ] Acceptance criteria ticked trên issue"
+   gh pr create --base develop `
+     --title "feat(<scope>): <mô tả tiếng Việt>" `
+     --body $prBody
    ```
-4. **Mark feature complete** in the todo file.
+
+5. **Mark feature complete** in the todo file.
 
 > ⛔ Anti-pattern: `gh pr create` trước `/review` = skip quality gate. PR reviewer sẽ catch issues mà lẽ ra self-review phải catch trước.
 

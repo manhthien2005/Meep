@@ -56,6 +56,19 @@ Nếu là bug → dùng template "Báo cáo bug".
 - `firebase/firestore.rules` / `firebase/storage.rules`
 - `apps/mobile/android/app/src/main/kotlin/...` (nếu touch widget native)
 
+## Files phải đọc trước (context)
+
+<!--
+Danh sách files agent/dev PHẢI đọc để hiểu existing contract trước khi bắt đầu code.
+Thường là: abstract interfaces, freezed models, providers liên quan, error types.
+Ví dụ:
+  - `lib/features/auth/data/auth_repository.dart` — existing interface + method signatures
+  - `lib/core/error/app_error.dart` — AppError hierarchy cần implement đúng
+  - `lib/features/auth/application/auth_controller.dart` — xem provider đang expect gì
+-->
+
+- 
+
 ## Dependencies / blockers
 
 <!-- Issue/PR khác phải xong trước task này. Để trống nếu không có. -->

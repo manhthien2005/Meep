@@ -63,6 +63,8 @@ Meep/
 ├── services/                  # OPTIONAL self-hosted BE (does not exist yet)
 │
 ├── docs/
+│   ├── team-onboarding/           # onboarding docs + per-dev memory bootstrap
+│   │   └── dev-memory-bootstrap.md   # paste to Cascade once per dev machine to set identity
 │   ├── team-workflow.md       # full team onboarding doc (read FIRST nếu là dev mới)
 │   ├── specs/                 # /spec workflow output
 │   ├── plans/                 # /plan workflow output
@@ -75,6 +77,12 @@ Meep/
 │       └── 0003-task-management-process.md
 │
 ├── tasks/                     # short-lived TODO/checklist files per feature
+│
+├── scripts/                   # utility PowerShell scripts (issue management, GitHub Project setup)
+│   ├── set-issue-status.ps1       # update Project v2 Status field (Backlog/In Progress/Review/Done)
+│   ├── tick-issue-checklist.ps1   # mark acceptance criteria done in GitHub issue
+│   ├── restore-auth-issue-bodies.ps1  # one-time restore auth sub-issues #20-26
+│   └── setup-*.ps1 / create-*.ps1    # project scaffolding (run once by leader)
 │
 ├── .github/
 │   ├── CODEOWNERS             # anh = default reviewer cho mọi path
@@ -95,7 +103,7 @@ Meep/
     ├── hooks/                 # Python hook scripts
     ├── rules/                 # 10 rule files (always_on + glob-scoped)
     ├── skills/                # 10 SKILL.md folders (TDD, debugging, ...)
-    ├── workflows/             # 8 slash commands (/spec /plan /build /test /review /debug /fix-issue /deploy)
+    ├── workflows/             # 9 slash commands (/start /spec /plan /build /test /review /debug /fix-issue /deploy)
     └── mcp_config.example.json  # sample MCP servers (copy to user-level path — see §9)
 ```
 
