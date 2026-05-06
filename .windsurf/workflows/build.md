@@ -132,21 +132,12 @@ DON'T silently deviate — future-you's context will be confused.
    ```bash
    git push origin <branch>
 
-   # Generate PR body from commits + issue link
-   COMMITS=$(git log develop..HEAD --oneline)
-   gh pr create --base develop \
-     --title "feat(<scope>): <mô tả tiếng Việt>" \
-     --body "## Thay đổi
-   $(git log develop..HEAD --oneline | sed 's/^/- /')
-
-   ## Issue liên quan
-   Closes #<issue-id>
-
-   ## Checklist
-   - [ ] Tests pass (flutter test / npm test)
-   - [ ] flutter analyze / npm run lint clean
-   - [ ] /review sạch (không còn 🔴)
-   - [ ] Acceptance criteria ticked trên issue"
+   # Generate PR body from commits + issue link (PowerShell on Windows)
+   $changes = (git log develop..HEAD --oneline) -replace '^', '- '
+   $prBody = "## Thay đổi`n$($changes -join "`n")`n`n## Issue liên quan`nCloses #<issue-id>`n`n## Checklist`n- [ ] Tests pass (flutter test / npm test)`n- [ ] flutter analyze / npm run lint clean`n- [ ] /review sạch (không còn 🔴)`n- [ ] Acceptance criteria ticked trên issue"
+   gh pr create --base develop `
+     --title "feat(<scope>): <mô tả tiếng Việt>" `
+     --body $prBody
    ```
 
 5. **Mark feature complete** in the todo file.
