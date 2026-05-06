@@ -77,11 +77,15 @@ Branch format: `feature/<DevName>/<short-desc>`
 git checkout -b feature/<DevName>/<short-desc> origin/develop
 ```
 
-DevName mapping (from team memory):
-- ThienPDM → leader
-- KhoaLND → BE
-- HanDHG → FE
-- NganTNK → FE
+DevName mapping (GitHub handle → DevName):
+| GitHub handle | DevName | Role |
+|---|---|---|
+| `manhthien2005` | `ThienPDM` | Leader |
+| `CatS1mp` | `KhoaLND` | BE |
+| `katheramp` | `HanDHG` | FE |
+| `JanaKimmm` | `NganTNK` | FE |
+
+Resolve DevName from the assignee fetched in Step 1. If the assignee is not in this table → ask: "DevName của bạn là gì?"
 
 ## Step 7 — Summary + handoff to /build
 
