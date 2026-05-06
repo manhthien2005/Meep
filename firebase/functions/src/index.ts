@@ -28,7 +28,7 @@ const sendFriendRequestSchema = z.object({
  *   - write the request doc with serverTimestamp()
  *   - send an FCM notification to the target
  */
-export const sendFriendRequest = onCall(async (request) => {
+export const sendFriendRequest = onCall((request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Login required');
   }
@@ -62,7 +62,7 @@ export const sendFriendRequest = onCall(async (request) => {
  */
 export const onPostCreated = onDocumentCreated(
   { document: 'posts/{postId}', region: 'asia-southeast1' },
-  async (event) => {
+  (event) => {
     const post = event.data?.data();
     if (!post) return;
     // TODO(impl): see comment above.

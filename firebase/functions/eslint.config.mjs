@@ -4,6 +4,7 @@ import tsParser from '@typescript-eslint/parser';
 export default [
   {
     files: ['src/**/*.ts'],
+    ignores: ['src/**/*.test.ts'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
@@ -30,7 +31,14 @@ export default [
   },
   {
     files: ['src/**/*.test.ts'],
+    languageOptions: {
+      parser: tsParser,
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
     rules: {
+      ...tseslint.configs.recommended.rules,
       '@typescript-eslint/no-explicit-any': 'off',
       'no-console': 'off',
     },
