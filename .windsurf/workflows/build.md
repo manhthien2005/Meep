@@ -116,13 +116,40 @@ DON'T silently deviate — future-you's context will be confused.
    npm test -- --coverage
    npm run lint
    ```
-2. **Run `/review` — MANDATORY before creating PR.** Do NOT open a PR until review is clean (no 🔴, 🟡 addressed or documented).
-3. **Only after `/review` passes** → create PR:
+
+2. **Tick issue checklist + set status to Review:**
+   ```bash
+   # Mark all acceptance criteria as done on GitHub issue
+   pwsh -File scripts/tick-issue-checklist.ps1 -IssueNum <issue-id>
+
+   # Move issue to "Review" on the project board
+   pwsh -File scripts/set-issue-status.ps1 -IssueNum <issue-id> -Status "Review"
+   ```
+
+3. **Run `/review` — MANDATORY before creating PR.** Do NOT open a PR until review is clean (no 🔴, 🟡 addressed or documented).
+
+4. **Only after `/review` passes** → create PR with auto-generated body:
    ```bash
    git push origin <branch>
-   gh pr create --base develop --title "..." --body "..."
+
+   # Generate PR body from commits + issue link
+   COMMITS=$(git log develop..HEAD --oneline)
+   gh pr create --base develop \
+     --title "feat(<scope>): <mô tả tiếng Việt>" \
+     --body "## Thay đổi
+   $(git log develop..HEAD --oneline | sed 's/^/- /')
+
+   ## Issue liên quan
+   Closes #<issue-id>
+
+   ## Checklist
+   - [ ] Tests pass (flutter test / npm test)
+   - [ ] flutter analyze / npm run lint clean
+   - [ ] /review sạch (không còn 🔴)
+   - [ ] Acceptance criteria ticked trên issue"
    ```
-4. **Mark feature complete** in the todo file.
+
+5. **Mark feature complete** in the todo file.
 
 > ⛔ Anti-pattern: `gh pr create` trước `/review` = skip quality gate. PR reviewer sẽ catch issues mà lẽ ra self-review phải catch trước.
 

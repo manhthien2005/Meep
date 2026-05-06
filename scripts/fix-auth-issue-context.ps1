@@ -4,6 +4,7 @@
 
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 $env:GH_TOKEN = [System.Environment]::GetEnvironmentVariable("GH_TOKEN", "User")
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 $repo = "manhthien2005/Meep"
 $insertBeforePattern = "## Acceptance criteria"

@@ -5,6 +5,7 @@
 
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 $env:GH_TOKEN = [System.Environment]::GetEnvironmentVariable("GH_TOKEN", "User")
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 $repo = "manhthien2005/Meep"
 $insertBeforePattern = "## Acceptance criteria"
@@ -116,7 +117,7 @@ foreach ($num in ($issueMap.Keys | Sort-Object)) {
     $newBody = $body -replace [regex]::Escape($insertBeforePattern), ($issueMap[$num] + $insertBeforePattern)
 
     $tempFile = [System.IO.Path]::GetTempFileName() + ".md"
-    [System.IO.File]::WriteAllText($tempFile, $newBody, [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText($tempFile, $newBody, [System.Text.UTF8Encoding]::new($false))
 
     gh issue edit $num --repo $repo --body-file $tempFile 2>&1 | Out-Null
 

@@ -69,13 +69,9 @@ If role = FE:
 - Check: `git log --oneline origin/develop -- lib/features/<feature>/data/` for recent model commits.
 - If models not yet merged → **STOP**. Report: "Contract chưa có trên develop. Hỏi leader trước khi start."
 
-## Step 6 — Create branch
+## Step 6 — Create branch + update project status
 
 Branch format: `feature/<DevName>/<short-desc>`
-
-```bash
-git checkout -b feature/<DevName>/<short-desc> origin/develop
-```
 
 DevName mapping (GitHub handle → DevName):
 | GitHub handle | DevName | Role |
@@ -87,6 +83,16 @@ DevName mapping (GitHub handle → DevName):
 
 Resolve DevName from the assignee fetched in Step 1. If the assignee is not in this table → ask: "DevName của bạn là gì?"
 
+**Run the following (in order):**
+
+```bash
+# 1. Create and switch to the feature branch
+git checkout -b feature/<DevName>/<short-desc> origin/develop
+
+# 2. Update issue status to "In Progress" on the project board
+pwsh -File scripts/set-issue-status.ps1 -IssueNum <issue-id> -Status "In Progress"
+```
+
 ## Step 7 — Summary + handoff to /build
 
 Print a concise summary:
@@ -97,6 +103,7 @@ Role:     FE / BE / Open
 Blockers: ✅ all closed / ❌ blocked by #X
 Contract: ✅ models on develop / ⚠️ missing (stop + ask leader)
 Branch:   feature/<DevName>/<short-desc>
+Status:   ✅ set to "In Progress" on project board
 Scope:    <list of files allowed to touch>
 
 Context loaded:
