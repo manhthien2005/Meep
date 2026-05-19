@@ -1,0 +1,61 @@
+# Cursor — block from semantic search, agent reference, @ mention.
+# Doc: https://cursor.com/docs/reference/ignore-file
+
+# Generated code (Flutter codegen)
+**/*.g.dart
+**/*.freezed.dart
+**/*.mocks.dart
+**/*.config.dart
+**/*.gr.dart
+
+# Build artifacts
+**/build/
+**/.dart_tool/
+**/dist/
+**/coverage/
+**/.next/
+**/node_modules/
+
+# Native build outputs
+**/android/.gradle/
+**/android/app/build/
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework/
+**/ios/Flutter/App.framework/
+
+# Lock files
+**/package-lock.json
+**/yarn.lock
+**/pnpm-lock.yaml
+**/pubspec.lock
+**/Podfile.lock
+
+# Reference repos
+.agent-kits/
+
+# Logs & tmp
+**/*.log
+**/firebase-debug.log
+**/firestore-debug.log
+**/ui-debug.log
+**/*.tmp
+**/*.bak
+
+# Secrets (defense-in-depth)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+firebase-adminsdk-*.json
+serviceAccount*.json
+google-services.json
+GoogleService-Info.plist
+key.properties

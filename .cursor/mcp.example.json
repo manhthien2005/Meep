@@ -1,0 +1,49 @@
+{
+  "_comment_1": "Workspace-level MCP config for Cursor — committed to git, shared with team.",
+  "_comment_2": "Cursor reads .cursor/mcp.json automatically. After copying this file → .cursor/mcp.json, restart Cursor or reload MCP panel.",
+  "_comment_3": "User-level overrides live at ~/.cursor/mcp.json (Windows: C:\\Users\\<you>\\.cursor\\mcp.json).",
+  "_comment_4": "Curated set. See AGENTS.md §9 for what was DELIBERATELY left out and why.",
+  "_comment_5": "SECRETS WARNING: NEVER commit the real .cursor/mcp.json. It is gitignored. Each dev fills their own tokens locally.",
+
+  "mcpServers": {
+    "context7": {
+      "_comment_1": "Up-to-date library documentation (Flutter, Firebase, Riverpod, freezed). Free tier, no API key.",
+      "_comment_2": "Prevents the agent hallucinating outdated APIs. Trigger by saying 'use context7' or let agent auto-call.",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+
+    "github": {
+      "_comment_1": "GitHub official MCP server — issues, PRs, repos, code search, workflows.",
+      "_comment_2": "Two install options. Pick ONE per dev based on what's available locally.",
+      "_comment_3": "OPTION A (recommended for team) — remote hosted by GitHub, requires Cursor v0.48.0+:",
+      "_option_a_url": "https://api.githubcopilot.com/mcp/",
+      "_option_a_headers": {
+        "Authorization": "Bearer ghp_REPLACE_WITH_YOUR_PAT"
+      },
+      "_comment_4": "OPTION B (below — active by default) — local Docker container. Requires Docker Desktop running.",
+      "_comment_5": "PAT scopes needed: repo, read:org, read:user, workflow.",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_REPLACE_WITH_YOUR_PAT"
+      }
+    },
+
+    "figma-mcp-go": {
+      "_comment_1": "Figma MCP via plugin bridge (vkhanhqui/figma-mcp-go) — NO Figma API token, NO rate limits.",
+      "_comment_2": "73 tools: read + write + create frames/components/variables/styles, export, prototype reactions.",
+      "_comment_3": "Why this over figma-developer-mcp: free plan only allows 6 tool calls/month via REST API. This bridges through a Figma plugin instead → unlimited.",
+      "_comment_4": "ONE-TIME SETUP — install Figma plugin: download plugin.zip from https://github.com/vkhanhqui/figma-mcp-go/releases → Figma Desktop → Plugins → Development → Import plugin from manifest → select manifest.json. Run plugin in any Figma file before asking the agent to use it.",
+      "command": "npx",
+      "args": ["-y", "@vkhanhqui/figma-mcp-go"]
+    }
+  }
+}

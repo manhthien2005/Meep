@@ -1,0 +1,105 @@
+---
+description: Flutter/Dart rules — layering, Riverpod, freezed, error model, widget split thresholds
+globs: ["apps/mobile/**/*.dart", "apps/mobile/pubspec.yaml", "apps/mobile/test/**", "apps/mobile/integration_test/**"]
+alwaysApply: false
+---
+
+# Flutter / Dart Rules
+
+Loaded only when editing the Flutter app. For general rules see `20-stack-conventions.mdc`.
+
+## Layering (strict)
+
+- **No Firestore / FirebaseAuth / Storage call in widgets or controllers.** All Firebase I/O goes through a `Repository` class.
+- **No business logic in widgets.** Widgets render state and dispatch intents.
+- **Layered:**
+  - `core/` — DI (`Provider`/`Riverpod`), theme, error model, routing.
+  - `features/<feature>/data/` — repositories (Firestore, Storage, local cache).
+  - `features/<feature>/application/` — controllers / state notifiers / services.
+  - `features/<feature>/presentation/` — widgets / pages.
+
+A widget that touches `FirebaseFirestore.instance` directly is a bug. Push the call into a repository.
+
+## State management — Riverpod 2 (code-gen)
+
+- Use `@riverpod` annotation + code-gen — `dart run build_runner build --delete-conflicting-outputs`.
+- Use `ref.watch` / `ref.read` only — do NOT mix in `Provider.of(context)` from the `provider` package.
+- Inject every dependency via a Riverpod provider — **no global singleton, no `getIt` lookup inside business logic**.
+- Cancel subscriptions / streams in `ref.onDispose(() => sub.cancel())`.
+
+## Data classes — freezed + json_serializable
+
+- Always immutable. No mutable fields.
+- Don't add behaviour to data classes — keep them dumb.
+- Convert `DocumentSnapshot` → model in a `fromFirestore(snap)` factory on the data class. NEVER inline in widgets/controllers.
+
+## Error model
+
+- Throw typed `AppError`s, never raw `Exception`. Subclass per failure case (`AuthFailedError`, `PostNotFoundError`, ...).
+- Use `Result<T, AppError>` returns when the caller is expected to handle the error path branch-by-branch.
+- Repositories convert `FirebaseException` / `PlatformException` into `AppError` at the boundary.
+
+## Async / streams
+
+- Prefer `Stream` from Firestore for live data (feeds, friend list).
+- Use `StreamProvider` / `FutureProvider` to surface to UI.
+- Always cancel subscriptions: `ref.onDispose(() => sub.cancel())`.
+- Don't `Future.delayed(...)` to "wait for state" — use proper completion.
+
+## Code organization & widget split
+
+### When to split
+
+| Smell | Threshold | Action |
+|---|---|---|
+| Widget body | > 150 lines | Split into sub-widgets |
+| Function / method | > 80 lines | Extract method |
+| Class | > 300 lines | Split by SRP |
+| Constructor parameters | > 5 | Consider config object |
+| Cyclomatic complexity | > 15 | Extract helper functions |
+| Nesting | > 5 levels | Early return / extract method |
+
+### When to reuse
+
+| Usage frequency | Extract to |
+|---|---|
+| Used ≥ 2 times in 1 feature | `features/<feature>/presentation/widgets/` |
+| Used ≥ 3 times cross-feature | `lib/shared/widgets/` |
+| Used once but complex ≥ 30 lines | Extract method/widget in same file |
+
+### Widget-specific
+
+- Use `const` constructors when possible.
+- `ListView.builder` for lists > 5 items. NEVER `ListView(children: [...])` for unbounded lists.
+- NEVER pass huge inline `Map` / `List` as widget props — extract to `static const`.
+- File names `snake_case`, class names `UpperCamelCase`.
+
+### File length
+
+- File ≤ 300 lines. Generated files (`*.g.dart`, `*.freezed.dart`) exempt.
+- Test files relaxed — if > 500 lines → split test groups.
+
+## Testing
+
+- Unit-test controllers + repositories with `fake_cloud_firestore` and `firebase_auth_mocks`.
+- Widget tests for any non-trivial UI (form, list, dialog).
+- Integration test for the login + post + feed loop minimum.
+- Prefer `FakeFirebaseFirestore` over `MockFirestore`.
+- Test files mirror lib structure: `lib/features/feed/post_repository.dart` ↔ `test/features/feed/post_repository_test.dart`.
+
+## Test commands
+
+```bash
+flutter test
+flutter test test/features/feed/
+flutter test --coverage
+flutter analyze
+dart format --set-exit-if-changed .
+```
+
+## Common gotchas
+
+| Issue | Fix |
+|---|---|
+| `Future` inside `build()` | Use `FutureProvider` / `StreamProvider`, never call inside `build` |
+| Slow rebuild | `const` constructors, split widgets, `ref.watch(provider.select(...))` |

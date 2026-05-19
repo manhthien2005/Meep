@@ -1,0 +1,139 @@
+---
+description: Invoke when fixing a specific issue (GitHub issue, Crashlytics report, bug) end-to-end
+alwaysApply: false
+---
+
+# /fix-issue — Targeted Issue Resolution
+
+End-to-end fix for a specific issue: GitHub issue, Crashlytics report, user complaint, or a clear bug with reproduction steps.
+
+## Pre-flight
+
+1. **Invoke skills:** `systematic-debugging` (primary), `tdd`, `karpathy-guidelines`.
+2. **Get issue details:** link / ID / description, repro steps, stack trace, affected version/platform.
+3. **New branch:**
+   ```bash
+   git checkout -b fix/<DevName>/<short-description> origin/develop
+   ```
+
+## Step 1: Understand the issue
+
+### 1.1 Read carefully
+- Read the full issue description, comments, related issues.
+- Read the error message / stack trace line by line.
+- Identify affected component(s): UI? data layer? rule? Function?
+
+### 1.2 Reproduce locally
+- Have you reproduced the issue on your machine?
+- If you can't reproduce → gather more info before attempting a fix.
+
+**DO NOT fix** an issue you can't reproduce, unless stack trace + logs clearly identify the root cause.
+
+## Step 2: Root cause analysis
+
+**→ Apply skill `systematic-debugging`** Phases 1-3.
+
+```bash
+git log -n 20 --oneline -- <affected files>
+```
+
+| Symptom | First check |
+|---|---|
+| Crashlytics: `setState() after dispose` | Riverpod migration vs `mounted` guard |
+| Firestore query empty in prod, OK in emulator | Rules → index → field-name typo |
+| FCM not delivered | Token registration → topic → payload → fg/bg state |
+| Auth token expired loop | Refresh handler in `AuthRepository` boundary |
+
+## Step 3: Plan a minimal fix
+
+**Karpathy guideline: surgical changes.**
+
+- Identify the **minimal change** to address the root cause.
+- DON'T bundle refactors, cleanup, or other bug fixes.
+- Consider side effects: will this fix break old tests / other features?
+
+If small (≤ 20 lines): implement directly.
+If big (multi-file, architectural): consider running mini `/spec` or discussing with the user first.
+
+## Step 4: Implement (TDD)
+
+**→ Apply skill `tdd`** "Bug fix → reproduction test" section.
+
+Name the test `regression: <issue title> (#<id>)` so it's traceable later.
+
+## Step 5: Verify the fix end-to-end
+
+### Mobile fix
+- Run the app on a real device.
+- Repro the original steps → confirm bug gone.
+- Smoke-test related features for no regression.
+
+### BE / Functions fix
+- Deploy to emulator → run integration tests.
+- Check logs have no new errors.
+
+### Apply skill `verification-before-completion`
+
+Don't claim "fixed" until:
+- ✅ Unit tests pass.
+- ✅ Original reproduction steps → bug gone.
+- ✅ Full test suite passes.
+- ✅ Lint clean.
+
+## Step 6: Commit
+
+```bash
+git add <files>
+git commit -m "fix(<scope>): <mô tả tiếng Việt>
+
+Root cause: <short — what was wrong>
+Fix: <approach>
+Test: regression test in <test file>
+
+Closes #<issue-id>"
+```
+
+## Step 7: PR / merge
+
+Apply workflow `/review` first, then:
+
+```bash
+gh pr create --base develop \
+  --title "fix(<scope>): <mô tả tiếng Việt>" \
+  --body "## Issue
+Closes #<id>
+
+## Root cause
+<1-2 sentences>
+
+## Fix
+<approach + why>
+
+## Verification
+- [ ] flutter test passes
+- [ ] flutter analyze clean
+- [ ] Manual repro confirmed bug gone"
+```
+
+## Step 8: Post-merge
+
+- Confirm the fix deployed successfully.
+- Monitor Crashlytics / logs for 24h.
+- Close the issue with a comment confirming the fix is verified.
+
+## When the issue isn't a bug
+
+- **Feature request in disguise** → push back, suggest `/spec`.
+- **User misunderstanding** → reply explaining expected behavior, don't change code.
+- **Documentation gap** → fix the doc, don't fix code.
+
+## Anti-patterns
+
+| Anti-pattern | Problem |
+|---|---|
+| Fix without reproducing | Might fix the wrong thing |
+| Fix multiple issues in one commit | Can't revert granularly |
+| Skip the regression test | Bug can recur silently |
+| Fix the symptom, not the root cause | Similar issues appear elsewhere |
+| "While I'm here" refactor | Hard-to-review diff |
+| Skip verification, trust the unit test | Might be testing the wrong thing |

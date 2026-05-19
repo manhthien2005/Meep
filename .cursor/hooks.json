@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": "python .cursor/hooks/block_dangerous_commands.py",
+        "timeout": 10
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": "python .cursor/hooks/protect_secrets.py",
+        "timeout": 10
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "python .cursor/hooks/protect_secrets.py",
+        "timeout": 10
+      }
+    ]
+  }
+}

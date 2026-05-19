@@ -1,0 +1,80 @@
+---
+description: Flutter UI patterns — design tokens, Figma mapping, accessibility, loading/error/empty states
+globs: ["apps/mobile/lib/features/**/presentation/**/*.dart", "apps/mobile/lib/core/theme/**/*.dart", "apps/mobile/lib/shared/widgets/**/*.dart"]
+alwaysApply: false
+---
+
+# Flutter UI Patterns — Presentation Layer
+
+Loaded when editing `presentation/`, `core/theme/`, or `shared/widgets/`. Supplements `21-flutter-rules.mdc` — this file focuses on **UI patterns** for the 2 FE-bridge devs (Figma → Flutter).
+
+**Widget split / function split / file length thresholds** — see `21-flutter-rules.mdc` §Code organization. Not duplicated here.
+
+## Design tokens — NO hardcoding
+
+**Required** (dark/light mode + text scaling breaks if hardcoded):
+- Hardcoded color: `Color(0xFF1A73E8)` → use `Theme.of(context).colorScheme.primary`.
+- Hardcoded font size/family: `TextStyle(fontSize: 16)` → use `Theme.of(context).textTheme.bodyMedium`.
+
+**Encouraged** (use tokens when they carry semantic meaning):
+- Spacing: prefer `Spacing.md` tokens for semantic spacing. One-off `SizedBox(height: 4)` acceptable.
+- Radius: prefer `Radii.md`. Inline OK if used only once.
+
+If Figma has a new color/font not yet in theme → **add to `core/theme/` first**, then use it. Never inline.
+
+## Layering — DO NOT exceed scope
+
+FE-bridge devs may only touch:
+- ✅ `apps/mobile/lib/features/<feature>/presentation/` — widgets, pages, theme application.
+- ✅ `apps/mobile/lib/core/theme/` — design tokens, theme system.
+- ✅ `apps/mobile/lib/shared/widgets/` — shared reusable widgets.
+- ⚠️ `apps/mobile/lib/features/<feature>/application/` — only **consume** existing controllers. DO NOT create new Riverpod controllers — ask FS dev.
+- ❌ `apps/mobile/lib/features/<feature>/data/` — FS dev only.
+- ❌ `firebase/functions/`, `apps/mobile/android/app/src/main/kotlin/` — FS dev only.
+
+## Accessibility — minimum required
+
+- **Semantics:** every `IconButton`, `GestureDetector`, custom tap area must have `Semantics(label: '...')` or `tooltip`.
+- **Touch target:** tap area ≥ 48x48 logical pixels. Use `InkWell` + padding or `IconButton`.
+- **Contrast:** use theme tokens — light/dark mode automatically meets WCAG AA.
+- **Text scaling:** never set `fixedFontSize` on `Text`.
+
+## Figma → Flutter mapping
+
+1. **1 Figma frame = 1 widget class**.
+2. **Layer name → variable/widget name:** `btn_primary_lg` → `PrimaryButtonLarge`.
+3. **Frame Auto-Layout → `Column`/`Row`** with `spacing` (Flutter 3.27+) or `SizedBox` token.
+4. **Constraints:**
+   - Stretch → `Expanded` or `SizedBox.expand`.
+   - Fix → `SizedBox(width: X, height: Y)`.
+   - Hug → let widget self-size (default).
+5. **Component variants → enum + factory constructor.** E.g. `Button.primary()`, `Button.secondary()`.
+
+## Widget state — minimal
+
+- **`StatelessWidget`** preferred. UI-local state (`setState`, `ValueNotifier`, `AnimationController`) OK for toggles, animations.
+- **Business state** (auth, posts, friends) → consume from Riverpod controller. DO NOT use `setState` to call APIs.
+- **Form state** → use Flutter's `Form` + `FormState`.
+
+## Loading / error / empty — 4 required states
+
+Every screen consuming async data must handle:
+
+```dart
+ref.watch(provider).when(
+  loading: () => LoadingIndicator(),
+  error: (e, _) => ErrorView(error: e),
+  data: (items) => items.isEmpty
+      ? EmptyState(message: 'Chưa có gì ở đây')
+      : ItemList(items: items),
+);
+```
+
+Empty state must have a **Vietnamese CTA** — never leave the screen blank.
+
+## When unsure — ask the leader before
+
+- Adding a new UI dependency (`flutter_animate`, `gap`, `flutter_svg`...).
+- Overriding the `MaterialApp` global theme.
+- Changing `core/theme/` shared tokens.
+- Touching `application/` to fix a bug — report to FS dev instead.

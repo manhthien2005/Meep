@@ -35,6 +35,10 @@ Thumbs.db
 # Personal Cascade memory cache
 .windsurf/.cache/
 
+# Cursor MCP local config (contains personal tokens) — commit only .cursor/mcp.example.json
+.cursor/mcp.json
+.cursor/.cache/
+
 # ===== Flutter =====
 # https://github.com/flutter/flutter/blob/master/.gitignore
 **/.dart_tool/
