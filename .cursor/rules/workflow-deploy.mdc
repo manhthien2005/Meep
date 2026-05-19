@@ -1,0 +1,154 @@
+---
+description: Invoke when building and deploying — Flutter app, Cloud Functions, Firestore rules, with rollback plan
+alwaysApply: false
+---
+
+# /deploy — Deploy Workflow
+
+> "Pre-deploy verification > rollback firefighting."
+
+## Pre-flight
+
+1. **Branch must be `deploy`** (production) or `develop` (staging). DON'T deploy from a feature branch.
+2. **Working tree clean:** `git status --short` empty.
+3. **Up-to-date:** `git pull origin deploy` (or `develop` for staging).
+4. **Apply skill `verification-before-completion`** — every step verifies for real.
+
+## Pre-deploy checklist
+
+### Universal
+- [ ] All tests pass:
+  ```bash
+  flutter test
+  npm test --prefix firebase/functions
+  ```
+- [ ] Lint clean:
+  ```bash
+  flutter analyze
+  npm run lint --prefix firebase/functions
+  ```
+- [ ] No debug logs left over (search `console.log` / `print(` in lib/ and functions/src/).
+- [ ] No TODO without a linked issue.
+- [ ] Version bump correct (if release): `pubspec.yaml` `version: x.y.z+build`.
+
+### Security
+- [ ] No hardcoded secrets (search `api[_-]?key|secret|password|token` in lib/ and functions/src/).
+- [ ] `.env*` not staged: `git ls-files | grep -E "\.env($|\.)"`  → expect empty.
+- [ ] Service account JSON, keystore not staged.
+
+## Path A: Flutter mobile app
+
+### A.1 Android (Play Store / APK)
+
+```bash
+flutter build apk --release
+# or App Bundle for Play Store
+flutter build appbundle --release
+```
+
+**Verify:**
+- [ ] Exit 0.
+- [ ] Output `build/app/outputs/bundle/release/app-release.aab` reasonable size.
+- [ ] Smoke test: login, post, feed, push notification.
+
+**Upload:** Internal testing track on Play Console before production.
+
+### A.2 iOS — DEFERRED per ADR-0002
+
+> Skip for MVP. iOS targeting is out of scope until post-MVP.
+
+## Path B: Firebase Cloud Functions
+
+```bash
+cd firebase/functions
+npm install && npm run build && npm test
+```
+
+**Pre-deploy:**
+- [ ] TypeScript compiles clean (`npm run build` exit 0).
+- [ ] Region correct in code (`asia-southeast1`).
+- [ ] Secrets exist in Secret Manager: `gcloud secrets list --project=meep-prod`
+
+**Deploy staging first:**
+```bash
+firebase deploy --only functions --project meep-staging
+```
+
+**Verify staging:**
+- [ ] Deploy log: no errors.
+- [ ] Function logs clean: `firebase functions:log --project meep-staging --limit 50`
+- [ ] Smoke test: trigger a real function from the staging app.
+
+**Deploy production — confirm with user first:**
+```bash
+firebase deploy --only functions --project meep-prod
+```
+
+**Post-deploy:** Monitor logs for 15-30 minutes.
+
+## Path C: Firestore / Storage rules
+
+⚠️ **Rules deploy = immediate production impact.**
+
+```bash
+# Test in emulator first
+firebase emulators:exec --only firestore "npm run test:rules"
+
+# Deploy staging
+firebase deploy --only firestore:rules,storage --project meep-staging
+
+# Deploy production — confirm with user first
+firebase deploy --only firestore:rules,storage --project meep-prod
+```
+
+**Rollback if something goes wrong:**
+```bash
+# Restore old version via Firebase Console or redeploy the old file
+git revert <bad-sha>
+firebase deploy --only firestore:rules,storage --project meep-prod
+```
+
+## Path D: Firestore indexes
+
+```bash
+firebase deploy --only firestore:indexes --project meep-prod
+```
+
+Index build can be slow (minutes to hours). Monitor:
+```bash
+firebase firestore:indexes --project meep-prod
+```
+
+## Post-deploy monitoring (first 24 hours)
+
+- [ ] Crashlytics: no error spike.
+- [ ] Firebase Analytics: new feature getting hits?
+- [ ] Firestore reads/writes: no abnormal spikes.
+- [ ] Function invocations: success rate, p99 latency.
+
+## Rollback plan
+
+**Functions:**
+```bash
+git checkout <previous-good-sha> -- firebase/functions
+cd firebase/functions && npm install && npm run build
+firebase deploy --only functions --project meep-prod
+```
+
+## Tag the release
+
+After confirming the deploy is stable (24h+):
+```bash
+git tag -a v1.2.0 -m "Release: feature X, fix Y"
+git push origin v1.2.0
+```
+
+## Anti-patterns
+
+| Anti-pattern | Problem |
+|---|---|
+| Deploy direct to prod, skip staging | Bugs land in users' hands |
+| Deploy on Friday afternoon | No one to monitor |
+| Skip post-deploy monitoring | Latent bugs go undetected |
+| `firebase deploy` without `--project` | Might deploy to the wrong project |
+| Push uncommitted code to prod | Can't trace deployed code |

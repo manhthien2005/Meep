@@ -1,6 +1,6 @@
 # Meep — Agent Operating Manual
 
-Anchor file for any AI agent working on this codebase. Always loaded together with `.windsurf/rules/*.md`. **Read this top-to-bottom before doing anything.**
+Anchor file for any AI agent working on this codebase. Always loaded together with `.windsurf/rules/*.md` (Windsurf/Cascade) and `.cursor/rules/*.mdc` (Cursor/Kiro). **Read this top-to-bottom before doing anything.**
 
 > **Output language:** Vietnamese by default — see `.windsurf/rules/00-personal-operating-mode.md`. This file (and most other `.windsurf/*` files) is written in English so the agent parses instructions reliably; the agent still talks to the user in Vietnamese.
 
@@ -98,13 +98,20 @@ Meep/
 │   ├── pre-commit             # dart format + flutter analyze + eslint staged
 │   └── pre-push               # validate branch name <type>/<DevName>/<short-desc>
 │
-└── .windsurf/
-    ├── hooks.json             # safety hooks (block_dangerous_commands, protect_secrets)
-    ├── hooks/                 # Python hook scripts
-    ├── rules/                 # 10 rule files (always_on + glob-scoped)
-    ├── skills/                # 10 SKILL.md folders (TDD, debugging, ...)
-    ├── workflows/             # 9 slash commands (/start /spec /plan /build /test /review /debug /fix-issue /deploy)
-    └── mcp_config.example.json  # sample MCP servers (copy to user-level path — see §9)
+├── .windsurf/
+│   ├── hooks.json             # safety hooks (block_dangerous_commands, protect_secrets)
+│   ├── hooks/                 # Python hook scripts
+│   ├── rules/                 # 11 rule files (always_on + glob-scoped)
+│   ├── skills/                # 10 SKILL.md folders (TDD, debugging, ...)
+│   ├── workflows/             # 9 slash commands (/start /spec /plan /build /test /review /debug /fix-issue /deploy)
+│   └── mcp_config.example.json  # sample MCP servers (copy to user-level path — see §9)
+│
+└── .cursor/
+    ├── hooks.json             # safety hooks (block_dangerous_commands, protect_secrets) — Cursor-native
+    ├── hooks/                 # Python hook scripts (mirrors .windsurf/hooks/)
+    ├── rules/                 # 21 .mdc rule files — mirrors .windsurf/rules/ + workflows + Cursor cheatsheet
+    ├── skills/                # 10 SKILL.md folders — mirrors .windsurf/skills/ (auto-discovered)
+    └── mcp.example.json       # workspace-level MCP config (copy to .cursor/mcp.json — gitignored)
 ```
 
 `.agent-kits/` is git-ignored and contains source repositories used as reference. **Do not edit anything inside it.**
@@ -140,24 +147,33 @@ Default deploy region for Functions + Storage: `asia-southeast1`.
 ## 5. How rules / skills / workflows / hooks fit together
 
 ```
-User message
-   ↓
-Cascade always loads:
+── Windsurf / Cascade ────────────────────────────────────────────────────────
+User message → always loads:
    - AGENTS.md (this file)
    - .windsurf/rules/*.md with trigger: always_on
-   - The user's message
-   ↓
-Cascade also loads on demand:
-   - Glob-scoped rules (21-flutter, 22-functions, 23-firestore) when matching files are touched
+On demand:
+   - Glob-scoped rules when matching files are touched
    - Skills via the Skill tool when their description fits the task
    - Workflows when the user types /<slash-command>
-   ↓
-For every read/write/run, hooks intercept:
+Hooks intercept every read/write/run:
    - pre_run_command   → block_dangerous_commands.py  (rm -rf, format, prod deploy …)
    - pre_read_code     → protect_secrets.py            (.env, *.pem, adminsdk JSON …)
    - pre_write_code    → protect_secrets.py
-   Exit 0 → action proceeds
-   Exit 2 → action blocked, reason shown
+   Exit 0 → proceeds / Exit 2 → blocked
+
+── Cursor / Kiro ─────────────────────────────────────────────────────────────
+User message → always loads:
+   - AGENTS.md (this file)
+   - .cursor/rules/*.mdc with alwaysApply: true
+On demand:
+   - Glob-scoped rules (globs: pattern) when matching files are open/edited
+   - Skills via .cursor/skills/<name>/SKILL.md (auto-discovered, agent-invoked when description matches)
+   - Workflow rules via description match (ask agent to run /start, /spec, /plan, etc.)
+Hooks intercept agent action via .cursor/hooks.json:
+   - beforeShellExecution → block_dangerous_commands.py  (rm -rf, force-push prod, prod deploy …)
+   - beforeReadFile       → protect_secrets.py            (.env, *.pem, adminsdk JSON …)
+   - afterFileEdit        → protect_secrets.py            (block writes to secret files)
+   Exit 0 + permission:allow → proceeds / Exit 2 + permission:deny → blocked
 ```
 
 ### Rule activation modes used
@@ -176,6 +192,8 @@ For every read/write/run, hooks intercept:
 | `50-token-discipline.md` | `always_on` | every message |
 
 This keeps stack-specific noise out of the context until the agent actually edits that stack's files.
+
+**Cursor/Kiro equivalent:** same files exist as `.cursor/rules/*.mdc`. `always_on` → `alwaysApply: true`. `glob` → `globs: <pattern>`. Workflows → `description:` field (agent-requested — just ask the agent to run `/start`, `/spec`, `/plan`, etc., no slash-command system needed).
 
 ## 6. Always-on guardrails
 
@@ -251,12 +269,31 @@ firebase emulators:start --project default
 
 ## 9. MCP servers — curated minimal set
 
-Windsurf reads MCP servers from a **user-level** file:
+**Windsurf/Cascade** reads MCP servers from a **user-level** file:
 
 - macOS / Linux: `~/.codeium/windsurf/mcp_config.json`
 - Windows: `C:\Users\<you>\.codeium\windsurf\mcp_config.json`
 
 (There is **no** workspace-level MCP config — Windsurf only supports the user-level file.)
+
+**Cursor/Kiro** reads MCP servers from:
+
+- **Workspace-level (preferred for team-shared servers):** `.cursor/mcp.json` at the repo root. Copy from `.cursor/mcp.example.json` (committed) to `.cursor/mcp.json` (gitignored) and adapt.
+- **User-level:** `C:\Users\<you>\.cursor\mcp.json` (Windows) / `~/.cursor/mcp.json` (macOS/Linux).
+
+To activate Cursor workspace MCP:
+
+```pwsh
+# Windows
+Copy-Item .cursor\mcp.example.json .cursor\mcp.json
+```
+
+```bash
+# macOS / Linux
+cp .cursor/mcp.example.json .cursor/mcp.json
+```
+
+Then restart Cursor or reload the MCP panel. Format is identical to Claude Desktop (`mcpServers` key).
 
 A starting point lives at `.windsurf/mcp_config.example.json`. To activate:
 
@@ -278,14 +315,26 @@ Then restart Windsurf or click "Refresh" on the MCPs panel in Cascade.
 ### Enabled by default
 
 - **context7** — up-to-date library docs (Flutter / Firebase / Riverpod / freezed). Prevents the agent hallucinating outdated APIs. Free tier, no API key.
+- **github** — official `ghcr.io/github/github-mcp-server`. Issues, PRs, repos, code search, workflows. Requires Docker + GitHub PAT (scopes: `repo`, `read:org`, `read:user`, `workflow`). Alternative: remote `https://api.githubcopilot.com/mcp/` (no Docker needed, requires Cursor v0.48.0+).
+- **figma** — `figma-developer-mcp` (GLips). Paste a Figma frame URL → MCP returns layout/text/colors → agent generates Flutter widget. Requires `FIGMA_API_KEY` from Figma → Settings → Personal access tokens.
+
+### Setup steps for Cursor
+
+```pwsh
+# Windows
+Copy-Item .cursor\mcp.example.json .cursor\mcp.json
+# Edit .cursor\mcp.json: replace ghp_REPLACE_WITH_YOUR_PAT and figd_REPLACE_WITH_YOUR_FIGMA_TOKEN
+# Restart Cursor or click Refresh on the MCP panel.
+```
+
+`.cursor/mcp.json` is gitignored — each dev fills their own tokens. Never commit the real file.
 
 ### Deliberately NOT enabled (and why)
 
 | MCP | Why skipped |
 |---|---|
-| `filesystem` | Redundant — Cascade already has `read_file`, `write_to_file`, `edit`, `find_by_name`, `grep_search`, `list_dir` natively (faster, no extra hop). |
-| `github` | `git` + `gh` CLI are faster and more direct for the team's PR workflow. Add when triage volume justifies it (likely Phase 2). |
-| `memory` | Redundant — Cascade has `create_memory` natively, persists across sessions. |
+| `filesystem` | Redundant — Cursor already has `read_file`, `write_to_file`, `edit`, `find_by_name`, `grep_search`, `list_dir` natively (faster, no extra hop). |
+| `memory` | Redundant — Cursor has built-in Memories (GA from 1.2), persists across sessions with user approval gate. |
 | `postgres` | Project uses Firestore (see ADR `0001-firebase-first-backend`). Add only when a real Postgres dependency appears. |
 | `firebase` | No audited official server yet (as of 2026-04). Prefer the `firebase` CLI directly — already guarded by `block_dangerous_commands.py` for prod targets. |
 

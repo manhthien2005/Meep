@@ -1,0 +1,20 @@
+# Cursor — exclude từ codebase index, NHƯNG agent vẫn read được khi cần.
+# Dùng cho file lớn / vendored / docs ít search.
+# Doc: https://cursor.com/docs/reference/ignore-file
+
+# Docs lớn — agent đọc khi cần qua @files, không cần semantic index
+docs/team-onboarding/
+docs/milestones/
+docs/report/
+docs/specs/
+
+# Reference kits (read-only)
+.agent-kits/
+
+# Generated migrations / fixtures
+**/__generated__/
+**/__snapshots__/
+**/fixtures/
+
+# Test coverage report
+**/coverage/lcov-report/

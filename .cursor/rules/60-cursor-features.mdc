@@ -1,0 +1,182 @@
+---
+description: Cursor-specific features — @-mentions, Composer, agent modes, tab autocomplete. Loaded always so the agent knows how to leverage Cursor's native capabilities.
+alwaysApply: true
+---
+
+# Cursor Features Cheatsheet
+
+> Cursor có nhiều tính năng native mà em phải tận dụng để tiết kiệm token và làm nhanh hơn. File này nhắc em (và anh) các surface chính.
+
+## @-mentions trong prompt
+
+| Mention | Dùng khi |
+|---|---|
+| `@codebase` | Hỏi tổng quát về codebase, không biết file nào liên quan. Cursor tự semantic search. |
+| `@files <path>` | Đính file cụ thể vào context (vd `@files apps/mobile/lib/main.dart`). |
+| `@folders <path>` | Đính cả folder (vd `@folders apps/mobile/lib/features/auth`). |
+| `@docs` | Tham chiếu docs đã index (Flutter, Firebase, ...). |
+| `@web` | Search web realtime — khi cần version/API mới. |
+| `@git` | Diff/log/blame của git. Vd "review @git diff develop..HEAD". |
+| `@cursor-rules` | Reference rule files trong `.cursor/rules/`. |
+| `@past chats` | Reference chat trước (em cite bằng `[<title>](<uuid>)`). |
+
+**Nguyên tắc:** Càng cụ thể `@files`/`@folders` → càng ít token và càng chính xác. `@codebase` chỉ khi thực sự không biết file nào.
+
+## Rule activation modes (4 modes)
+
+Cursor support 4 modes qua frontmatter `.mdc`:
+
+| Mode | Frontmatter | Khi nào |
+|---|---|---|
+| **Always Apply** | `alwaysApply: true` | Load mỗi message — cho rule core (operating mode, project context, security). |
+| **Auto Attached** | `globs: <pattern>` | Tự load khi file match được mở/edit — cho stack-specific rule (Flutter, Functions). |
+| **Agent Requested** | `description: <when>` + `alwaysApply: false` | Agent tự quyết load khi description match — cho workflow rule (`/build`, `/spec`, `/plan`). |
+| **Manual** | Không có field nào | Chỉ load khi user `@<rule-name>` — cho reference hiếm dùng. |
+
+**Meep dùng đúng 3 mode đầu.** Manual chưa cần.
+
+## Skills system
+
+- Skills auto-discover từ `.cursor/skills/<name>/SKILL.md`.
+- Cursor đọc `description:` trong frontmatter để biết khi nào dùng.
+- Em invoke bằng cách read `SKILL.md` đó **trước khi** làm task tương ứng.
+- User có thể trigger trực tiếp bằng `/<skill-name>` trong chat.
+
+**Skills hiện có (10):**
+- `tdd`, `systematic-debugging`, `verification-before-completion` — discipline
+- `karpathy-guidelines`, `brainstorming`, `writing-plans` — methodology
+- `code-review-five-axis` — review framework
+- `flutter-firebase-patterns`, `nodejs-ts-backend` — stack patterns
+- `caveman-vi` — opt-in compressed mode
+
+## Hooks (project-level)
+
+`.cursor/hooks.json` chạy script Python để guard agent action:
+
+| Hook | Script | Mục đích |
+|---|---|---|
+| `beforeShellExecution` | `block_dangerous_commands.py` | Block `rm -rf /`, `git push --force` lên main, `firebase deploy prod`, etc. |
+| `beforeReadFile` | `protect_secrets.py` | Block đọc `.env`, `*.pem`, service account JSON, ... |
+| `afterFileEdit` | `protect_secrets.py` | Block ghi vào file secret. |
+
+**Nếu hook block** → em phải dừng + báo anh, không được bypass. Override: thêm `# CONFIRMED-<TOKEN>` vào command (xem `block_dangerous_commands.py`).
+
+## MCP servers
+
+- Workspace: `.cursor/mcp.example.json` (commit) → copy thành `.cursor/mcp.json` (gitignored, có token thật) khi setup.
+- User: `~/.cursor/mcp.json` (global override).
+- Hiện tại enable: `context7` (live library docs), `github` (issue/PR/repo), `figma` (Figma frame → code).
+- KHÔNG enable: `filesystem`, `memory`, `postgres` (xem AGENTS.md §9 để hiểu lý do).
+
+**Kích hoạt:**
+```pwsh
+Copy-Item .cursor\mcp.example.json .cursor\mcp.json
+# Edit .cursor\mcp.json: thay ghp_REPLACE_... bằng PAT thật, figd_REPLACE_... bằng Figma token thật.
+# Restart Cursor → MCP panel reload.
+```
+
+## Indexing control — `.cursorignore` & `.cursorindexingignore`
+
+| File | Tác dụng |
+|---|---|
+| `.cursorignore` | Block file khỏi semantic search, Tab, Agent, Inline Edit, `@` mention. Pattern giống `.gitignore`. Dùng cho generated code (`*.g.dart`, `*.freezed.dart`), build artifacts, lock files, secrets. |
+| `.cursorindexingignore` | Exclude khỏi index NHƯNG agent vẫn read được khi user `@-mention` hoặc cần. Dùng cho docs lớn ít search (specs, milestones), reference kits. |
+
+**Đã setup ở root repo.** Nếu codebase phình to, edit 2 file này — không cần đụng `.cursor/` config.
+
+## Custom @Docs
+
+Cursor tự index docs phổ biến (Flutter, Firebase). Anh có thể add docs riêng:
+
+1. Type `@Docs` trong chat → "Add new doc"
+2. Paste URL → Cursor crawl + index → available qua `@<doc-name>`
+
+**Khuyến nghị add cho Meep (Android-only, ADR-0002):**
+
+| Doc | URL |
+|---|---|
+| Riverpod 2 | `https://riverpod.dev/` |
+| Riverpod code-gen | `https://riverpod.dev/docs/concepts/about_code_generation` |
+| Flutter CustomPainter | `https://api.flutter.dev/flutter/rendering/CustomPainter-class.html` |
+| Flutter Canvas (dart:ui) | `https://api.flutter.dev/flutter/dart-ui/Canvas-class.html` |
+| Flutter CustomPaint widget | `https://api.flutter.dev/flutter/widgets/CustomPaint-class.html` |
+| home_widget package | `https://pub.dev/packages/home_widget` |
+| Android AppWidget (native Kotlin) | `https://developer.android.com/develop/ui/views/appwidgets/overview` |
+| Firebase Functions v2 | `https://firebase.google.com/docs/functions/2nd-gen-upgrade` |
+| Firestore Security Rules | `https://firebase.google.com/docs/firestore/security/rules-conditions` |
+| Firestore indexes | `https://firebase.google.com/docs/firestore/query-data/indexing` |
+
+Diary feature (Tier 0+) cần canvas draw → 3 doc Flutter Canvas/CustomPainter ở trên là core. KHÔNG add iOS WidgetKit / Apple Sign-In (defer per ADR-0002).
+
+## Bugbot — KHÔNG enable (paid)
+
+Bugbot $40/user/month (Teams plan), không có free tier. Capstone 4 dev → quá đắt. **Skip.** Self-review qua skill `code-review-five-axis` + `/review` workflow là đủ cho team capstone.
+
+## Team onboarding cho `.cursor/`
+
+Mọi thứ trong `.cursor/` (trừ `mcp.json` thật) đều commit git. Team member mới chỉ cần:
+
+```pwsh
+# 1. Pull repo về
+git clone <repo>
+
+# 2. Copy MCP template + điền token
+Copy-Item .cursor\mcp.example.json .cursor\mcp.json
+# Edit .cursor\mcp.json: thay ghp_REPLACE_... bằng GitHub PAT cá nhân
+
+# 3. (Optional) Install Figma plugin nếu dùng Figma MCP
+# Tải plugin.zip từ https://github.com/vkhanhqui/figma-mcp-go/releases
+# Figma Desktop → Plugins → Development → Import plugin from manifest
+
+# 4. (Optional) Add custom @Docs trong Cursor Settings UI (xem list ở trên)
+
+# 5. Restart Cursor → done
+```
+
+**KHÔNG cần** cài Cursor Team plan, KHÔNG cần dashboard config. Mọi rule + skill + hook auto-load qua repo.
+
+| Command | Khi nào |
+|---|---|
+| `/worktree` | Cô lập task lớn vào git worktree riêng — không ảnh hưởng working tree hiện tại. |
+| `/best-of-n` | Chạy task song song trên nhiều model, so sánh outcome. Dùng cho task khó (architecture decision, complex algo). |
+| `/Await` | Đợi background shell/subagent hoàn thành trước khi tiếp tục. |
+
+**Khi nào em dùng:**
+- Task ≥ 30 phút có rủi ro break working tree → đề xuất `/worktree`.
+- Task có 2-3 cách giải khác nhau, anh chưa biết chọn → đề xuất `/best-of-n`.
+- Run test suite dài / build APK → `/Await` thay vì poll thủ công.
+
+## Memories (GA từ 1.2)
+
+Cursor tự generate memory từ chat session. Em sẽ:
+- **Không tự ý** save memory khi anh chưa approve.
+- Surface lên khi memory mới được generate → anh review.
+- Memory lưu cross-session, persist qua restart.
+
+## Composer / Agent / Ask mode
+
+| Mode | Khi nào |
+|---|---|
+| **Agent (default)** | Implement task — full tool access (read/write/run). |
+| **Ask** | Câu hỏi, review, không edit code. Read-only. |
+| **Plan** | Design trước khi code — không apply edit, chỉ propose. |
+
+Em proactively **switch mode** khi context cần (planning lớn → Plan mode; câu hỏi → Ask mode). Nhưng theo `00-personal-operating-mode.mdc`, default em thẳng tay làm cho task ≤ 3 step.
+
+## Token discipline khi dùng Cursor
+
+- **Đính file cụ thể** thay vì `@codebase` cho task định scope rõ.
+- **Tránh đọc file > 1000 dòng full** — dùng `Grep` hoặc `Read` với offset/limit.
+- **Tận dụng cache:** rule `alwaysApply: true` đã được Cursor cache, không cần em đọc lại.
+- **Subagent (Task tool)** cho exploration rộng — preserve main context cho implementation.
+
+Xem thêm `50-token-discipline.mdc`.
+
+## Cursor-specific anti-patterns
+
+| Anti-pattern | Vì sao xấu |
+|---|---|
+| Dùng `@codebase` cho mọi câu hỏi | Tốn token + kết quả mơ hồ — đính file cụ thể nếu biết. |
+| Bỏ qua hook block bằng cách chạy command khác | Hook có lý do — discuss với anh trước. |
+| Không invoke skill khi task match `description` | Skill là discipline, không phải optional. |
+| Edit `.cursor/rules/*.mdc` trong feature branch | Infra file — phải ở `chore/` branch (xem `00-personal-operating-mode.mdc`). |
