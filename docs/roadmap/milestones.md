@@ -21,9 +21,10 @@ Foundation  Social Core  Differentiator
 
 ## Team allocation
 
-- **2 FS dev (anh + 1):** Cloud Functions + Firestore rules + native Kotlin widget + data layer + complex business logic
-- **2 FE-bridge:** Figma → Flutter UI (presentation layer + theme + reusable widgets)
-- Cross-lane PR review: FE-bridge PR → anh review default
+- **Solo-dev model (ADR-0004):** mỗi dev own 1+ module end-to-end (data + logic + UI + test). Không tách FE/BE.
+- **Leader (anh):** define spec + freezed model + abstract interface + stub provider trước khi giao module. Review tất cả PR.
+- **HanDHG + NganTNK** kiêm UI/UX Figma + module owner. Module họ design Figma → ưu tiên họ implement Flutter.
+- Module assignment chưa pre-assign — anh chốt khi finalize từng spec.
 
 ## Velocity baseline
 
@@ -100,7 +101,7 @@ End of M1: 4 dev signup được + login được + có CI/CD chạy stage deplo
 | 8-9 | UI/Design | UI placeholder Signup 5-screen flow | FE-2 | L |
 | 10 | UI/Design | UI placeholder Profile screen scaffold | FE-1 | S |
 | 10 | UI/Design | UI placeholder Home placeholder + AuthGate | FE-2 | S |
-| 11-12 | All | Widget tests + integration test login flow | FE-bridge + FS | M |
+| 11-12 | All | Widget tests + integration test login flow | All | M |
 | 12 | All | M1 demo prep (run through scenario, fix critical bug) | All | S |
 | 13 | All | M1 demo + retro (giảng viên review) | All | — |
 
@@ -273,7 +274,7 @@ End of M3: Demo M3 story Aldo+Beatrice+Charlie chạy mượt trước giảng v
 ### 7. Polish + Demo prep ✅
 - Bug fix critical from M2
 - Loading/error/empty states across all screens
-- Re-skin với design tokens (FE-bridge)
+- Re-skin với design tokens (HanDHG + NganTNK)
 - Demo rehearsal 3+ lần
 - Backup video record
 

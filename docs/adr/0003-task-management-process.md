@@ -1,7 +1,9 @@
 # 0003. Task management process — sprint cadence + hybrid assignment
 
 **Date:** 2026-04-30
-**Status:** Accepted
+**Status:** Accepted (partial — §3, §4, §9 superseded by ADR-0004 on 2026-05-21)
+
+> **Lưu ý:** §3 (Team skill spread FE/BE), §4 (Hybrid lane assignment), §9 (Lane field trong task template) đã bị superseded bởi [ADR-0004](0004-solo-dev-module-ownership.md) sau khi giảng viên yêu cầu solo-dev model. Các section khác (sprint cadence, DoD, estimation, review SLA, daily check-in, milestone reporting, GitHub Projects) vẫn áp dụng.
 
 ## Context
 

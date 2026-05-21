@@ -327,8 +327,8 @@ Anh hỏi em khi tới lúc setup, em hướng dẫn chi tiết.
    - `Status`: Backlog / In Progress / Review / Done (single-select)
    - `Sprint`: Sprint 1 / Sprint 2 / Sprint 3 (single-select)
    - `Type`: feature / fix / chore / refactor / docs / test (single-select)
-   - `Lane`: Specialty-BE-Native / Specialty-UI-Design / Open (single-select) — xem §8.4
-   - `Assignee`: link với GitHub user
+   - `Module`: auth / feed / post / friend / camera / diary / space / rollcall / profile / widget / notification / reaction / core / functions (single-select) — xem §8.4
+   - `Assignee`: link với GitHub user (= module owner)
    - `Effort`: XS / S / M / L (single-select) — task > L phải break nhỏ hơn
 4. Auto-add: mọi issue mới + PR mới của repo → tự thêm vào board.
 
@@ -396,40 +396,55 @@ Task phải dùng template `.github/ISSUE_TEMPLATE/task.md`. Bắt buộc fields
 - **Mô tả** (1-2 câu).
 - **Acceptance criteria** ≥ 3 bullet, đo được.
 - **Estimate** T-shirt size (XS/S/M/L).
-- **Lane** (Specialty BE/Native, Specialty UI/Design, hoặc Open).
+- **Module** (auth / feed / post / ... — xem §8.4 module list) + **assignee** (= module owner).
 - **Files có thể chạm** (preview scope).
 - **Test plan** (test file + manual repro).
 
 Thiếu các field này → task chưa ready để pull. Anh sẽ flag trong sprint planning.
 
-### 8.4 Phân chia task — Hybrid lane
+### 8.4 Phân chia task — Solo-dev module ownership
 
-Team mix: **2 FS** (anh + 1, full-stack) + **2 FE-bridge** (Figma → Flutter UI, scope `presentation/` + `theme/` + `shared/widgets/`). Chi tiết scope code mỗi role: xem [ADR-0003 §3](adr/0003-task-management-process.md).
+Team **solo-dev model**: 4 dev, mỗi người own 1+ module **end-to-end** (data + logic + UI + test). Không tách FE/BE. Module phức tạp có thể nhiều người làm chung, nhưng **ưu tiên 1 người 1 module** để rõ ownership. Detail role: [ADR-0004](adr/0004-solo-dev-module-ownership.md) (sẽ thêm) + `.cursor/rules/25-dev-code-standards.mdc`.
 
-Backlog có 3 lane:
+**Module list** (chưa pre-assign — anh chốt khi finalize spec):
 
-| Lane | Cách phân | Loại task |
+| Module | Type | Ghi chú |
 |---|---|---|
-| **Specialty — BE/Native** | Anh assign cho 2 FS | Cloud Functions phức tạp, Firestore rules, Android widget Kotlin, data layer (repositories, mappers), native integration |
-| **Specialty — UI/Design** | Anh assign cho 2 FE-bridge | Screen từ Figma, design system extraction, theme tokens, reusable widget, animation phức tạp |
-| **Open** | Backlog có priority order. Dev pull theo thứ tự khi rảnh (theo skill match) | Docs, simple test, config tweak, small refactor, ADR draft |
+| `auth` | Tier 0 | Email + Google sign-in |
+| `friend` | Tier 0 | Invite + accept + friend list |
+| `camera` | Tier 0 | Back/front + capture + caption |
+| `post` | Tier 0 | Upload + metadata + push trigger |
+| `feed` | Tier 0 | Vertical list + cache + pagination |
+| `notification` | Tier 0 | FCM Android |
+| `reaction` | Tier 0 | Single emoji react |
+| `widget` | Tier 0 | Android AppWidget native |
+| `diary` | Tier 0+ | Text + 1-3 ảnh, no canvas |
+| `space` | Tier 0+ | Group + send photo |
+| `rollcall` | Tier 0+ | Weekly notif + special post |
+| `profile` | Tier 0+ | Avatar + bio + grid |
+
+**Designer role** (HanDHG + NganTNK kiêm):
+
+- Vẽ Figma frame + design system + theme token cho **cả app** trước khi anh export contract.
+- Module nào do họ design → ưu tiên họ implement Flutter để giữ design fidelity.
+- Tracking task design qua label `module:<name>` + assignee.
 
 **Rules:**
 
 - **WIP limit:** mỗi dev tối đa **2 task** `In Progress`.
-- **Pull workflow:** dev comment trong issue "lấy task này" → tự assign mình → move card sang `In Progress` → tạo branch theo §3.
-- **Specialty fallback:** task specialty không có owner kịp →
-  - **BE/Native:** anh hoặc FS dev thứ 2 pickup. Cả 2 FS đầy WIP → task giữ Backlog, anh re-prioritize.
-  - **UI/Design:** FE-bridge dev kia pickup, hoặc anh pickup nếu cả 2 FE-bridge đầy WIP.
-- **Anh là default safety net:** task quá khó cho dev student → anh pickup hoặc pair.
-- **AI agent guard cho FE-bridge:** Cascade tự load `.windsurf/rules/24-flutter-ui-patterns.md` (glob-scoped) khi edit `presentation/` hoặc `theme/`. Rule reminder design tokens, widget patterns, accessibility, Figma mapping.
+- **Assignment:** anh assign trực tiếp module owner cho từng task qua issue → owner = assignee.
+- **Cross-module strict:** dev A cần đụng module B → khoá lại, ping leader, leader xem xét + cập nhật contract → mở task riêng cho owner B (hoặc explicit assign cross-module task). Detail: `25-dev-code-standards.mdc` §Cross-module touch.
+- **Spec-driven:** mọi module phải có `docs/specs/<module>.md` + freezed models + abstract interfaces merged vào `develop` TRƯỚC khi giao dev. Dev không tự đoán contract.
+- **Multi-owner module phức tạp:** nếu module quá lớn (vd `feed` cả pagination + cache + UI), anh có thể assign 2 dev — chia sub-task rõ ràng (vd dev A: data + controller, dev B: UI + widget test) trong issue.
+- **Anh là safety net:** task quá khó cho dev student → anh pickup hoặc pair-program.
+- **AI agent guard:** Cursor tự load `.cursor/rules/24-flutter-ui-patterns.mdc` khi edit `presentation/` / `core/theme/` / `shared/widgets/`. Tự load `.cursor/rules/25-dev-code-standards.mdc` mọi message (`alwaysApply: true`) để remind solo-dev contract.
 
 ### 8.5 Definition of Done
 
 Một task được mark `Done` chỉ khi đầy đủ 7 mục:
 
 - [ ] Code committed theo Conventional Commits + tiếng Việt.
-- [ ] Tests added (unit cho logic; widget cho UI critical path; theo `.windsurf/rules/30-testing-and-verification.md`).
+- [ ] Tests added (unit cho logic; widget cho UI critical path; theo `.cursor/rules/30-testing-and-verification.mdc`).
 - [ ] `flutter analyze` + `dart format` clean (auto via husky pre-commit).
 - [ ] PR mở, description theo `.github/pull_request_template.md`.
 - [ ] ≥ 1 reviewer approve (anh là default CODEOWNERS).

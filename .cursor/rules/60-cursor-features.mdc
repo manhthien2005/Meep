@@ -1,6 +1,6 @@
 ---
-description: Cursor-specific features — @-mentions, Composer, agent modes, tab autocomplete. Loaded always so the agent knows how to leverage Cursor's native capabilities.
-alwaysApply: true
+description: Cursor features cheatsheet — slash commands, @-mentions, MCP setup, hooks, skills, indexing, custom @Docs, memories. Load when user asks about Cursor features/setup, or when agent needs to suggest a Cursor-native workflow.
+alwaysApply: false
 ---
 
 # Cursor Features Cheatsheet
@@ -137,9 +137,17 @@ Copy-Item .cursor\mcp.example.json .cursor\mcp.json
 
 | Command | Khi nào |
 |---|---|
-| `/worktree` | Cô lập task lớn vào git worktree riêng — không ảnh hưởng working tree hiện tại. |
-| `/best-of-n` | Chạy task song song trên nhiều model, so sánh outcome. Dùng cho task khó (architecture decision, complex algo). |
-| `/Await` | Đợi background shell/subagent hoàn thành trước khi tiếp tục. |
+| `/start <issue-id>` | Custom (`.cursor/commands/start.md`) — kickoff task mới. |
+| `/build` | Custom (`.cursor/commands/build.md`) — TDD cycle implement task. |
+| `/review` | Custom (`.cursor/commands/review.md`) — 5-axis self review trước PR. |
+| `/worktree` | Native — cô lập task lớn vào git worktree riêng. |
+| `/best-of-n` | Native — chạy task song song trên nhiều model, so sánh. |
+| `/Await` | Native — đợi background shell/subagent hoàn thành. |
+
+**Custom slash commands** (`.cursor/commands/<name>.md`):
+- File markdown chứa prompt cho command. Cursor scan folder này khi gõ `/`.
+- Khác với `workflow-*.mdc` rule (`description:` field — agent-requested mode): command file là cho **dev gõ trực tiếp** trong chat.
+- Restart Cursor sau khi add file mới để re-scan.
 
 **Khi nào em dùng:**
 - Task ≥ 30 phút có rủi ro break working tree → đề xuất `/worktree`.

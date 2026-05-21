@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Flutter UI Patterns — Presentation Layer
 
-Loaded when editing `presentation/`, `core/theme/`, or `shared/widgets/`. Supplements `21-flutter-rules.mdc` — this file focuses on **UI patterns** for the 2 FE-bridge devs (Figma → Flutter).
+Loaded when editing `presentation/`, `core/theme/`, or `shared/widgets/`. Supplements `21-flutter-rules.mdc` — this file focuses on **UI patterns** áp dụng cho mọi solo-dev khi implement screen (đặc biệt important cho HanDHG + NganTNK khi map Figma → Flutter).
 
 **Widget split / function split / file length thresholds** — see `21-flutter-rules.mdc` §Code organization. Not duplicated here.
 
@@ -22,15 +22,24 @@ Loaded when editing `presentation/`, `core/theme/`, or `shared/widgets/`. Supple
 
 If Figma has a new color/font not yet in theme → **add to `core/theme/` first**, then use it. Never inline.
 
-## Layering — DO NOT exceed scope
+## Layering — solo-dev module owner
 
-FE-bridge devs may only touch:
-- ✅ `apps/mobile/lib/features/<feature>/presentation/` — widgets, pages, theme application.
-- ✅ `apps/mobile/lib/core/theme/` — design tokens, theme system.
-- ✅ `apps/mobile/lib/shared/widgets/` — shared reusable widgets.
-- ⚠️ `apps/mobile/lib/features/<feature>/application/` — only **consume** existing controllers. DO NOT create new Riverpod controllers — ask FS dev.
-- ❌ `apps/mobile/lib/features/<feature>/data/` — FS dev only.
-- ❌ `firebase/functions/`, `apps/mobile/android/app/src/main/kotlin/` — FS dev only.
+Module Owner own full-stack module → được touch tất cả layer trong module mình:
+
+- ✅ `apps/mobile/lib/features/<my-module>/data/` — repositories, mappers.
+- ✅ `apps/mobile/lib/features/<my-module>/application/` — controllers, services.
+- ✅ `apps/mobile/lib/features/<my-module>/presentation/` — widgets, pages.
+- ✅ `firebase/functions/src/<my-module>/` — Cloud Functions của module mình.
+- ✅ `apps/mobile/android/app/src/main/kotlin/<my-module>/` — native code của module mình.
+
+**Khoá lại + ping leader** khi cần touch:
+- ❌ `apps/mobile/lib/core/theme/` — design token shared cho cả app.
+- ❌ `apps/mobile/lib/shared/widgets/` — widget reuse cross-module.
+- ❌ `apps/mobile/lib/core/error/`, `core/router/`, `core/di/` — shared infra.
+- ❌ `firebase/firestore.rules`, `storage.rules`, `firestore.indexes.json` — security rules + indexes.
+- ❌ `features/<other-module>/**` — module dev khác (xem `25-dev-code-standards.mdc` §Cross-module touch).
+
+Lý do: shared code đụng vào sẽ break nhiều module → leader gate review impact.
 
 ## Accessibility — minimum required
 

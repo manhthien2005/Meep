@@ -30,11 +30,16 @@ Standalone Node/TypeScript BE added only when: long-running work, heavy 3rd-part
 ## Team
 
 - **4 devs** (including the team leader).
+- **Solo-dev model:** mỗi dev own một (hoặc vài) module end-to-end (data + logic + UI + test). Không tách FE/BE.
+- **Leader define contract upfront:** spec + freezed model + abstract interface + stub provider merge vào `develop` trước khi giao module cho dev.
+- **Strict gate:** dev đụng module khác hoặc chệch contract → khoá lại, leader duyệt mới đi tiếp.
+- **HanDHG + NganTNK** kiêm UI/UX design (Figma) cho cả app — module nào do họ design, ưu tiên họ implement Flutter.
 - Dev name format: PascalCase + abbreviation — `ThienPDM`, `KhoaLND`, `HanDHG`, `NganTNK`.
-- Leader is default reviewer (CODEOWNERS).
+- Leader (anh) là default reviewer (CODEOWNERS). Sau khi chốt module → thêm module owner làm co-required reviewer.
 - Branching: `develop` → `deploy`. Feature branch: `<type>/<DevName>/<short-desc>`.
 - Commit messages: Conventional Commits + Vietnamese descriptions.
 - Task tracking: GitHub Projects v2. Full workflow: `docs/team-workflow.md`.
+- Detail role + ownership: `.cursor/rules/25-dev-code-standards.mdc`.
 
 ## Core MVP scope
 

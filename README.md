@@ -37,16 +37,22 @@ Chi tiết tech decisions: [`docs/adr/`](docs/adr/).
 
 ## Team
 
-4 dev student capstone. Branch + commit format track per dev (PascalCase + abbrev).
+4 dev student capstone, **solo-dev model** — mỗi người own một (hoặc vài) module end-to-end (data + logic + UI). Không tách FE/BE. Module phức tạp có thể nhiều người cùng làm, nhưng ưu tiên 1 người 1 module để rõ ownership.
 
-| Dev name | GitHub | Tên đầy đủ | Specialty |
+| Dev name | GitHub | Tên đầy đủ | Vai trò |
 |---|---|---|---|
-| `ThienPDM` | [@manhthien2005](https://github.com/manhthien2005) | Phan Điền Mạnh Thiên | Leader, default CODEOWNERS |
-| `KhoaLND` | [@CatS1mp](https://github.com/CatS1mp) | Lê Ngọc Đăng Khoa | Open (BE/UI flexible) |
-| `NganTNK` | [@JanaKimmm](https://github.com/JanaKimmm) | Trần Nguyễn Kim Ngân | UI / Design |
-| `HanDHG` | [@katheramp](https://github.com/katheramp) | Đào Huỳnh Gia Hân | UI / Design |
+| `ThienPDM` | [@manhthien2005](https://github.com/manhthien2005) | Phan Điền Mạnh Thiên | Leader, default CODEOWNERS, define contracts upfront |
+| `KhoaLND` | [@CatS1mp](https://github.com/CatS1mp) | Lê Ngọc Đăng Khoa | Module owner |
+| `HanDHG` | [@katheramp](https://github.com/katheramp) | Đào Huỳnh Gia Hân | Module owner + UI/UX design (Figma) |
+| `NganTNK` | [@JanaKimmm](https://github.com/JanaKimmm) | Trần Nguyễn Kim Ngân | Module owner + UI/UX design (Figma) |
+
+> **Solo-dev workflow:** leader define spec + freezed model + abstract interface upfront, dev cầm contract về implement full-stack module mình. Đụng module người khác hoặc chệch contract → khoá lại, leader duyệt mới đi tiếp. Chi tiết: [`.cursor/rules/25-dev-code-standards.mdc`](.cursor/rules/25-dev-code-standards.mdc).
+>
+> **UI/UX design:** HanDHG + NganTNK chịu trách nhiệm vẽ Figma (frame, design system, theme tokens) cho cả app, trước khi anh export contract cho tất cả module. Module Figma đó của ai → người đó implement Flutter.
 
 > **Phân biệt** — `Dev name` (PascalCase) dùng cho branch + commit (vd `feature/KhoaLND/...`). `GitHub username` dùng trong CODEOWNERS + PR @mention. Hai cái KHÔNG giống nhau, không cần match.
+
+> **Module ownership:** chưa pre-assign. Sẽ chốt khi anh finalize module list (`docs/specs/` + ADR). Đến lúc đó update `.github/CODEOWNERS` per-module path.
 
 ## Setup nhanh
 

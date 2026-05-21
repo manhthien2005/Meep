@@ -56,10 +56,12 @@ For language/framework-specific rules, see:
 
 | GitHub handle | DevName | Role |
 |---|---|---|
-| `manhthien2005` | `ThienPDM` | Leader |
-| `CatS1mp` | `KhoaLND` | BE |
-| `katheramp` | `HanDHG` | FE |
-| `JanaKimmm` | `NganTNK` | FE |
+| `manhthien2005` | `ThienPDM` | Leader (define contracts, review PR) |
+| `CatS1mp` | `KhoaLND` | Module Owner |
+| `katheramp` | `HanDHG` | Module Owner + UI/UX (Figma) |
+| `JanaKimmm` | `NganTNK` | Module Owner + UI/UX (Figma) |
+
+> Solo-dev model — không tách FE/BE. Mỗi dev own module end-to-end. Detail: `25-dev-code-standards.mdc`.
 
 ## Naming
 

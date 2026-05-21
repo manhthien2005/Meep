@@ -8,6 +8,14 @@
   - Assign #14 vào milestone M2 + add vào Project #2
   - Idempotent: re-run safe
 
+  ⚠️ DEPRECATED PARTIAL (2026-05-21) — sau ADR-0004 (solo-dev module ownership):
+  - Field "Lane" + giá trị "Specialty-BE-Native" / "Specialty-UI-Design" không còn dùng.
+  - `modules.md` cũng đã mark outdated, đợi leader rewrite.
+  - KHÔNG re-run script này cho đến khi:
+    1. Leader rewrite `modules.md` với owner mới (solo-dev assignment).
+    2. Project board đổi field "Lane" → "Module".
+    3. Block "Module = X" trong file này được rewrite tương ứng.
+
 .EXAMPLE
   pwsh ./scripts/sync-epic-issues.ps1
 #>

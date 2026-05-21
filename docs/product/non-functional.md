@@ -101,7 +101,7 @@ PII includes: email, phone, display name, photos, captions, friend graph, FCM to
 
 ## 4. Accessibility
 
-Theo `.windsurf/rules/24-flutter-ui-patterns.md` §"Accessibility (a11y)".
+Theo `.cursor/rules/24-flutter-ui-patterns.mdc` §"Accessibility (a11y)".
 
 - [ ] Touch target ≥ 48x48 dp
 - [ ] Text contrast ratio ≥ 4.5:1 (WCAG AA)
@@ -167,7 +167,7 @@ MVP capstone scale: target ~100-500 users (4 dev + close friends + giảng viên
 
 ### Loading / error / empty / data states (4 trạng thái bắt buộc)
 
-Theo `.windsurf/rules/24-flutter-ui-patterns.md`. Mọi screen phải implement.
+Theo `.cursor/rules/24-flutter-ui-patterns.mdc`. Mọi screen phải implement.
 
 ### Vietnamese UX standard
 
@@ -216,5 +216,5 @@ Theo `.windsurf/rules/24-flutter-ui-patterns.md`. Mọi screen phải implement.
 
 - **Security detail:** [`../architecture/security-model.md`](../architecture/security-model.md)
 - **Rules cấm hardcoding:** `.windsurf/rules/40-security-guardrails.md`
-- **Testing discipline:** `.windsurf/rules/30-testing-and-verification.md`
-- **UI accessibility:** `.windsurf/rules/24-flutter-ui-patterns.md`
+- **Testing discipline:** `.cursor/rules/30-testing-and-verification.mdc`
+- **UI accessibility:** `.cursor/rules/24-flutter-ui-patterns.mdc`

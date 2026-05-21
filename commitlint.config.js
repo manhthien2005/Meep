@@ -52,5 +52,5 @@ export default {
   },
 
   helpUrl:
-    'Xem .windsurf/rules/20-stack-conventions.md §Git — Team Workflow để biết format chi tiết.',
+    'Xem .cursor/rules/20-stack-conventions.mdc (hoặc .windsurf/rules/20-stack-conventions.md) §Git — Team Workflow để biết format chi tiết.',
 };

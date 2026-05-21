@@ -55,7 +55,7 @@ Detail: [`docs/product/features.md`](features.md). Day estimates: memory `mvp-ti
 
 ## Team & timeline
 
-- **Team:** 4 dev student capstone (anh là leader). 2 FS dev (Flutter + Cloud Functions + Firestore rules + native Kotlin) + 2 FE-bridge (Figma → Flutter UI).
+- **Team:** 4 dev student capstone (anh là leader). **Solo-dev model** — mỗi dev own 1+ module end-to-end (data + logic + UI + test). Không tách FE/BE. HanDHG + NganTNK kiêm UI/UX Figma. Detail: [ADR-0004](../adr/0004-solo-dev-module-ownership.md).
 - **Timeline:** 6 tuần hard deadline, 30/4 → 9/6/2026.
 - **3 milestones:** M1 (Setup + Auth) → M2 (Social core) → M3 (Differentiator + Demo).
 

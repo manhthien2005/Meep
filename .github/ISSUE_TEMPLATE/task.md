@@ -39,22 +39,24 @@ Nếu là bug → dùng template "Báo cáo bug".
 - [ ] **M** — 1 ngày, ~8h (1 feature screen có state, 1 Cloud Function + tests)
 - [ ] **L** — 2-3 ngày (1 module phức tạp: friend graph, post + storage)
 
-## Lane
+## Module ownership
 
-<!-- Leader assign cho 2 specialty lanes; Open lane dev tự pull theo skill match. -->
+<!-- Module nào của task này. Module owner = assignee. Cross-module touch (đụng module dev khác) phải qua leader trước. -->
 
-- [ ] **Specialty — BE/Native** (FS owns: Cloud Functions, Firestore rules, Android widget Kotlin, data layer)
-- [ ] **Specialty — UI/Design** (FE-bridge owns: screen từ Figma, design system, theme, reusable widget)
-- [ ] **Open** (dev pull theo priority + skill match — docs, simple test, config tweak, small refactor)
+- **Module:** `<auth | feed | post | friend | camera | diary | space | rollcall | profile | widget | notification | reaction | core | functions>`
+- **Module owner (assignee):** @<github-username>
 
 ## Files có thể chạm
 
-<!-- Preview scope cho reviewer. Không cần exhaustive — list module/folder chính. -->
+<!-- Preview scope cho reviewer. Solo-dev → owner full-stack module mình. -->
 
-- `apps/mobile/lib/features/<feature>/...`
-- `firebase/functions/src/...`
-- `firebase/firestore.rules` / `firebase/storage.rules`
-- `apps/mobile/android/app/src/main/kotlin/...` (nếu touch widget native)
+- Data layer: `apps/mobile/lib/features/<module>/data/`
+- Application layer: `apps/mobile/lib/features/<module>/application/`
+- Presentation layer: `apps/mobile/lib/features/<module>/presentation/`
+- Cloud Functions (nếu module có): `firebase/functions/src/<module>/`
+- Native (nếu module có widget Android): `apps/mobile/android/app/src/main/kotlin/<module>/`
+
+> ⚠️ **Đụng `core/`, `shared/widgets/`, `firestore.rules`, hoặc module dev khác → khoá lại, ping leader trước.** Chi tiết: `.cursor/rules/25-dev-code-standards.mdc` §Cross-module touch.
 
 ## Files phải đọc trước (context)
 

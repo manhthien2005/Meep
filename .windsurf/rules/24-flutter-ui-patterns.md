@@ -5,7 +5,7 @@ globs: apps/mobile/lib/features/**/presentation/**/*.dart,apps/mobile/lib/core/t
 
 # Flutter UI Patterns — Presentation Layer
 
-Loaded when editing `presentation/`, `core/theme/`, or `shared/widgets/`. Supplements `21-flutter-rules.md` (general mobile rules) — this file focuses on **UI patterns** for the 2 FE-bridge devs (Figma → Flutter).
+Loaded when editing `presentation/`, `core/theme/`, or `shared/widgets/`. Supplements `21-flutter-rules.md` (general mobile rules) — this file focuses on **UI patterns** áp dụng cho mọi solo-dev khi implement screen (đặc biệt important cho HanDHG + NganTNK khi map Figma → Flutter).
 
 **General rules for splitting widgets / functions / classes** (size threshold, reuse threshold, file length) — see `21-flutter-rules.md` §Code organization & widget split. This file does NOT duplicate those; it only covers FE-specific patterns below.
 
@@ -23,18 +23,25 @@ Loaded when editing `presentation/`, `core/theme/`, or `shared/widgets/`. Supple
 
 If Figma has a new color/font not yet in theme → **add to `core/theme/` first**, then use it. Never inline.
 
-## Layering — DO NOT exceed scope
+## Layering — solo-dev module owner
 
-FE-bridge devs may only touch:
+Module Owner own full-stack module → được touch tất cả layer trong module mình:
 
-- ✅ `apps/mobile/lib/features/<feature>/presentation/` — widgets, pages, theme application.
-- ✅ `apps/mobile/lib/core/theme/` — design tokens, theme system.
-- ✅ `apps/mobile/lib/shared/widgets/` — shared reusable widgets.
-- ⚠️ `apps/mobile/lib/features/<feature>/application/` — only **consume** existing controllers (`ref.watch(authControllerProvider)`). DO NOT create new Riverpod controllers — ask FS dev.
-- ❌ `apps/mobile/lib/features/<feature>/data/` — repositories, mappers. FS dev only.
-- ❌ `firebase/functions/`, `apps/mobile/android/app/src/main/kotlin/` — FS dev only.
+- ✅ `apps/mobile/lib/features/<my-module>/data/` — repositories, mappers.
+- ✅ `apps/mobile/lib/features/<my-module>/application/` — controllers, services.
+- ✅ `apps/mobile/lib/features/<my-module>/presentation/` — widgets, pages.
+- ✅ `firebase/functions/src/<my-module>/` — Cloud Functions của module mình.
+- ✅ `apps/mobile/android/app/src/main/kotlin/<my-module>/` — native code của module mình.
 
-If Cascade suggests code outside ✅/⚠️ scope → flag user: "outside FE-bridge scope, should I ask FS dev?".
+**Khoá lại + ping leader** khi cần touch:
+
+- ❌ `apps/mobile/lib/core/theme/` — design token shared cho cả app.
+- ❌ `apps/mobile/lib/shared/widgets/` — widget reuse cross-module.
+- ❌ `apps/mobile/lib/core/error/`, `core/router/`, `core/di/` — shared infra.
+- ❌ `firebase/firestore.rules`, `storage.rules`, `firestore.indexes.json` — security rules + indexes.
+- ❌ `features/<other-module>/**` — module dev khác (xem `25-dev-code-standards.md` §Cross-module touch).
+
+If Cascade suggests code outside ✅ scope → flag user: "outside my module scope, should I ping leader?".
 
 ## Accessibility — minimum required
 

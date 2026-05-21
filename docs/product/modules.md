@@ -4,7 +4,17 @@
 
 | Status | Owner | Last update |
 |---|---|---|
-| 🟢 Active | `ThienPDM` (Leader) | 2026-05-03 |
+| 🟡 Outdated (đợi rewrite) | `ThienPDM` (Leader) | 2026-05-03 |
+
+> ⚠️ **2026-05-21 — File này đang outdated sau ADR-0004.**
+>
+> - Trường `Lane: BE-heavy / UI-heavy + BE` không còn áp dụng — solo-dev model không tách FE/BE.
+> - Pre-assignment "Owner: ThienPDM + KhoaLND (BE) + NganTNK + HanDHG (UI)" sẽ được rewrite theo nguyên tắc:
+>   - **ThienPDM (Leader) + KhoaLND** → module phức tạp (Auth, Post + storage, Widget native, Cloud Functions infra). Mỗi người own nhiều module hơn.
+>   - **HanDHG + NganTNK** → module M (medium) hoặc dễ. Ít module hơn (đổi thời gian Figma).
+>   - 1 module = 1 owner duy nhất (không pair). Cross-module touch strict gate qua leader.
+> - Anh (Leader) sẽ rewrite full file này trong sprint tới. Tới khi đó, KHÔNG dùng các trường `Lane` / `Owner` ở đây làm source of truth.
+> - Source of truth hiện tại cho assignment: GitHub issue assignee + ADR-0004.
 
 ## 0. Quick navigation
 

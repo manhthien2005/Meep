@@ -12,7 +12,7 @@ Meep is a private/intimate photo-sharing app for close friends — small, focuse
 - **Home-screen widget** showing latest images is a key differentiator. **MVP target: Android AppWidget only.** iOS WidgetKit is deferred post-MVP — see `docs/adr/0002-android-first-defer-ios.md`.
 - **Meep ≠ Locket clone.** Defining differentiator features (must ship M3): Diary, Space, RollCall, Camera. See Tier 0+ in `.windsurf/rules/10-project-context.md` §Core MVP scope.
 - **Firebase-first backend:** Auth, Firestore, Storage, Cloud Functions, FCM. A self-hosted Node/TypeScript service is added only when something genuinely cannot be done in Firebase.
-- **Team capstone:** 4 dev student (anh là leader). Every decision must keep onboarding low (a new dev productive in <1 day) and ops surface small.
+- **Team capstone:** 4 student devs (anh là leader). **Solo-dev model** — mỗi dev own module end-to-end (data + logic + UI + test), không tách FE/BE. Leader define contract upfront, dev cầm contract về implement. HanDHG + NganTNK kiêm UI/UX Figma. Detail: `.cursor/rules/25-dev-code-standards.mdc` + `docs/team-workflow.md` §8.4. Decisions must keep onboarding low (a new dev productive in <1 day) and ops surface small.
 - **MVP scope:** 12 firm features (Tier 0 + Tier 0+) + 3 stretch (Tier 1) + 11 cut (Tier 2). Detail: `.windsurf/rules/10-project-context.md` §Core MVP scope, `docs/product/features.md`, `docs/roadmap/milestones.md`, memory `mvp-tier-priority`.
 
 ## 2. Repository layout (current)
@@ -122,10 +122,12 @@ Full table + rationale lives in:
 - `.windsurf/rules/10-project-context.md` — high-level decisions + Firebase-first rationale.
 - `.windsurf/rules/20-stack-conventions.md` — naming + cross-cutting conventions.
 - `.windsurf/rules/21-flutter-rules.md` (loaded when editing `apps/mobile/**`).
-- `.windsurf/rules/22-functions-rules.md` (loaded when editing `firebase/functions/**`).
-- `.windsurf/rules/23-firestore-rules.md` (loaded when editing rules / indexes).
-- `.windsurf/rules/24-flutter-ui-patterns.md` (loaded when editing `presentation/`, `core/theme/`, `shared/widgets/`).
+- `.cursor/rules/22-functions-rules.mdc` (loaded when editing `firebase/functions/**`).
+- `.cursor/rules/23-firestore-rules.mdc` (loaded when editing rules / indexes).
+- `.cursor/rules/24-flutter-ui-patterns.mdc` (loaded when editing `presentation/`, `core/theme/`, `shared/widgets/`).
+- `.cursor/rules/25-dev-code-standards.mdc` (always loaded — solo-dev model rules).
 - `docs/adr/0001-firebase-first-backend.md` — why Firebase over self-host.
+- `docs/adr/0004-solo-dev-module-ownership.md` — solo-dev model decisions.
 
 Default deploy region for Functions + Storage: `asia-southeast1`.
 
@@ -219,162 +221,14 @@ Full onboarding doc lives at `docs/team-workflow.md`. Quick reference:
 
 Detail rules: `.windsurf/rules/20-stack-conventions.md` §Git — Team Workflow.
 
-## 8. First-run setup checklist
 
-Tooling currently installed on this machine:
+## 8. Setup, MCP, and reference kits
 
-- ✅ **Flutter 3.41.4** (stable channel)
-- ✅ **Node 22.17.0** (local OK — backward-compat với Node 20. **CI + Cloud Functions runtime = Node 20** để match production engine. Test BE features cần Node 20 trước khi push để tránh CI fail.)
-- ✅ **Git 2.51**
-- ✅ **Java 21 LTS** (Android dev)
-- ✅ **Python 3.13.4** (used by Cascade hooks)
-- ❌ **Firebase CLI** — needs `npm install -g firebase-tools`
-- ❌ **flutterfire CLI** — needs `dart pub global activate flutterfire_cli`
-- ❌ **MCP servers** — see §8 below
-- ❌ **RTK** (token-killer proxy) — optional, see §9 below
+Setup commands, MCP server config, RTK install, và source kits ref đã move sang **[docs/setup.md](docs/setup.md)** để giảm context bloat (setup info là one-time, không cần load mỗi message).
 
-### One-time setup commands
-
-```bash
-# Firebase CLI + login
-npm install -g firebase-tools
-firebase login
-
-# flutterfire CLI (used to wire google-services.json / GoogleService-Info.plist)
-dart pub global activate flutterfire_cli
-
-# Flutter app deps + code generation
-cd apps/mobile
-flutter pub get
-flutterfire configure --project=<your-firebase-project-id>
-dart run build_runner build --delete-conflicting-outputs
-cd ../..
-
-# Functions deps
-cd firebase/functions
-npm install
-cd ../..
-
-# Project alias
-cp firebase/.firebaserc.example firebase/.firebaserc
-# Edit firebase/.firebaserc with your real project IDs
-
-# Local env
-cp .env.example .env
-# Edit .env with your real values
-
-# Smoke test the emulator suite
-firebase emulators:start --project default
-```
-
-## 9. MCP servers — curated minimal set
-
-**Windsurf/Cascade** reads MCP servers from a **user-level** file:
-
-- macOS / Linux: `~/.codeium/windsurf/mcp_config.json`
-- Windows: `C:\Users\<you>\.codeium\windsurf\mcp_config.json`
-
-(There is **no** workspace-level MCP config — Windsurf only supports the user-level file.)
-
-**Cursor/Kiro** reads MCP servers from:
-
-- **Workspace-level (preferred for team-shared servers):** `.cursor/mcp.json` at the repo root. Copy from `.cursor/mcp.example.json` (committed) to `.cursor/mcp.json` (gitignored) and adapt.
-- **User-level:** `C:\Users\<you>\.cursor\mcp.json` (Windows) / `~/.cursor/mcp.json` (macOS/Linux).
-
-To activate Cursor workspace MCP:
-
-```pwsh
-# Windows
-Copy-Item .cursor\mcp.example.json .cursor\mcp.json
-```
-
-```bash
-# macOS / Linux
-cp .cursor/mcp.example.json .cursor/mcp.json
-```
-
-Then restart Cursor or reload the MCP panel. Format is identical to Claude Desktop (`mcpServers` key).
-
-A starting point lives at `.windsurf/mcp_config.example.json`. To activate:
-
-```pwsh
-# Windows
-$mcpDir = "$env:USERPROFILE\.codeium\windsurf"
-New-Item -ItemType Directory -Force -Path $mcpDir | Out-Null
-Copy-Item .windsurf\mcp_config.example.json "$mcpDir\mcp_config.json"
-```
-
-```bash
-# macOS / Linux
-mkdir -p ~/.codeium/windsurf
-cp .windsurf/mcp_config.example.json ~/.codeium/windsurf/mcp_config.json
-```
-
-Then restart Windsurf or click "Refresh" on the MCPs panel in Cascade.
-
-### Enabled by default
-
-- **context7** — up-to-date library docs (Flutter / Firebase / Riverpod / freezed). Prevents the agent hallucinating outdated APIs. Free tier, no API key.
-- **github** — official `ghcr.io/github/github-mcp-server`. Issues, PRs, repos, code search, workflows. Requires Docker + GitHub PAT (scopes: `repo`, `read:org`, `read:user`, `workflow`). Alternative: remote `https://api.githubcopilot.com/mcp/` (no Docker needed, requires Cursor v0.48.0+).
-- **figma** — `figma-developer-mcp` (GLips). Paste a Figma frame URL → MCP returns layout/text/colors → agent generates Flutter widget. Requires `FIGMA_API_KEY` from Figma → Settings → Personal access tokens.
-
-### Setup steps for Cursor
-
-```pwsh
-# Windows
-Copy-Item .cursor\mcp.example.json .cursor\mcp.json
-# Edit .cursor\mcp.json: replace ghp_REPLACE_WITH_YOUR_PAT and figd_REPLACE_WITH_YOUR_FIGMA_TOKEN
-# Restart Cursor or click Refresh on the MCP panel.
-```
-
-`.cursor/mcp.json` is gitignored — each dev fills their own tokens. Never commit the real file.
-
-### Deliberately NOT enabled (and why)
-
-| MCP | Why skipped |
-|---|---|
-| `filesystem` | Redundant — Cursor already has `read_file`, `write_to_file`, `edit`, `find_by_name`, `grep_search`, `list_dir` natively (faster, no extra hop). |
-| `memory` | Redundant — Cursor has built-in Memories (GA from 1.2), persists across sessions with user approval gate. |
-| `postgres` | Project uses Firestore (see ADR `0001-firebase-first-backend`). Add only when a real Postgres dependency appears. |
-| `firebase` | No audited official server yet (as of 2026-04). Prefer the `firebase` CLI directly — already guarded by `block_dangerous_commands.py` for prod targets. |
-
-If you later need any of these, add the entry to `~/.codeium/windsurf/mcp_config.json` and restart Cascade.
-
-## 10. RTK (Rust Token Killer) — optional
-
-RTK proxies shell commands and compresses noisy output before it enters the Cascade context (60–90% token saving on `git status`, test runners, etc.). Not installed yet — `.windsurf/rules/50-token-discipline.md` already has fallback flags for noisy commands, so this is purely an optimization.
-
-If you want to install it later, three options:
-
-**Option 1 — Pre-built binary (fastest, no Rust needed):**
-1. Download `rtk-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/rtk-ai/rtk/releases).
-2. Extract `rtk.exe` to `C:\Users\<user>\.local\bin\` (create the folder if missing).
-3. Add that folder to `PATH` (System Properties → Environment Variables).
-4. Restart Windsurf, verify with `rtk --version`.
-5. Activate: `rtk init --agent windsurf`.
-
-**Option 2 — Cargo (if you install Rust first):**
-```pwsh
-winget install Rustlang.Rustup
-rustup default stable
-cargo install --git https://github.com/rtk-ai/rtk
-rtk init --agent windsurf
-```
-
-**Option 3 — WSL** (Linux native, full hook system): see [docs](https://github.com/rtk-ai/rtk#windows).
-
-## 11. Source kits (reference only)
-
-The `.agent-kits/` folder (gitignored) contains seven cloned reference repos. They were inspected during the bootstrap of this project's `.windsurf/` setup. **Do not edit anything inside `.agent-kits/`.** If a skill needs an update, edit the file in `.windsurf/skills/` directly.
-
-| Folder | Origin | What was kept |
-|---|---|---|
-| `superpowers/` | obra/superpowers | Methodology skills: TDD, systematic-debugging, verification, brainstorming, writing-plans |
-| `class-ai-agent/` | bahdotsh/class-ai-agent | Slash-command workflow scaffolds (rewritten for Flutter/Firebase) |
-| `andrej-karpathy-skills/` | karpathy | `karpathy-guidelines` skill, near-verbatim |
-| `caveman/` | JuliusBrussee/caveman | Windsurf `.windsurf/` format reference + adapted into `caveman-vi` |
-| `everything-claude-code/` | hesreallyhim/everything-claude-code | Inspected; not used wholesale (Claude-Code-specific plugin system) |
-| `mattpocock-skills/` | mattpocock | Inspected; not cherry-picked (overlaps with superpowers) |
-| `rtk/` | rtk-ai/rtk | Documented install path only; not auto-installed |
-
-The folder is ~150MB on disk. Safe to delete with `Remove-Item -Recurse -Force .agent-kits` once you're comfortable with what's in `.windsurf/`.
+Khi bạn cần:
+- **First-run setup** (Firebase CLI, flutterfire, deps) → `docs/setup.md` §1-§2.
+- **MCP servers** (context7, github, figma) → `docs/setup.md` §3.
+- **RTK token-killer** (optional) → `docs/setup.md` §4.
+- **.agent-kits/ source kits** → `docs/setup.md` §5.
+- **Restart checklist sau setup** → `docs/setup.md` §6.
