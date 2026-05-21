@@ -24,7 +24,7 @@ E2E acceptance test cho M3 demo (9/6/2026). Story 3 nhân vật Aldo + Beatrice 
   - Tốt nhất: 3 phone khác model + screen size để show responsive
   - Aldo: phone chính anh
   - Beatrice: phone dev FS-2
-  - Charlie: phone dev FE-bridge
+  - Charlie: phone dev module owner UI
 - **Projector / TV screencast**: cast 1 phone screen lên (Aldo) chính, 2 phone còn lại physical hold up theo turn
 - **Backup laptop**: APK + recording video sẵn sàng
 - **Wi-Fi office + mobile hotspot backup**
@@ -218,7 +218,7 @@ E2E acceptance test cho M3 demo (9/6/2026). Story 3 nhân vật Aldo + Beatrice 
 
 **Trả lời:**
 - Cross-platform ready cho post-MVP iOS (codebase reuse 80%)
-- Single team Dart skillset (FE-bridge dễ tham gia)
+- Single team Dart skillset (mọi dev đều full-stack module → tham gia dễ)
 - Material 3 default UI tốt, ít boilerplate
 - Performance gần native (especially scrolling)
 - Hot reload boost dev velocity 2-3x

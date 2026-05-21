@@ -10,6 +10,12 @@
   - Tạo 12 epic issues từ docs/roadmap/milestones.md (Tier 0 + 0+)
   - Add issues vào project với field values (Sprint/Lane/Effort)
 
+  ⚠️ DEPRECATED PARTIAL (2026-05-21) — sau ADR-0004 (solo-dev module ownership):
+  - Lane field + lane:* labels không còn dùng. Mọi `Lane` trong script này là LEGACY.
+  - Khi tạo issue mới: dùng template `task.md` với field "Module" thay vì Lane.
+  - Đã chạy 1 lần rồi → labels tồn tại trên GitHub. Không cần re-run.
+  - Để giữ board sạch: vào GitHub Projects → Settings → đổi field "Lane" thành "Module" (hoặc thêm field "Module" mới và archive Lane).
+
 .NOTES
   Idempotent: safe re-run. Skip resource đã tồn tại.
   Requires: gh CLI ≥2.40, authenticated với scopes repo + project.

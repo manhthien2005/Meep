@@ -62,7 +62,7 @@ apps/mobile/lib/
 │   ├── auth/
 │   │   ├── data/                  # AuthRepository (Firebase Auth wrapping)
 │   │   ├── application/           # Riverpod controllers
-│   │   └── presentation/          # Screens + widgets (FE-bridge owns)
+│   │   └── presentation/          # Screens + widgets (module owner full-stack)
 │   ├── friends/
 │   ├── camera/
 │   ├── feed/

@@ -15,13 +15,13 @@ gh issue view <issue-id> --repo manhthien2005/Meep
 
 Read and extract:
 - **Title** — task name + scope
-- **Assignee** — who owns this task
-- **Lane label** — `lane:specialty-be-native` (BE) or `lane:specialty-ui-design` (FE) or `lane:open`
+- **Assignee** — module owner của task
+- **Module** — module nào (xem label `module:<name>` nếu đã có, hoặc đọc trong issue body)
 - **Acceptance criteria** — what done looks like
 - **Files có thể chạm** — output scope
 - **Files phải đọc trước** — context files (read these in Step 3)
 - **Dependencies / blockers** — issue numbers that must be closed first
-- **Plan reference** — `docs/plans/` path
+- **Spec / plan reference** — `docs/specs/` + `docs/plans/` path
 
 ## Step 2 — Check blockers
 
@@ -51,24 +51,25 @@ If the section is empty or missing:
 
 **Goal:** Understand the existing contract before writing a single line.
 
-## Step 4 — Determine role + load rule context
+## Step 4 — Identify module + load rule context
 
-Check the lane label from Step 1:
+Check the `Module` field in issue (or label `module:<name>`):
 
-| Label | Role | Key rules to internalize |
-|---|---|---|
-| `lane:specialty-ui-design` | FE | Scope: `presentation/` only. Read `24-flutter-ui-patterns.mdc`. Use typed mock from leader's freezed models. Never call Firebase directly. |
-| `lane:specialty-be-native` | BE | Scope: `data/` + `application/`. Implement abstract interface exactly. Never touch `presentation/`. |
-| `lane:open` | Open | Check task scope in issue — follow whichever rules apply. |
+- Read `docs/specs/<module>.md` if exists — module spec + acceptance.
+- Read `25-dev-code-standards.mdc` — solo-dev contract rules.
+- If task touches presentation/theme/shared widgets → `24-flutter-ui-patterns.mdc` auto-loads via glob.
 
-If no lane label is set → ask: "Bạn là FE hay BE dev cho task này?"
+If no Module field set → ask: "Module nào của task này? (auth/feed/post/...)"
 
-## Step 5 — Verify contract exists (FE only)
+## Step 5 — Verify contract exists
 
-If role = FE:
-- Confirm that the freezed models and providers needed by this screen exist on `develop`.
-- Check: `git log --oneline origin/develop -- lib/features/<feature>/data/`
-- If models not yet merged → **STOP**. Report: "Contract chưa có trên develop. Hỏi leader trước khi start."
+Confirm leader đã merge contract vào `develop`:
+
+- Spec: `docs/specs/<module>.md` exists.
+- Models: `git log --oneline origin/develop -- apps/mobile/lib/features/<module>/data/` có commit từ leader.
+- Stub providers throw `UnimplementedError` (chưa wire real impl).
+
+If contract chưa có → **STOP**. Report: "Contract module `<X>` chưa có trên develop. Ping @manhthien2005 trước khi start."
 
 ## Step 6 — Create branch + update project status
 
@@ -77,10 +78,10 @@ Branch format: `feature/<DevName>/<short-desc>`
 DevName mapping:
 | GitHub handle | DevName | Role |
 |---|---|---|
-| `manhthien2005` | `ThienPDM` | Leader |
-| `CatS1mp` | `KhoaLND` | BE |
-| `katheramp` | `HanDHG` | FE |
-| `JanaKimmm` | `NganTNK` | FE |
+| `manhthien2005` | `ThienPDM` | Leader (define contracts, review PR) |
+| `CatS1mp` | `KhoaLND` | Module Owner |
+| `katheramp` | `HanDHG` | Module Owner + UI/UX (Figma) |
+| `JanaKimmm` | `NganTNK` | Module Owner + UI/UX (Figma) |
 
 ```bash
 # 1. Create and switch to the feature branch
@@ -96,12 +97,13 @@ Print a concise summary:
 
 ```
 Issue:    #<id> <title>
-Role:     FE / BE / Open
+Module:   <module-name>
+Owner:    <DevName> (assignee)
 Blockers: ✅ all closed / ❌ blocked by #X
-Contract: ✅ models on develop / ⚠️ missing (stop + ask leader)
+Contract: ✅ spec + models on develop / ⚠️ missing (stop + ping leader)
 Branch:   feature/<DevName>/<short-desc>
 Status:   ✅ set to "In Progress" on project board
-Scope:    <list of files allowed to touch>
+Scope:    <module folder> + <related> (cross-module touch → ping leader first)
 
 Context loaded:
   - <file1> — <why>

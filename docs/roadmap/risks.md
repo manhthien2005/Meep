@@ -10,7 +10,7 @@ Top risks cho 6-tuần capstone. Mỗi risk có likelihood, impact, mitigation, 
 |---|---|---|---|---|---|
 | R1 | M3 overflow do quá nhiều task differentiator | High | High | 🔴 Critical | Anh (leader) |
 | R2 | Native Kotlin Widget Android phức tạp | Med | High | 🟡 Med | FS-1 (anh) |
-| R3 | Design tokens land trễ → FE-bridge idle | Med | Med | 🟡 Med | Anh (coordination) |
+| R3 | Design tokens land trễ → module owner UI idle | Med | Med | 🟡 Med | Anh (coordination) |
 | R4 | Velocity 4 dev không đều | High | Med | 🟡 Med | Anh (planning) |
 | R5 | Camera package compatibility issues trên một số Android | Med | Med | 🟡 Med | FS-1 |
 | R6 | AI hallucination tạo bug subtle | High | Med | 🟡 Med | All dev |
@@ -68,9 +68,9 @@ Top risks cho 6-tuần capstone. Mỗi risk có likelihood, impact, mitigation, 
 
 ---
 
-## R3 🟡 — Design tokens land trễ → FE-bridge idle
+## R3 🟡 — Design tokens land trễ → module owner UI idle
 
-**Mô tả:** Design team chưa hoàn thiện design pattern (color, typography, spacing, component variants). FE-bridge dev có thể bị block khi build UI screens.
+**Mô tả:** HanDHG + NganTNK (kiêm UI/UX) chưa hoàn thiện design pattern (color, typography, spacing, component variants) trong Figma. Module owner phụ thuộc design tokens có thể bị block khi build UI screens.
 
 **Trigger conditions:**
 - M1 day 5 (5/5) — design tokens chưa có
@@ -78,9 +78,9 @@ Top risks cho 6-tuần capstone. Mỗi risk có likelihood, impact, mitigation, 
 
 **Mitigation:**
 
-1. **Communicate sớm (today):** Anh discuss với design team — request ưu tiên design tokens deliver trong tuần này.
-2. **FE-bridge work với Material 3 baseline:** Dùng `Theme.of(context).colorScheme.primary` + `textTheme.headlineSmall` (rule 24 cấm hardcode hex/font). Re-skin sau khi tokens land = update `core/theme/` only, KHÔNG refactor widget.
-3. **FE-bridge alternative tasks nếu idle:**
+1. **Communicate sớm (today):** Anh discuss với HanDHG + NganTNK — request ưu tiên design tokens deliver trong tuần này.
+2. **Module owner work với Material 3 baseline:** Dùng `Theme.of(context).colorScheme.primary` + `textTheme.headlineSmall` (rule 24 cấm hardcode hex/font). Re-skin sau khi tokens land = update `core/theme/` only, KHÔNG refactor widget.
+3. **Module owner alternative tasks nếu idle:**
    - Viết widget tests cho UI placeholder
    - Learn Riverpod consume pattern
    - Scaffold `shared/widgets/` từ wireframe (placeholder common components)
@@ -94,8 +94,8 @@ Top risks cho 6-tuần capstone. Mỗi risk có likelihood, impact, mitigation, 
 ## R4 🟡 — Velocity 4 dev không đều
 
 **Mô tả:** 4 dev student capstone với skill levels khác nhau:
-- Anh + 1 FS dev mạnh
-- 2 FE-bridge skill basic (Figma → Flutter)
+- Anh + 1 dev mạnh (skill backend/native vững)
+- 2 dev còn lại skill basic (cần ramp-up Flutter + Firebase)
 - AI boost factor: senior 3-4x, junior 1-2x
 
 **Trigger conditions:**
@@ -104,14 +104,14 @@ Top risks cho 6-tuần capstone. Mỗi risk có likelihood, impact, mitigation, 
 
 **Mitigation:**
 
-1. **Pair-programming AI early:** 2 FE-bridge pair với anh hoặc FS dev mạnh tuần 1. Học pattern.
-2. **Task allocation:**
-   - Anh + FS dev mạnh → core path (Auth, Share photo, Widget)
-   - 2 dev còn lại → support path (Friends, Feed, UI placeholder, tests)
-   - Pair-programming các milestone-critical task
+1. **Pair-programming AI early:** 2 dev junior pair với anh hoặc dev senior tuần 1. Học pattern.
+2. **Module assignment theo skill:**
+   - Anh + dev senior → module phức tạp (Auth, Post + storage, Widget native)
+   - 2 dev junior → module UI-heavy + đã có Figma sẵn (Profile, Diary, Reaction)
+   - Pair-programming các module milestone-critical
 3. **Code review chặt:** Anh review tất cả PR. Catch bug + teach pattern.
-4. **Daily check-in async:** Phát hiện block sớm. Re-allocate task nếu dev stuck.
-5. **Specialty fallback:** BE/Native tasks → anh + FS dev pickup; UI/Design → FE-bridge kia pickup hoặc anh.
+4. **Daily check-in async:** Phát hiện block sớm. Re-allocate module nếu dev stuck.
+5. **Cross-module fallback (ADR-0004):** dev nghỉ → leader pickup module hoặc explicit assign cross-module task cho dev khác. Strict gate vẫn áp dụng — không tự ý sửa module owner khác.
 
 **Owner:** Anh (planning + coordination).
 
@@ -212,7 +212,7 @@ M3 demo + giảng viên test cùng lúc + 4 dev test = có thể spike traffic.
 
 **Mitigation:**
 
-1. **Specialty fallback (đã spec ADR-0003):** BE/Native dev nghỉ → anh + FS dev kia pickup; UI/Design → FE-bridge kia hoặc anh.
+1. **Cross-module fallback (ADR-0004):** dev nghỉ → leader pickup module owner hoặc explicit assign cross-module task. Strict gate vẫn áp dụng.
 2. **WIP limit ≤ 2 task/dev:** Limit task mỗi dev. Khi 1 dev nghỉ, task của họ 1-2 cái OK pickup.
 3. **Documentation:** Mỗi task có `Test plan` + `Files affected` trong issue → dev khác pickup dễ.
 4. **Pair-programming:** Pair giảm bus factor. Mỗi feature có 2 người hiểu code.

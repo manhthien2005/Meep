@@ -51,7 +51,7 @@ A widget that touches `FirebaseFirestore.instance` directly is a bug. Push the c
 
 ## Code organization & widget split
 
-Applies to **all Dart files** in `apps/mobile/**` (not just presentation). FE-bridge devs editing `presentation/` also follow these rules — plus FE-specific rules in `24-flutter-ui-patterns.md`.
+Applies to **all Dart files** in `apps/mobile/**`. Solo-dev module owner editing `presentation/` cũng follow rule này — plus UI-specific rule trong `24-flutter-ui-patterns.md`.
 
 ### When to split (split threshold)
 

@@ -2,6 +2,8 @@
 trigger: always_on
 ---
 
+> ⚠️ **DEPRECATED 2026-05-21** — Source of truth ở `.cursor/rules/10-project-context.mdc`. File này freeze, không sync solo-dev model + ADR-0004.
+
 # Project Context — Meep
 
 ## What Meep is

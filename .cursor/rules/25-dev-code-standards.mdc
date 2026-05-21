@@ -1,40 +1,84 @@
 ---
-description: Dev code standards — Walking Skeleton pattern, role responsibilities, stub rules
+description: Dev code standards — Walking Skeleton (solo-dev model), module ownership, leader-defined contracts
 alwaysApply: true
 ---
 
-# Dev Code Standards — Walking Skeleton Pattern
+# Dev Code Standards — Walking Skeleton (Solo-Dev Model)
 
-Meep uses **Walking Skeleton**: the leader creates a runnable shell at the start of each sprint; FE and BE fill it in parallel. The app must compile and run at every commit.
+Meep dùng **solo-dev model**: mỗi dev own một (hoặc vài) module **end-to-end** — data + logic + UI + test. Không tách FE/BE. Leader define contract upfront để app luôn compile + run, dev cầm contract về implement full-stack module mình.
 
 ## Role responsibilities
 
 | Role | Does | Does NOT do |
 |---|---|---|
-| **Leader** | Define freezed models + abstract interfaces + stub providers + wire router | Implement Firebase / UI screens |
-| **KhoaLND (BE)** | Implement Firebase repositories + controllers | Define new models / change interfaces unilaterally |
-| **HanDHG / NganTNK (FE)** | Implement UI screens using typed mock data | Call Firebase directly / invent ad-hoc models |
+| **Leader (ThienPDM)** | Define spec + freezed models + abstract interfaces + stub providers + wire router; review tất cả PR; gatekeep contract changes | Implement chi tiết module (trừ khi pickup làm safety net) |
+| **Module Owner** (mọi dev) | Full-stack implement module được giao: data layer, application layer (controllers), presentation layer (UI Flutter), test, native code (nếu module có widget Android) | Đụng module dev khác, đổi contract leader đã chốt, tự thêm field/interface không qua leader |
+| **Designer** (HanDHG, NganTNK — kèm role Module Owner) | Vẽ Figma frame + design system + theme token cho cả app TRƯỚC khi leader export contract | Vẽ ad-hoc trong code (hardcode color/font không qua design token) |
 
-## 3 non-negotiable rules
+> **Designer note:** HanDHG + NganTNK kiêm thêm Figma. Module nào do họ design Figma, ưu tiên chính họ implement Flutter để giữ design fidelity. Detail mapping Figma → Flutter: xem `24-flutter-ui-patterns.mdc`.
+
+## 4 non-negotiable rules
 
 ### 1. Skeleton rule — App always runs
 
-Every commit must compile cleanly and the app must launch. Stubs return mock data or throw `UnimplementedError` — no broken imports, no commented-out code to bypass errors.
+Mọi commit phải compile clean và app launch được. Stub trả mock data hoặc throw `UnimplementedError` — không broken import, không comment-out code để bypass error.
 
 ```dart
-// ✅ Correct stub
+// ✅ Correct stub (leader pre-defined trước khi giao module)
 @Riverpod(keepAlive: true)
 AuthRepository authRepository(Ref ref) => throw UnimplementedError(
-  'wire FirebaseAuthRepository in main.dart',
+  'wire FirebaseAuthRepository in main.dart — assigned to <DevName>',
 );
 ```
 
-### 2. Typed mock rule — FE uses the leader-defined freezed model
+### 2. Contract-first rule — Leader chốt contract trước khi dev start
 
-FE mock data must use the exact type defined by the leader. Never invent a `Map<String, dynamic>`.
+Trước khi giao module cho dev, leader phải merge vào `develop`:
+
+- Spec đầy đủ tại `docs/specs/<feature>.md` (acceptance criteria đo được).
+- Freezed models + abstract interfaces (data layer contract).
+- Stub Riverpod providers (throw `UnimplementedError`).
+- Route stub trong router.
+- TODO marker `// TODO(<task-id>/<DevName>): ...` trên mọi stub.
+
+Dev pull `develop` về → contract đã sẵn → implement không cần đoán.
+
+```
+Leader: spec → models → interfaces → stubs → merge develop
+        ↓
+Module Owner pull develop → implement full-stack module
+        ↓
+Module Owner mở PR → leader review → merge develop
+        ↓
+Leader: wire real implementation in main.dart (integration check)
+```
+
+### 3. Strict gate — Đụng module khác hoặc chệch contract phải qua leader
+
+**Khoá lại + báo leader** khi:
+
+- Cần đổi field trong freezed model leader đã chốt (kể cả thêm field mới).
+- Cần đổi signature của abstract interface.
+- Cần touch file thuộc module dev khác (không phải module mình own).
+- Cần thêm Firestore collection / index mới.
+- Cần thêm pub package vào `pubspec.yaml` hoặc npm package vào `firebase/functions/package.json`.
+- Phát hiện contract không khớp Figma / spec.
+- Cần đổi shared code (`core/`, `shared/widgets/`, `core/theme/`).
+
+**Cách xử lý:**
+
+1. Stop. Không tự sửa.
+2. Comment trên GitHub issue đang làm: `Block: cần đổi <X> trong module <Y>, ping @manhthien2005`.
+3. Leader xem xét → cập nhật spec/contract → merge contract change vào `develop` qua PR riêng → ping dev tiếp tục.
+
+> Vì sao strict: contract là source of truth chung. Mỗi solo-dev tự quyết → conflict + drift + integration crash. Leader gate giữ tốc độ team đồng bộ.
+
+### 4. Typed everything — không `Map<String, dynamic>` ad-hoc
+
+Mọi data flow giữa các layer phải dùng freezed model leader đã định nghĩa. Mock data trong test cũng dùng đúng type đó.
 
 ```dart
-// ✅ Typed mock
+// ✅ Typed
 final mockUser = UserProfile(
   uid: 'mock-uid',
   displayName: 'Thien',
@@ -42,29 +86,17 @@ final mockUser = UserProfile(
   createdAt: DateTime.now(),
 );
 
-// ❌ Ad-hoc map — compiler cannot catch mismatches
+// ❌ Ad-hoc map — compiler không catch được mismatch
 final mockUser = {'name': 'Thien', 'avatar': 'url'};
-```
-
-### 3. Freeze-before-FE rule — Models land on develop before FE starts
-
-Freezed models and abstract interfaces must be merged into `develop` before any FE dev begins implementing a screen that depends on them.
-
-```
-Leader: define models + interfaces → merge into develop
-    ↓
-FE and BE start in parallel (pull from develop)
-    ↓
-Leader: wire real implementation in main.dart (integration)
 ```
 
 ## Ownership principle
 
-Every file the agent creates or modifies is **that dev's code**. Read and understand it before committing.
+Mỗi file dev tạo hoặc sửa là **code của dev đó** (kể cả AI agent generate). Đọc + hiểu trước khi commit. Code mình own → mình chịu trách nhiệm review, debug, maintain.
 
 ## Stub / placeholder standard
 
-Every stub must have a TODO that identifies the assignee and task:
+Mọi stub phải có TODO identify task ID + module owner:
 
 ```dart
 // TODO(T8/HanDHG): implement IntroPage per Figma — intro screen
@@ -73,24 +105,50 @@ Every stub must have a TODO that identifies the assignee and task:
 
 Format: `// TODO(<task-id>/<DevName>): <short description>`
 
-A TODO without `<task-id>/<DevName>` is **invalid** and will be flagged in review.
+TODO không có `<task-id>/<DevName>` → **invalid**, sẽ bị flag trong `/review`.
 
-## When to ask the leader before proceeding
+## Module ownership tracking
 
-Always ask (do not decide unilaterally) when:
+Hiện tại module list **chưa chốt**. Khi anh finalize:
 
-- Adding a new field to a freezed model that affects multiple devs.
-- Changing the signature of an abstract interface.
-- Adding a new Firestore collection or index.
-- Adding a new pub package dependency to `pubspec.yaml`.
-- Discovering that the contract does not match Figma.
+1. Anh update `docs/specs/modules.md` (hoặc tương đương) — bảng module → owner.
+2. Update `.github/CODEOWNERS` — mỗi module path có module owner + leader required.
+3. Update file này — thêm bảng module owner reference.
 
-## Complex screens — leader defines extra context before FE mocks
+Cho đến lúc đó: leader assign từng task qua GitHub issue, owner = assignee của issue.
 
-| Screen | Leader must decide first |
+## Cross-module touch — FORBIDDEN by default
+
+Module Owner A KHÔNG được tự ý sửa code thuộc module Owner B. Kể cả:
+
+- Bug fix nhỏ trong module B (kể cả 1 dòng).
+- Format / rename "tiện thể".
+- Thêm field vào model dùng chung.
+
+**Trừ ngoại lệ duy nhất:** leader explicit assign cross-module task qua issue (vd "fix #42: Khoa fix bug trong Auth module của Han") → tạo branch + PR review bởi cả Han + leader.
+
+## Definition of Done — solo-dev module
+
+Module được mark Done chỉ khi:
+
+- [ ] Spec acceptance criteria pass (đo được, không "should work").
+- [ ] Data layer: repository implement đúng abstract interface, có unit test với `fake_cloud_firestore`.
+- [ ] Application layer: controller có unit test cover happy + edge + error.
+- [ ] Presentation layer: widget test cho critical flow + design tokens (no hardcoded color/font).
+- [ ] Native code (nếu có): Android widget test hoặc manual smoke test trên device.
+- [ ] `flutter analyze` + `dart format` clean.
+- [ ] Functions test (nếu module có Cloud Function): `npm test` + `npm run lint` clean.
+- [ ] PR review: leader approve + module owner self-review qua `/review` framework.
+- [ ] CI pass: `pr-check.yml` green.
+- [ ] Merged vào `develop`, issue auto-close qua `Closes #N`.
+
+## Anti-patterns
+
+| Anti-pattern | Vấn đề |
 |---|---|
-| Feed, Space | Fan-out vs query strategy → Firestore collection path |
-| Reaction | Optimistic UI contract → error rollback behavior |
-| Pagination | Cursor strategy → `startAfterDocument` field in model |
-
-For Auth, Profile, Diary, Camera UI: the freezed model is sufficient — FE can start immediately.
+| Tự đổi field trong shared model "vì cần" | Break module dev khác → integration fail |
+| Hardcode color/font trong screen | Design system drift, dark mode broken |
+| Push code thẳng `develop` "vì gấp" | Branch protection block + bypass review = bug lọt prod |
+| Skip spec, code thẳng "tạm" | Không có acceptance → không biết khi nào done |
+| Module A pickup task module B "tiện thể" | Vi phạm ownership, owner B mất context |
+| Commit `feat(auth):` từ module Feed | Scope sai → changelog rối, history khó truy |

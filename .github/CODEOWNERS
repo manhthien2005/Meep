@@ -1,7 +1,7 @@
 # CODEOWNERS — Meep
 # Mỗi PR cần approval từ CODEOWNERS tương ứng.
-# Anh là default reviewer cho mọi thứ. Khi 3 dev khác có GitHub username,
-# anh chia ownership theo module để giảm bottleneck.
+# Solo-dev model: leader (anh) là default. Module owner = co-required reviewer
+# khi anh đã chốt module → owner mapping (TODO ở dưới).
 #
 # QUAN TRỌNG — phân biệt 2 khái niệm:
 #   - Dev name (theo AGENTS.md convention): PascalCase + abbreviation, vd `ThienPDM`, `KhoaLND`.
@@ -19,41 +19,39 @@
 
 # ============================================================
 # Module-specific ownership
-# Phân chia theo specialty + giảm bottleneck. Multi-owner = ANY ONE owner approve được.
+# Solo-dev model: mỗi module có 1 owner full-stack. Leader luôn co-required.
+# Multi-owner = ANY ONE owner approve được, NHƯNG leader vẫn cần approve riêng.
+#
+# TODO(setup): cập nhật bảng dưới khi anh chốt module → dev assignment.
+# Hiện tại tất cả features default về leader-only — anh assign owner sau khi
+# finalize module list. Format mục tiêu khi đã chốt:
+#
+#   /apps/mobile/lib/features/<module>/        @manhthien2005 @<owner-github>
+#   /firebase/functions/src/<module>/          @manhthien2005 @<owner-github>
 # ============================================================
 
-# BE-heavy features (Firebase + Native Android logic): leader + KhoaLND (Open)
-/apps/mobile/lib/features/auth/             @manhthien2005 @CatS1mp
-/apps/mobile/lib/features/friend/           @manhthien2005 @CatS1mp
-/apps/mobile/lib/features/camera/           @manhthien2005 @CatS1mp
-/apps/mobile/lib/features/post/             @manhthien2005 @CatS1mp
-/apps/mobile/lib/features/space/            @manhthien2005 @CatS1mp
-/apps/mobile/lib/features/rollcall/         @manhthien2005 @CatS1mp
-/apps/mobile/lib/features/notification/     @manhthien2005 @CatS1mp
+# Features (placeholder — leader-only cho đến khi chốt owner)
+/apps/mobile/lib/features/                  @manhthien2005
 
-# UI-heavy features (Figma → Flutter widgets): leader + NganTNK + HanDHG
-/apps/mobile/lib/features/feed/             @manhthien2005 @JanaKimmm @katheramp
-/apps/mobile/lib/features/profile/          @manhthien2005 @JanaKimmm @katheramp
-/apps/mobile/lib/features/reaction/         @manhthien2005 @JanaKimmm @katheramp
-/apps/mobile/lib/features/diary/            @manhthien2005 @JanaKimmm @katheramp
+# Cloud Functions (placeholder — leader-only cho đến khi chốt owner)
+/firebase/functions/                        @manhthien2005
 
-# Native Android (Kotlin AppWidget) — leader only (specialized)
+# Native Android widget — leader (specialized)
 /apps/widget/                               @manhthien2005
 
-# Cloud Functions (BE): leader + KhoaLND
-/firebase/functions/                        @manhthien2005 @CatS1mp
-
-# Security-sensitive (rules + indexes) — leader only
+# Security-sensitive (rules + indexes) — leader only, KHÔNG share
 /firebase/firestore.rules                   @manhthien2005
 /firebase/storage.rules                     @manhthien2005
 /firebase/firestore.indexes.json            @manhthien2005
 
-# Core architecture (DI, theme, error, routing) — leader only
+# Core architecture (DI, theme, error, routing) — leader only, gate shared code
 /apps/mobile/lib/core/                      @manhthien2005
+/apps/mobile/lib/shared/                    @manhthien2005
 
 # Infra / config — chỉ leader review
 /.github/                                   @manhthien2005
 /.husky/                                    @manhthien2005
+/.cursor/                                   @manhthien2005
 /.windsurf/                                 @manhthien2005
 /AGENTS.md                                  @manhthien2005
 /CONTEXT.md                                 @manhthien2005
