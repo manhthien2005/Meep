@@ -1,18 +1,48 @@
 {
-  "_comment_1": "Sample MCP config for Meep. Windsurf reads MCPs from ~/.codeium/windsurf/mcp_config.json (USER-LEVEL, not workspace-level).",
+  "_comment_1": "Sample MCP config for Meep. Windsurf reads MCPs from USER-LEVEL path (not workspace-level).",
   "_comment_2": "To activate: copy this file to ~/.codeium/windsurf/mcp_config.json (Windows: C:\\Users\\<you>\\.codeium\\windsurf\\mcp_config.json), then restart Windsurf or click 'Refresh' on the MCPs panel in Cascade.",
-  "_comment_3": "Curated minimal set. See `AGENTS.md` §8 for what was DELIBERATELY left out (filesystem, github, memory, postgres) and why.",
+  "_comment_3": "Curated set — same as .cursor/mcp.example.json. See AGENTS.md §8 for what was DELIBERATELY left out and why.",
+  "_comment_4": "SECRETS WARNING: NEVER commit the real mcp_config.json. Each dev fills their own tokens locally at the user-level path.",
 
   "mcpServers": {
     "context7": {
-      "_comment_1": "Up-to-date library documentation lookup from upstash/context7. Free tier, no API key needed.",
-      "_comment_2": "Useful when working with rapidly-evolving SDKs (Flutter, Firebase, Riverpod, freezed) — prevents the agent hallucinating outdated APIs.",
-      "_comment_3": "In a prompt, just say 'use context7' or the agent will call it automatically when relevant.",
+      "_comment_1": "Up-to-date library documentation (Flutter, Firebase, Riverpod, freezed). Free tier, no API key.",
+      "_comment_2": "Prevents the agent hallucinating outdated APIs. Say 'use context7' or let agent auto-call.",
       "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+
+    "github": {
+      "_comment_1": "GitHub official MCP server — issues, PRs, repos, code search, workflows.",
+      "_comment_2": "Two install options. Pick ONE per dev based on what's available locally.",
+      "_comment_3": "OPTION A (recommended) — remote hosted by GitHub, requires Windsurf with remote MCP support:",
+      "_option_a_url": "https://api.githubcopilot.com/mcp/",
+      "_option_a_headers": {
+        "Authorization": "Bearer ghp_REPLACE_WITH_YOUR_PAT"
+      },
+      "_comment_4": "OPTION B (below — active by default) — local Docker container. Requires Docker Desktop running.",
+      "_comment_5": "PAT scopes needed: repo, read:org, read:user, workflow.",
+      "command": "docker",
       "args": [
-        "-y",
-        "@upstash/context7-mcp"
-      ]
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_REPLACE_WITH_YOUR_PAT"
+      }
+    },
+
+    "figma-mcp-go": {
+      "_comment_1": "Figma MCP via plugin bridge (vkhanhqui/figma-mcp-go) — NO Figma API token, NO rate limits.",
+      "_comment_2": "73 tools: read + write + create frames/components/variables/styles, export, prototype reactions.",
+      "_comment_3": "Why this over figma-developer-mcp: free plan only allows 6 tool calls/month via REST API. This bridges through a Figma plugin instead → unlimited.",
+      "_comment_4": "ONE-TIME SETUP — install Figma plugin: download plugin.zip from https://github.com/vkhanhqui/figma-mcp-go/releases → Figma Desktop → Plugins → Development → Import plugin from manifest → select manifest.json. Run plugin in any Figma file before asking the agent to use it.",
+      "command": "npx",
+      "args": ["-y", "@vkhanhqui/figma-mcp-go"]
     }
   }
 }
