@@ -37,8 +37,8 @@ HARD_BLOCK_PATTERNS: list[tuple[str, str]] = [
 # Block unless the command line itself contains an explicit confirmation token.
 CONFIRMED_PATTERNS: list[tuple[str, str, str]] = [
     (
-        r"\bgit\s+push\s+(?:.*\s)?(?:-f|--force|--force-with-lease)\b.*\b(main|master|production|prod)\b",
-        "git push --force on main/master/prod",
+        r"\bgit\s+push\s+(?:.*\s)?(?:-f|--force|--force-with-lease)\b.*\b(main|master|production|prod|develop|deploy)\b",
+        "git push --force on protected branch (main/master/prod/develop/deploy)",
         "Add `# CONFIRMED-FORCE-PUSH` to the command, OR work on a feature branch.",
     ),
     (

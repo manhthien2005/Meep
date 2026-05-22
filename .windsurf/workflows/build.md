@@ -16,7 +16,7 @@ Implement task by task from `tasks/todo-<feature>.md`. Each task = one Red-Green
    ```bash
    git branch --show-current   # must NOT be develop or deploy
    ```
-4. **Infra-file guard** — before touching ANY file under `.windsurf/`, `.github/`, `docs/adr/`, `scripts/`:
+4. **Infra-file guard** — before touching ANY file under `.windsurf/`, `.cursor/`, `.github/`, `docs/adr/`, `scripts/`:
    - Verify current branch is `chore/<DevName>/...` (not a `feature/` branch).
    - If on a `feature/` branch → **STOP**. Stash changes, create `chore/<DevName>/<desc>` from `develop`, commit infra there, open a separate PR.
    - Lesson: PR #27 mixed infra + feature → required painful cherry-pick to untangle.
@@ -65,7 +65,7 @@ git add <specific files>
 git commit -m "feat(<scope>): <description>"
 ```
 
-**Before `git add`:** scan staged files. If any path starts with `.windsurf/`, `.github/`, `docs/adr/`, `scripts/` → do NOT add on a `feature/` branch. Move them to a `chore/` branch first.
+**Before `git add`:** scan staged files. If any path starts with `.windsurf/`, `.cursor/`, `.github/`, `docs/adr/`, `scripts/` → do NOT add on a `feature/` branch. Move them to a `chore/` branch first.
 
 Allowed types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `perf`, `style`. Body (optional) explains **why**, not what.
 

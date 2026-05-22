@@ -1,0 +1,114 @@
+---
+trigger: always_on
+---
+
+# Domain Language — Meep
+
+Shared vocabulary giữa anh và agent. Dùng đúng terms khi discuss system hoặc viết code. Disambiguate overloaded words + lock naming consistency.
+
+## Core entities
+
+| Term | Definition | Lives at |
+|---|---|---|
+| **User** | Authenticated person, identified by `uid` (Firebase Auth UID, string). Có `displayName`, `avatarUrl`. | Firestore: `/users/{uid}` |
+| **Post** | One photo + optional caption shared bởi User cho friends. NEVER public. Always tied to one author. | Firestore: `/posts/{postId}` |
+| **Caption** | Text accompanying a Post. ≤ 200 chars. Optional (post can be photo-only). | Field `caption` in `/posts/{postId}` |
+| **Friend** | User khác có mutual accepted friendship với current User. Bidirectional. | Derived from `/friendships/{pairId}` |
+| **Friend graph** | Set của tất cả friendships across Users. Bidirectional, no public following. | Firestore: `/friendships` |
+| **Friend request** | Pending invite từ User này đến User khác. Becomes Friend khi accepted. | Firestore: `/friend_requests/{requestId}` |
+| **Feed** | Chronological list của friends' Posts visible cho current User. Cursor-paginated, latest first. | Computed by querying `/posts` filtered by friend `authorId`s |
+| **Notification** | Push message về friend's activity (new post, accepted request). Persisted per user. | Firestore: `/users/{uid}/notifications/{notifId}` + FCM push |
+
+## Identifiers
+
+| Term | Format | Example |
+|---|---|---|
+| `uid` | Firebase Auth UID — opaque string, ≤ 128 chars | `7Mk9x2QR8vN3yL4pHzAj` |
+| `postId` | Auto-generated Firestore doc ID, 20 chars | `aB3xKzqrL5MnPq7Ws2Yd` |
+| `pairId` | **Sorted** `uidA_uidB` cho friendship lookup. Always `min < max` để deterministic. | `7Mk9x2QR_xZ1fGh4Bp9Q` |
+| `requestId` | Auto-generated Firestore doc ID for friend requests | `cD9zLmrqW3NpKj5Rs8Yt` |
+| `notifId` | Auto-generated Firestore doc ID for notifications | `eF2hQrsbT8VnLk6Zp4Mw` |
+
+```dart
+// Pair ID computation — must be deterministic
+String pairIdOf(String a, String b) {
+  return a.compareTo(b) < 0 ? '${a}_$b' : '${b}_$a';
+}
+```
+
+## Architectural patterns
+
+| Pattern | What it means | Where it appears |
+|---|---|---|
+| **Fan-out** | Cloud Function pattern: khi Post được tạo, Function enumerate author's Friends + push Notification cho mỗi người. NOT done client-side. | `firebase/functions/src/index.ts` `onPostCreated` |
+| **Denormalize** | Copy value (vd `authorName`, `authorAvatarUrl`) vào Post document để Feed query không cần JOIN. Trade write complexity cho read speed. | `/posts/{postId}` fields `authorName`, `authorAvatarUrl` |
+| **Repository** | Class abstract Firebase calls để widgets/controllers KHÔNG touch `FirebaseFirestore.instance` directly. Lives in `lib/features/<feature>/data/`. | e.g. `AuthRepository`, `PostRepository` |
+| **Cursor pagination** | Dùng `startAfterDocument(lastDoc)` thay vì `offset()` (Firestore không có efficient offset). | Feed query, friend list |
+| **ServerTimestamp** | Dùng `FieldValue.serverTimestamp()` cho `createdAt`/`updatedAt`. Never trust client clocks. | Every doc với timestamps |
+
+## Disambiguation — overloaded terms
+
+Cùng một từ có nghĩa khác nhau theo context. Always specify which.
+
+### "Widget"
+
+| Term | Meaning | Where the code lives |
+|---|---|---|
+| **Widget (Flutter)** | UI component (`StatelessWidget`, `ConsumerWidget`, `StatefulWidget`). Building block của mọi screen. | `apps/mobile/lib/features/<feature>/presentation/` |
+| **Widget (home-screen)** | Native Android AppWidget hiển thị latest Meep images trên user's home screen. The headline differentiator. iOS WidgetKit deferred per ADR-0002. | `apps/widget/` (Android Kotlin) |
+
+Khi unclear, write **"home-screen widget"** cho native, just **"widget"** cho Flutter UI.
+
+### "Provider"
+
+| Term | Meaning | Library |
+|---|---|---|
+| **Provider (Riverpod)** | `Provider<T>` / `StreamProvider<T>` / `FutureProvider<T>` / `NotifierProvider<T>`. Riverpod 2 idiom. | `flutter_riverpod` |
+| **Provider (Firebase Auth)** | OAuth identity provider — Google, email/password. (Apple deferred per ADR-0002.) | `firebase_auth` |
+
+Khi unclear, write **"Riverpod provider"** vs **"auth provider"**.
+
+### "Storage"
+
+| Term | Meaning |
+|---|---|
+| **Storage (Firebase)** | Cloud Storage for Firebase — nơi images live. Bucket: `<project>.appspot.com`. |
+| **Storage (local)** | On-device cache (SharedPreferences / Hive / SQLite). For offline / widget data. |
+
+Khi unclear, write **"Cloud Storage"** vs **"local cache"**.
+
+### "Rule"
+
+| Term | Meaning |
+|---|---|
+| **Rule (Firestore)** | `.rules` file declaring per-collection access policy. |
+| **Rule (Windsurf agent)** | `.windsurf/rules/*.md` file giving agent instructions. |
+| **Rule (lint)** | Entry trong `analysis_options.yaml` hoặc ESLint config. |
+
+Write **"Firestore rules"**, **"agent rules"**, **"lint rules"** để explicit.
+
+## Anti-terms — words to AVOID
+
+| Avoid | Use instead | Why |
+|---|---|---|
+| `user_id` | `uid` | Inconsistent với Firebase Auth field name |
+| `friend_id` | `pairId` (cho friendship doc) hoặc `friendUid` (cho friend's User) | Ambiguous |
+| `image` | `imageUrl` (cho URL string) hoặc `image bytes` (cho raw data) | Both meanings clash |
+| "the database" | "Firestore" | Không có "a database" — có specific products (Firestore, Storage, Auth) |
+| "the backend" | "Cloud Functions" / "the (optional) Node BE in `services/api/`" | Same reason |
+| "save" | "create" / "update" / "upsert" | Vague — say which write op |
+| "fetch" | "read once" (`get()`) / "watch" (`snapshots()`) | Different perf characteristics |
+
+## Status fields enum
+
+| Field | Values |
+|---|---|
+| `friend_requests.status` | `pending` / `accepted` / `declined` / `cancelled` |
+| `posts.uploadStatus` (if used) | `uploading` / `uploaded` / `failed` |
+| `notifications.read` | `true` / `false` (boolean, default false) |
+
+## Update policy
+
+- **When to update:** new entity introduced, new disambiguation needed, naming convention change.
+- **When NOT to update:** transient implementation details, internal helper names.
+- **Review:** quick re-read at start of each `/spec` session — if a new term appears trong spec discovery, add nó ở đây BEFORE coding.

@@ -2,7 +2,7 @@
 trigger: always_on
 ---
 
-> ⚠️ **DEPRECATED 2026-05-21** — Source of truth ở `.cursor/rules/10-project-context.mdc`. File này freeze, không sync solo-dev model + ADR-0004.
+
 
 # Project Context — Meep
 
@@ -37,12 +37,25 @@ In every other case → keep it in Firebase. Reduces ops surface for the team (4
 ## Team
 
 - **4 devs** (including the team leader).
-- Dev name format: PascalCase + abbreviation, e.g. `ThienPDM`, `KhoaLND`.
-- Leader is default reviewer (CODEOWNERS).
-- Branching: `develop` (integration) → `deploy` (production releases). Feature branch format: `<type>/<DevName>/<short-desc>`.
-- Commit messages in Vietnamese (Conventional Commits with Vietnamese descriptions).
-- Task tracking: GitHub Projects v2.
-- Full team workflow doc: `docs/team-workflow.md`.
+- **Solo-dev model:** mỗi dev own một (hoặc vài) module **end-to-end** — data + logic + UI + test. Không tách FE/BE.
+- **Leader define contract upfront:** spec + freezed model + abstract interface + stub provider merge vào `develop` trước khi giao module cho dev.
+- **Strict gate:** dev đụng module khác hoặc chệch contract → khoá lại, leader duyệt mới đi tiếp.
+- **HanDHG + NganTNK** kiêm UI/UX design (Figma) cho cả app — module nào do họ design, ưu tiên họ implement Flutter.
+- Dev name format: PascalCase + abbreviation — `ThienPDM`, `KhoaLND`, `HanDHG`, `NganTNK`.
+- Leader (anh) là default reviewer (CODEOWNERS). Sau khi chốt module → thêm module owner làm co-required reviewer.
+- Branching: `develop` → `deploy`. Feature branch: `<type>/<DevName>/<short-desc>`.
+- Commit messages: Conventional Commits + Vietnamese descriptions.
+- Task tracking: GitHub Projects v2. Full workflow: `docs/team-workflow.md`.
+- Detail role + ownership: `.windsurf/rules/25-dev-code-standards.md`.
+
+### DevName mapping
+
+| GitHub handle | DevName | Role |
+|---|---|---|
+| `manhthien2005` | `ThienPDM` | Leader (define contracts, review PR) |
+| `CatS1mp` | `KhoaLND` | Module Owner |
+| `katheramp` | `HanDHG` | Module Owner + UI/UX (Figma) |
+| `JanaKimmm` | `NganTNK` | Module Owner + UI/UX (Figma) |
 
 ## Repository layout
 
