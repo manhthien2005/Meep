@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/core/utils/hex_color.dart';
 import 'package:meep/features/space/data/space.dart';
 
 /// Single row trong [SpaceContextBottomSheet] — Space icon (emoji + color
@@ -94,7 +95,7 @@ class _Icon extends StatelessWidget {
       );
     }
 
-    final color = _parseHexColor(space!.colorHex);
+    final color = parseHexColor(space!.colorHex) ?? AppColors.bw700;
     return Container(
       width: 40,
       height: 40,
@@ -108,16 +109,5 @@ class _Icon extends StatelessWidget {
         style: const TextStyle(fontSize: 20),
       ),
     );
-  }
-
-  /// Parse 7-char hex `#RRGGBB`. Fallback to bw700 if malformed (defensive —
-  /// CF createSpace validate trước khi ghi nên hiếm khi malformed).
-  Color _parseHexColor(String hex) {
-    try {
-      final clean = hex.replaceFirst('#', '');
-      return Color(int.parse('FF$clean', radix: 16));
-    } catch (_) {
-      return AppColors.bw700;
-    }
   }
 }

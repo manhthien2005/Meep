@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_proportions.dart';
+import 'package:meep/core/utils/hex_color.dart';
 import 'package:meep/features/feed/application/app_camera_controller.dart';
 import 'package:meep/features/feed/application/camera_state.dart';
 import 'package:meep/features/feed/presentation/capture_action_bar.dart';
@@ -88,18 +89,6 @@ class _CameraSectionState extends ConsumerState<CameraSection> {
     }
   }
 
-  /// Parse 7-char hex `#RRGGBB` của Space colorHex. Null safe — null in,
-  /// null out → CameraSection trả về default UI khi không có Space context.
-  Color? _spaceAccent(String? hex) {
-    if (hex == null) return null;
-    try {
-      final clean = hex.replaceFirst('#', '');
-      return Color(int.parse('FF$clean', radix: 16));
-    } catch (_) {
-      return null;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final camState = ref.watch(appCameraControllerProvider);
@@ -107,7 +96,7 @@ class _CameraSectionState extends ConsumerState<CameraSection> {
     // context. CameraSection re-render: viền + nút chụp + badge đổi theo
     // colorHex của Space hiện tại.
     final currentSpace = ref.watch(currentSpaceProvider);
-    final accent = _spaceAccent(currentSpace?.colorHex);
+    final accent = parseHexColor(currentSpace?.colorHex);
     final screenW = MediaQuery.sizeOf(context).width;
     // Mirror _AudienceRow height: avatarSize + gap(4) + labelSize(avatarSize*0.4) + bottomPad(4)
     final historyRowH = AppProportions.audienceAvatarSize(screenW) * 1.4 + 8;
