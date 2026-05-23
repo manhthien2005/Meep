@@ -12,6 +12,8 @@ import 'package:meep/features/feed/application/app_camera_controller.dart';
 import 'package:meep/features/feed/application/camera_state.dart';
 import 'package:meep/features/feed/presentation/capture_action_bar.dart';
 import 'package:meep/features/feed/presentation/capture_preview_args.dart';
+import 'package:meep/features/space/application/space_controller.dart';
+import 'package:meep/features/space/presentation/widgets/space_context_badge.dart';
 import 'package:meep/shared/widgets/app_dots_indicator.dart';
 import 'package:meep/shared/widgets/app_photo_frame.dart';
 
@@ -86,9 +88,26 @@ class _CameraSectionState extends ConsumerState<CameraSection> {
     }
   }
 
+  /// Parse 7-char hex `#RRGGBB` của Space colorHex. Null safe — null in,
+  /// null out → CameraSection trả về default UI khi không có Space context.
+  Color? _spaceAccent(String? hex) {
+    if (hex == null) return null;
+    try {
+      final clean = hex.replaceFirst('#', '');
+      return Color(int.parse('FF$clean', radix: 16));
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final camState = ref.watch(appCameraControllerProvider);
+    // Watch Space context — null = "All friends" mặc định, non-null = Space
+    // context. CameraSection re-render: viền + nút chụp + badge đổi theo
+    // colorHex của Space hiện tại.
+    final currentSpace = ref.watch(currentSpaceProvider);
+    final accent = _spaceAccent(currentSpace?.colorHex);
     final screenW = MediaQuery.sizeOf(context).width;
     // Mirror _AudienceRow height: avatarSize + gap(4) + labelSize(avatarSize*0.4) + bottomPad(4)
     final historyRowH = AppProportions.audienceAvatarSize(screenW) * 1.4 + 8;
@@ -99,9 +118,16 @@ class _CameraSectionState extends ConsumerState<CameraSection> {
         // the (photo + dots) cluster sits vertically centered in the space
         // between the top bar and the action bar.
         const Spacer(),
+        // Badge "Đang gửi: [SpaceName]" — chỉ hiện khi currentSpace != null.
+        // Render above frame để user scan rõ context trước khi chụp.
+        if (currentSpace != null) ...const [
+          SpaceContextBadge(),
+          SizedBox(height: 8),
+        ],
         GestureDetector(
           onHorizontalDragEnd: (d) => _onViewfinderSwipe(d.primaryVelocity),
           child: AppPhotoFrame(
+            borderColor: accent,
             child: camState.mode == CameraMode.single
                 ? _ViewfinderContent(
                     controller: ref
@@ -153,6 +179,7 @@ class _CameraSectionState extends ConsumerState<CameraSection> {
                 ref.read(appCameraControllerProvider.notifier).toggleCamera(),
             isCapturing: camState.isCapturing,
             showFlip: camState.mode == CameraMode.single,
+            captureRingColor: accent,
           ),
         ),
         const Spacer(),

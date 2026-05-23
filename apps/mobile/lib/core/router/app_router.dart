@@ -29,7 +29,6 @@ import 'package:meep/features/profile/presentation/edit_profile_screen.dart';
 import 'package:meep/features/profile/presentation/friend_profile_screen.dart';
 import 'package:meep/features/profile/presentation/photo_detail_screen.dart';
 import 'package:meep/features/profile/presentation/profile_screen.dart';
-import 'package:meep/features/space/presentation/space_context_bottom_sheet.dart';
 import 'package:meep/features/space/presentation/space_create_sheet.dart';
 import 'package:meep/features/streak/presentation/streak_photo_detail_screen.dart';
 import 'package:meep/features/streak/presentation/streak_screen.dart';
@@ -345,9 +344,13 @@ GoRouter appRouter(Ref ref) {
         path: '/space/create',
         builder: (_, __) => const SpaceCreateSheet(),
       ),
+      // Deeplink target — vd: tap Widget Android sẽ deeplink `/space/:spaceId`
+      // để mở Home với Space context active. SpaceContextBottomSheet KHÔNG
+      // map sang route (chỉ mở qua showModalBottomSheet từ long-press
+      // FriendsButton).
       GoRoute(
         path: '/space/:spaceId',
-        builder: (_, state) => SpaceContextBottomSheet(
+        builder: (_, state) => HomeScreen(
           spaceId: state.pathParameters['spaceId'] ?? '',
         ),
       ),

@@ -15,6 +15,7 @@ final class CameraBarConfig extends CaptureBarConfig {
     required this.onFlip,
     required this.isCapturing,
     this.showFlip = true,
+    this.captureRingColor,
   });
 
   final VoidCallback onCapture;
@@ -22,6 +23,10 @@ final class CameraBarConfig extends CaptureBarConfig {
   final VoidCallback onFlip;
   final bool isCapturing;
   final bool showFlip;
+
+  /// Override viền nút chụp khi user trong Space context (pass
+  /// `space.colorHex`). Null = default turquoise500.
+  final Color? captureRingColor;
 }
 
 final class PreviewBarConfig extends CaptureBarConfig {
@@ -66,6 +71,7 @@ class CaptureActionBar extends StatelessWidget {
             :final onFlip,
             :final isCapturing,
             :final showFlip,
+            :final captureRingColor,
           ) =>
             [
               _SideBtn(
@@ -77,6 +83,7 @@ class CaptureActionBar extends StatelessWidget {
               AppCameraButton(
                 size: centerSize,
                 onPressed: isCapturing ? null : onCapture,
+                ringColor: captureRingColor,
               ),
               SizedBox(width: gap),
               showFlip
