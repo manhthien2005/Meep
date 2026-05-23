@@ -108,7 +108,8 @@ class GroupChatScreen extends ConsumerWidget {
       case GroupMenuAction.leaveSpace:
         final confirmed = await showLeaveSpaceDialog(context);
         if (confirmed) {
-          // TODO(C/wire): ref.read(spaceControllerProvider.notifier).leaveSpace(spaceId)
+          // TODO(C/wire): ref.read(spaceControllerProvider(uid).notifier).leaveSpace(spaceId)
+          //   — controller giờ là family, đọc uid từ currentUidProvider trước khi gọi.
         }
     }
   }

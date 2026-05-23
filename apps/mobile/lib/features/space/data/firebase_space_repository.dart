@@ -17,9 +17,13 @@ class FirebaseSpaceRepository implements SpaceRepository {
 
   @override
   Stream<List<Space>> watchMySpaces(String uid) {
+    // orderBy createdAt desc — Space mới nhất lên đầu để Space list trong
+    // Profile/Camera context sheet có thứ tự ổn định (không bị Firestore
+    // default insertion order khiến UI nhảy).
     return _firestore
         .collection(_spacesCollection)
         .where('memberIds', arrayContains: uid)
+        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
