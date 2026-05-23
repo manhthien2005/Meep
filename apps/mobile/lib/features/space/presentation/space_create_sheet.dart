@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/presentation/widgets/friend_select_step.dart';
 import 'package:meep/features/space/presentation/widgets/icon_builder_step.dart';
@@ -106,9 +107,16 @@ class _SpaceCreateSheetState extends ConsumerState<SpaceCreateSheet> {
 
   Future<void> _createSpace() async {
     if (_isCreating) return;
+    final uid = ref.read(currentUidProvider).valueOrNull;
+    if (uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chưa đăng nhập')),
+      );
+      return;
+    }
     setState(() => _isCreating = true);
     try {
-      await ref.read(spaceControllerProvider.notifier).createSpace(
+      await ref.read(spaceControllerProvider(uid).notifier).createSpace(
             name: _spaceName.trim(),
             iconEmoji: _iconEmoji,
             colorHex: _colorHex,
