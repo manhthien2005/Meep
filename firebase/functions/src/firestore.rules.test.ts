@@ -409,10 +409,10 @@ describe('/friend_requests/{requestId}', () => {
     );
   });
 
-  test('nobody can update (server-side only)', async () => {
+  test('nobody can delete (server-side only)', async () => {
     await seedRequest();
     await assertFails(
-      authed(bob).firestore().doc(`friend_requests/${REQ_ID}`).update({ status: 'accepted' }),
+      authed(bob).firestore().doc(`friend_requests/${REQ_ID}`).delete(),
     );
   });
 });
