@@ -1,0 +1,59 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "_comment": "Up-to-date library docs (Flutter, Firebase, Riverpod, freezed). Free tier, no API key. Use when unsure about latest API."
+    },
+    "github": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      },
+      "_comment": "GitHub issues, PRs, repos, code search. Requires Docker Desktop + GITHUB_PERSONAL_ACCESS_TOKEN env var (scopes: repo, read:org, read:user, workflow). Set token in shell env or .env file (gitignored)."
+    },
+    "figma": {
+      "command": "npx",
+      "args": ["-y", "@vkhanhqui/figma-mcp-go"],
+      "_comment": "Figma MCP via plugin bridge — no API token, no rate limits. ONE-TIME SETUP: install Figma plugin from https://github.com/vkhanhqui/figma-mcp-go/releases. Use when converting Figma frames to Flutter widgets (/figma-to-flutter)."
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/block_dangerous_commands.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/protect_secrets.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/protect_secrets.py"
+          }
+        ]
+      }
+    ]
+  }
+}
