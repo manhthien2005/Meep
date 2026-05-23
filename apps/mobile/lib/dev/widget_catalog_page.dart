@@ -5,9 +5,13 @@ import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
+import 'package:meep/features/friend/application/friend_state.dart';
 import 'package:meep/features/friend/data/friend_repository.dart';
+import 'package:meep/features/friend/data/friend_request.dart';
+import 'package:meep/features/friend/presentation/friend_sheet.dart';
 import 'package:meep/features/space/presentation/space_create_sheet.dart';
 import 'package:meep/shared/widgets/app_back_button.dart';
 import 'package:meep/shared/widgets/app_google_button.dart';
@@ -220,7 +224,31 @@ class _WidgetCatalogPageState extends ConsumerState<WidgetCatalogPage> {
               ),
             ),
           ]),
+          _section('FriendSheet — Bottom Sheet', [
+            AppPrimaryButton(
+              label: 'Mở FriendSheet (Mock Data)',
+              onPressed: () => _showFriendSheet(context),
+            ),
+          ]),
         ],
+      ),
+    );
+  }
+
+  void _showFriendSheet(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: false,
+        barrierColor: Colors.transparent,
+        pageBuilder: (context, _, __) => ProviderScope(
+          overrides: [
+            currentUidProvider.overrideWith((ref) => Stream.value('mock-uid')),
+            friendControllerProvider('mock-uid').overrideWith(
+              () => _MockFriendController(),
+            ),
+          ],
+          child: const FriendSheet(),
+        ),
       ),
     );
   }
@@ -260,4 +288,99 @@ class _WidgetCatalogPageState extends ConsumerState<WidgetCatalogPage> {
       ),
     );
   }
+}
+
+// Mock FriendController for Widget Catalog
+class _MockFriendController extends FriendController {
+  @override
+  FriendState build(String uid) {
+    return FriendState(
+      friends: [
+        UserProfile(
+          uid: 'friend1',
+          email: 'alice@test.com',
+          displayName: 'Alice Nguyen',
+          username: 'alice',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+        UserProfile(
+          uid: 'friend2',
+          email: 'bob@test.com',
+          displayName: 'Bob Tran',
+          username: 'bob',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+        UserProfile(
+          uid: 'friend3',
+          email: 'charlie@test.com',
+          displayName: 'Charlie Le',
+          username: 'charlie',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+        UserProfile(
+          uid: 'friend4',
+          email: 'david@test.com',
+          displayName: 'David Pham',
+          username: 'david',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+        UserProfile(
+          uid: 'friend5',
+          email: 'eva@test.com',
+          displayName: 'Eva Hoang',
+          username: 'eva',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+        UserProfile(
+          uid: 'friend6',
+          email: 'frank@test.com',
+          displayName: 'Frank Vo',
+          username: 'frank',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      ],
+      pendingRequests: [
+        FriendRequest(
+          requestId: 'req1',
+          senderId: 'sender1',
+          receiverId: 'mock-uid',
+          status: FriendRequestStatus.pending,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+        FriendRequest(
+          requestId: 'req2',
+          senderId: 'sender2',
+          receiverId: 'mock-uid',
+          status: FriendRequestStatus.pending,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<void> searchUser(String query) async {}
+
+  @override
+  Future<void> sendFriendRequest(String receiverId) async {}
+
+  @override
+  Future<void> acceptFriendRequest(String requestId) async {}
+
+  @override
+  Future<void> declineFriendRequest(String requestId) async {}
+
+  @override
+  Future<void> cancelFriendRequest(String requestId) async {}
+
+  @override
+  Future<void> unfriend(String friendUid) async {}
 }

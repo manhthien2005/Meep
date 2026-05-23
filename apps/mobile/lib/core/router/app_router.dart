@@ -124,7 +124,9 @@ class _RouterNotifier extends ChangeNotifier {
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
   // ── Cold start: process deep link TRƯỚC khi tạo GoRouter ─────────────────
-  String initialLocation = '/dev/widgets'; // DEV: khởi động vào widget catalog
+  // Cold start mặc định vào /intro để chạy luồng auth thật → /home (feed).
+  // Deep link (nếu có) sẽ override bên dưới.
+  String initialLocation = '/intro';
   try {
     final rawRoute =
         WidgetsBinding.instance.platformDispatcher.defaultRouteName;

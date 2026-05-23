@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -18,6 +19,9 @@ import 'package:meep/features/auth/data/firebase_user_repository.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/data/fake_conversation_repository.dart';
+import 'package:meep/features/friend/application/friend_controller.dart';
+import 'package:meep/features/friend/data/firebase_friend_repository.dart';
+import 'package:meep/features/friend/data/firebase_friend_request_repository.dart';
 import 'package:meep/firebase_options.dart';
 
 // Pass --dart-define=USE_EMULATOR=true khi dev local để trỏ vào Firebase Emulator Suite.
@@ -52,6 +56,15 @@ void main() async {
         authRepositoryProvider.overrideWithValue(authRepo),
         userRepositoryProvider.overrideWithValue(
           FirebaseUserRepository(firestore: FirebaseFirestore.instance),
+        ),
+        friendRepositoryProvider.overrideWithValue(
+          FirebaseFriendRepository(FirebaseFirestore.instance),
+        ),
+        friendRequestRepositoryProvider.overrideWithValue(
+          FirebaseFriendRequestRepository(
+            FirebaseFirestore.instance,
+            FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
+          ),
         ),
         // TODO(C/wire): swap for FirestoreConversationRepository once the chat
         // backend (Friend #88 / Settings #115 / Space) is wired. FE-first only.
