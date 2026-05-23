@@ -60,7 +60,7 @@ HomeScreen (CustomScrollView)
 │
 ├─ [Top / scroll UP] Camera Section
 │   ├─ FriendsButton "15 người bạn" [audience selector cho post sắp gửi]
-│   ├─ Avatar góc phải (Profile module — out of scope)
+│   ├─ Avatar góc phải → Settings sheet (tap → SettingsSheet slide up)
 │   ├─ Viewfinder 400×400, cornerRadius 50
 │   ├─ 2 pagination dots: [Single] [Dual]
 │   ├─ Swipe TRÁI trên viewfinder → Dual Camera mode
@@ -78,7 +78,7 @@ HomeScreen (CustomScrollView)
     │   ├─ Photo 400×400
     │   ├─ Caption overlay (Note pill)
     │   ├─ "[Tên bạn] [time ago]" label bên dưới ảnh
-    │   └─ ActText bar: "Gửi tin nhắn..." + �🤣🥰 + smile-plus [M3 — disabled]
+    │   └─ ActText bar: "Gửi tin nhắn..." + light-blue-heart/🤣/🥰 + smile-plus [M3 — disabled]
     │
     └─ Post card: ảnh bản thân
         ├─ Photo 400×400
@@ -159,17 +159,19 @@ HomeScreen (CustomScrollView)
 ```
 Presentation                  Application                Data
 ──────────────────────        ──────────────────         ──────────────────────
-HomeScreen                    CameraController            PostRepository (abstract)
+HomeScreen                    AppCameraController         PostRepository (abstract)
  ├─ CameraSection              └─ CameraState             FirebasePostRepository
  └─ FeedSection               FeedController              StorageRepository (abstract)
      ├─ FeedFilterBar           ├─ FeedState               FirebaseStorageRepository
-     └─ PostCard                └─ FeedFilter
+     └─ PostCard                └─ FeedFilter (all/person/space)
          ├─ FriendPostCard      PostController
          └─ OwnPostCard          └─ PostState
 CapturePreviewScreen
 CaptionPresetModal
 GridViewScreen
 ```
+
+> **[NAMING] `AppCameraController`** (không phải `CameraController`) — tránh trùng với `CameraController` export từ Flutter `camera` package. File: `lib/features/feed/application/app_camera_controller.dart`.
 
 **Scroll architecture:** `CustomScrollView` với 2 sliver:
 - `SliverToBoxAdapter` → `CameraSection` (fixed height)
@@ -189,7 +191,9 @@ GridViewScreen
   caption:          string?,       // ≤ 200 chars, null nếu không chọn
   captionType:      'text' | 'location' | 'weather' | 'music' | 'star' | 'time' | 'streak' | null,
   audienceType:     'all' | 'select',
-  audienceUids:     string[],      // [] khi audienceType='all'
+  audienceUids:     string[],      // [] khi audienceType='all'; ignored khi spaceId != null
+  spaceId:          string?,       // [Space module] null nếu All-friends post; spaceId nếu Space post
+                                   // khi spaceId != null: broadcast tới tất cả Space members, audienceType/audienceUids bị ignore
   createdAt:        Timestamp,     // serverTimestamp()
 }
 ```
@@ -199,34 +203,48 @@ GridViewScreen
 { reactorId, reactorName, emoji, createdAt }
 ```
 
+**Firestore `/users/{uid}/feed/{postId}`** — fan-out collection (ghi bởi CF `onPostCreated`):
+```
+{
+  postId:    string,     // = documentId
+  authorId:  string,     // dùng cho filter per-person
+  spaceId:   string?,    // [C6-FIX] null nếu All-friends post; spaceId nếu Space post
+                         // dùng cho Space feed filter: .where('spaceId', isEqualTo: spaceId)
+  createdAt: Timestamp,  // copy từ post — dùng cho sort
+}
+```
+
+> Mỗi user có feed collection riêng. CF `onPostCreated` ghi vào feed của từng người nhận dựa trên `audienceType`. Không giới hạn số bạn bè.
+
 **Firebase Storage path:** `posts/{uid}/{postId}/photo.jpg`
 
 ### Feed query + pagination
 
-**Giới hạn hệ thống:** tối đa 20 bạn bè/user → `whereIn` tối đa 21 UIDs (20 bạn + bản thân), an toàn với giới hạn 30 của Firestore.
+**Fan-out architecture — scalable, không giới hạn số bạn bè:**
 
 **M2 (Friend module chưa có) — owner-only:**
 ```dart
-Firestore.collection('posts')
-  .where('authorId', isEqualTo: currentUid)
-  .orderBy('createdAt', descending: true)
-  .limit(10)
-  .startAfterDocument(lastDoc)  // cursor pagination
-```
-
-**M2+ (sau khi Friend module done) — all friends + self:**
-```dart
-final friendUids = await friendRepository.getFriendUids(currentUid);
-Firestore.collection('posts')
-  .where('authorId', whereIn: [currentUid, ...friendUids])  // max 21 UIDs
+// Query feed của bản thân (chỉ post của mình hiện trong feed)
+Firestore.collection('users').doc(currentUid).collection('feed')
   .orderBy('createdAt', descending: true)
   .limit(10)
   .startAfterDocument(lastDoc)
 ```
 
+**M2+ (sau khi Friend module done) — all friends + self:**
+```dart
+// CF đã fan-out vào /users/{uid}/feed — chỉ cần query collection của mình
+Firestore.collection('users').doc(currentUid).collection('feed')
+  .orderBy('createdAt', descending: true)
+  .limit(10)
+  .startAfterDocument(lastDoc)
+// Rồi fetch từng post: .doc('posts').doc(feedDoc.postId).get()
+```
+
 **Feed filter (FriendsButton):**
-- `FeedFilter.all` → `whereIn [currentUid + friendUids]`
-- `FeedFilter.person(uid)` → `where authorId == uid` (xem feed của 1 người)
+- `FeedFilter.all` → query `/users/{uid}/feed` — không filter thêm
+- `FeedFilter.person(specificUid)` → query `/users/{uid}/feed` `.where('authorId', isEqualTo: specificUid)`
+- `FeedFilter.space(spaceId)` → query `/users/{uid}/feed` `.where('spaceId', isEqualTo: spaceId)` **[Space module]**
 
 **Pagination strategy — prefetch tại item thứ 6:**
 ```dart
@@ -296,7 +314,16 @@ Output: "14:30" (không cần API)
 4. Firestore batch:
    - Set /posts/{postId} với imageUrl + metadata
 // Không có notification khi đăng ảnh
+// CF onPostCreated trigger sau khi doc tạo → increment postCount trên /users/{uid}
 ```
+
+### Cloud Functions
+
+| Function | Trigger | Việc làm |
+|---|---|---|
+| `onPostCreated` | Firestore onCreate `/posts/{postId}` | **[H10: 1 function duy nhất — không tạo trùng trong notification.md]** (1) Fan-out feed: ghi `/users/{recipientUid}/feed/{postId}` (include `spaceId` field) cho từng recipient theo `audienceType` hoặc Space `memberIds`; (2) Increment `postCount` trên `/users/{authorId}`; (3) Fan-out FCM (dùng logic từ Notification module, gọi trong cùng function) |
+| `onPostDeleted` | Firestore onDelete `/posts/{postId}` | (1) Xoá tất cả `/users/{uid}/feed/{postId}` docs (batch); (2) Decrement `postCount`; (3) Xoá Storage file (parse path từ `post.imageUrl`) |
+| `onFriendshipDeleted` | Firestore onDelete `/friendships/{pairId}` | Xoá cross-feed: posts của A khỏi feed của B và ngược lại (batch delete where `authorId == removedFriendUid` **AND `spaceId == null`**) — Space posts được giữ nguyên |
 
 ### Dependencies
 
@@ -320,14 +347,38 @@ Output: "14:30" (không cần API)
 
 ## Security
 
+### Global Firestore rules helpers (define trong `firestore.rules` trước tất cả rules)
+
+```javascript
+// ⚠️ PHẢI define trong firestore.rules trước khi dùng trong bất kỳ rule nào
+// isAuthed() được dùng khắp tất cả specs — define 1 lần ở đầu file
+
+function isAuthed() {
+  return request.auth != null;
+}
+
+function isOwner(uid) {
+  return isAuthed() && request.auth.uid == uid;
+}
+
+// isFriend(uid) — defined trong friend.md §Security
+// isMember(spaceId) — defined trong space.md §Security
+// isCreator(spaceId) — defined trong space.md §Security
+// isBlocked(uid) — defined trong settings.md §Security
+```
+
+> Khi viết `firestore.rules` file thật: copy-paste tất cả helper functions từ các spec vào đầu file, SAU đó copy-paste từng `match` block theo module.
+
 ### Firestore rules
 
 ```javascript
 match /posts/{postId} {
-  // M2: owner-only — chỉ tác giả đọc được post của mình
-  // TODO(Friend module): mở rộng thêm || isFriend(authorId)
-  // để bạn bè đọc được sau khi Friend rules được deploy
-  allow read: if isAuthed() && request.auth.uid == resource.data.authorId;
+  // Author luôn đọc được post của mình
+  // Recipient đọc được nếu postId xuất hiện trong feed của họ (CF đã fan-out)
+  allow read: if isAuthed() && (
+    request.auth.uid == resource.data.authorId ||
+    exists(/databases/$(database)/documents/users/$(request.auth.uid)/feed/$(postId))
+  );
   allow create: if isAuthed()
                 && request.auth.uid == request.resource.data.authorId
                 && (request.resource.data.caption == null
@@ -335,15 +386,25 @@ match /posts/{postId} {
   allow delete: if isAuthed() && request.auth.uid == resource.data.authorId;
   allow update: if false; // posts bất biến sau khi tạo
 }
+
+match /users/{uid}/feed/{postId} {
+  // Chỉ owner của feed đọc được
+  allow read:   if isAuthed() && request.auth.uid == uid;
+  // CF Admin SDK ghi — client không tự ghi/xóa
+  allow write:  if false;
+}
 ```
 
 ### Storage rules
 
 ```javascript
 match /posts/{uid}/{postId}/{filename} {
-  // M2: owner-only — chỉ tác giả đọc được ảnh của mình
-  // TODO(Friend module): mở rộng thêm || isFriend(uid)
-  allow read:  if isAuthed() && request.auth.uid == uid;
+  // Đọc được nếu là author HOẶC có feed doc (CF đã fan-out)
+  // Không cần isFriend check — feed subcollection enforce access
+  allow read:  if isAuthed() && (
+    request.auth.uid == uid ||
+    exists(/databases/$(database)/documents/users/$(request.auth.uid)/feed/$(postId))
+  );
   allow write: if isAuthed()
                && request.auth.uid == uid
                && request.resource.size < 5 * 1024 * 1024
@@ -378,13 +439,15 @@ match /posts/{uid}/{postId}/{filename} {
 
 ### Firestore rules tests
 
-- `/posts/{id}` Firestore: author read ✓, other user read ✗
-- Storage `/posts/{uid}/...`: owner read ✓, other user read ✗
-- `/posts/{id}` Firestore: author read ✓
+- `/posts/{id}`: author read ✓
+- `/posts/{id}`: recipient (có feed doc) read ✓
+- `/posts/{id}`: user không trong feed (không phải friend/audience) read ✗
 - `/posts/{id}`: caption > 200 chars → create rejected ✗
 - `/posts/{id}`: update → rejected ✗
-- Storage: upload > 5MB → rejected ✗
-- Storage: non-image MIME → rejected ✗
+- `/users/{uid}/feed/{postId}`: owner read ✓
+- `/users/{uid}/feed/{postId}`: stranger read ✗
+- `/users/{uid}/feed/{postId}`: client write trực tiếp → rejected ✗ (CF only)
+- Storage `/posts/{uid}/...`: owner write ✓, > 5MB rejected ✗, non-image rejected ✗
 
 ---
 
@@ -394,7 +457,7 @@ match /posts/{uid}/{postId}/{filename} {
 |---|---|
 | `app_camera_button.dart` | 82×82, inner white 70×70 `Ellipse`, outer Turquoise/500 ring. Tap animate scale 0.9→1. |
 | `app_note_pill.dart` | `cornerRadius 30`, bg `#39404166`, Nunito Bold 14, white. `case-sensitive` icon bên trái. Editable via `TextEditingController`. |
-| `app_act_text_bar.dart` | M3 placeholder — render "Gửi tin nhắn..." + 3 emoji + smile-plus. Disabled (no-op tap) ở M2. |
+| `app_act_text_bar.dart` | M2: render "Gửi tin nhắn..." + 3 emoji + smile-plus, **disabled** (no-op). M3: (1) tap text area → inline `TextField` expand ngay trên Feed, user gõ + nhấn gửi → tin nhắn đến conversation 1-1 sẵn có của tác giả post (tạo lúc kết bạn); (2) tap emoji preset → react (Reaction module); (3) tap smile-plus → EmojiPickerSheet. Không navigate khỏi Feed. |
 | `post_card.dart` | 400×400 image, cornerRadius 50, `Note` overlay, label bên dưới. |
 | `caption_service.dart` | Abstract: `Future<String> resolve(CaptionType type)`. Impl: Text (passthrough), Location (Nominatim), Weather (Open-Meteo), Time (DateTime), Mock (Music/Star/Streak). |
 | `share_modal.dart` | Bottom sheet: title "Chia sẻ đến...", 4 share targets (Chia sẻ/Messenger/Instagram/Tin nhắn-disabled), 2 actions (Lưu/Xoá). Xoá chỉ hiển khi `isAuthor == true`. |
@@ -432,7 +495,7 @@ match /posts/{uid}/{postId}/{filename} {
 | `StorageRepository` abstract | `lib/features/feed/data/storage_repository.dart` | ❌ |
 | `CaptionService` abstract | `lib/features/feed/application/caption_service.dart` | ❌ |
 | `FeedController` stub | `lib/features/feed/application/feed_controller.dart` | ❌ |
-| `CameraController` stub | `lib/features/feed/application/camera_controller.dart` | ❌ |
+| `AppCameraController` stub | `lib/features/feed/application/app_camera_controller.dart` | ❌ |
 | `PostController` stub | `lib/features/feed/application/post_controller.dart` | ❌ |
 | Routes: `/home`, `/capture-preview`, `/caption-modal`, `/grid-view` | `lib/core/router/app_router.dart` | ❌ |
 | Shared widgets (6 items) | `lib/shared/widgets/` | ❌ |
@@ -455,9 +518,9 @@ match /posts/{uid}/{postId}/{filename} {
 |---|---|
 | 1 | Caption = 7 types (Text/Vị trí/Thời tiết/Nhạc-mock/Sao-mock/Giờ/Streak-TODO) |
 | 2 | Không có notification khi đăng ảnh |
-| 3 | Feed M2: owner-only. M2+: whereIn max 21 UIDs (giới hạn 20 bạn/user) |
+| 3 | Feed dùng **fan-out subcollection** `/users/{uid}/feed` — query owner's subcollection, không dùng whereIn. M2: chỉ post của bản thân. M2+: sau khi Friend module done, fan-out include cả friends' posts. [H8-FIX: removed stale whereIn reference] |
 | 4 | Vị trí: Nominatim. Thời tiết: Open-Meteo. Cả 2 free, no API key |
-| 5 | Firestore + Storage rules M2: owner-only read, TODO isFriend khi Friend module done |
+| 5 | Firestore rules dùng fan-out feed doc check (`exists(feed/{postId})`) — không cần `isFriend` check trực tiếp. M2: owner-only (feed chưa có data bạn bè). M2+: sau khi fan-out done, tự mở cho bạn bè. |
 | 6 | Dual camera: swipe trái trên viewfinder, không phải Tier 2 nữa |
 | 7 | Xem ảnh bản thân (3 states) — thuộc Profile module, out of scope |
 | 8 | Download tap = icon đổi in-place (download → ✔), không navigate |
@@ -468,6 +531,24 @@ match /posts/{uid}/{postId}/{filename} {
 | 13 | "Tin nhắn" trong Share Modal → disabled M2, TODO Chat module (Tier 1) |
 
 ---
+
+## Worst path
+
+| Scenario | Expected behavior |
+|---|---|
+| Compress ảnh fail (OOM) | Toast "Không thể xử lý ảnh", ở lại Camera, không navigate |
+| Upload Storage fail (network) | Toast "Tải ảnh thất bại — thử lại", KHÔNG tạo Firestore doc |
+| Firestore createPost fail sau khi Storage đã upload | Orphan file trong Storage — CF `onPostDeleted` cleanup; toast retry |
+| App bị kill giữa chừng upload | Storage `UploadTask` bị huỷ, không resume — user phải chụp lại; không orphan Firestore doc |
+| Double-tap capture button | Disable button ngay sau tap đầu tiên cho đến khi navigate xong — tránh double submission |
+| `audienceType='select'` không chọn friend nào | Disable nút "Đăng" — phải chọn ít nhất 1 người |
+| GPS permission denied | Caption tự động switch về Text type, không crash |
+| Nominatim / Open-Meteo timeout (> 5s) | Hiển thị fallback text `"📍 ..."` / `"🌤️ ..."`, không block user |
+| CF `onPostCreated` fan-out fail (partial) | Một số feed không nhận post — acceptable, CF retry tự động (idempotent) |
+| Camera không khởi động được (thiếu permission) | Hiện `CameraPermissionScreen` yêu cầu cấp quyền, không crash |
+| Feed load fail (offline) | Hiện cached posts từ `cached_network_image`; error banner trên đầu |
+| Feed scroll hết danh sách | Hiện indicator "Đã hiển thị tất cả", không gọi thêm |
+| Tap post của người đã unfriend | Feed doc vẫn tồn tại nhưng `/posts/{id}` read → `permission-denied` → ẩn post card, không crash |
 
 ## Risks
 
