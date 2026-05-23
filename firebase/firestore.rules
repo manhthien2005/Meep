@@ -150,8 +150,10 @@ service cloud.firestore {
     // ===== /friendships/{pairId} =====
     match /friendships/{pid} {
       allow read: if isAuthed() &&
-        resource.data.members.hasAll([request.auth.uid]);
-      allow create, update, delete: if false; // CF acceptFriendRequest only
+        request.auth.uid in resource.data.members;
+      allow create, update: if false; // CF acceptFriendRequest only
+      allow delete: if isAuthed() &&
+        request.auth.uid in resource.data.members;
     }
 
     // ===== /friend_requests/{requestId} =====
@@ -164,8 +166,20 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll(
           ['senderId', 'receiverId', 'status', 'createdAt', 'updatedAt']
         )
-        && request.resource.data.status == 'pending';
-      allow update, delete: if false; // server-side only
+        && request.resource.data.status == 'pending'
+        && request.resource.data.senderId != request.resource.data.receiverId;
+      allow update: if isAuthed() && (
+        (
+          resource.data.receiverId == request.auth.uid &&
+          resource.data.status == 'pending' &&
+          request.resource.data.status in ['accepted', 'declined']
+        ) || (
+          resource.data.senderId == request.auth.uid &&
+          resource.data.status == 'pending' &&
+          request.resource.data.status == 'cancelled'
+        )
+      );
+      allow delete: if false; // server-side only
     }
 
     // ===== /blocks/{blockId} =====
