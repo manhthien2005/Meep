@@ -1,0 +1,622 @@
+{
+  "source_pdf": "Nhom1_DieuLinh_XuanNghi_SRS_FinalProject - D21CQPT01-N PHAN XUAN NGHI.pdf",
+  "page_count": 66,
+  "section_count": 62,
+  "figure_count": 48,
+  "sections": [
+    {
+      "number": "1",
+      "level": 1,
+      "title": "Đặt vấn đề",
+      "page": 5
+    },
+    {
+      "number": "1.1",
+      "level": 2,
+      "title": "Mục đích, yêu cầu dự án",
+      "page": 5
+    },
+    {
+      "number": "1.2",
+      "level": 2,
+      "title": "Xác định phạm vi hệ thống",
+      "page": 5
+    },
+    {
+      "number": "1.2.1",
+      "level": 3,
+      "title": "Kiến trúc hệ thống",
+      "page": 5
+    },
+    {
+      "number": "1.2.2",
+      "level": 3,
+      "title": "Phạm vi chức năng",
+      "page": 6
+    },
+    {
+      "number": "1.2.3",
+      "level": 3,
+      "title": "Phạm vi triển khai",
+      "page": 6
+    },
+    {
+      "number": "1.3",
+      "level": 2,
+      "title": "Hệ thống hiện tại",
+      "page": 6
+    },
+    {
+      "number": "1.3.1",
+      "level": 3,
+      "title": "Các chức năng trong hệ thống:",
+      "page": 6
+    },
+    {
+      "number": "1.3.2",
+      "level": 3,
+      "title": "Quy trình sơ bộ:",
+      "page": 7
+    },
+    {
+      "number": "2",
+      "level": 1,
+      "title": "Cơ sở lý thuyết",
+      "page": 8
+    },
+    {
+      "number": "2.1",
+      "level": 2,
+      "title": "Khái niệm về Lập trình Mobile:",
+      "page": 8
+    },
+    {
+      "number": "2.1.1",
+      "level": 3,
+      "title": "Lập trình theo hướng Native",
+      "page": 8
+    },
+    {
+      "number": "2.1.2",
+      "level": 3,
+      "title": "Lập trình theo hướng Hybrid",
+      "page": 8
+    },
+    {
+      "number": "2.1.3",
+      "level": 3,
+      "title": "Lập trình theo hướng Cross-platform",
+      "page": 8
+    },
+    {
+      "number": "2.2",
+      "level": 2,
+      "title": "Khái niệm và lý do chọn Flutter:",
+      "page": 8
+    },
+    {
+      "number": "2.3",
+      "level": 2,
+      "title": "Khái niệm và lý do chọn Firebase:",
+      "page": 10
+    },
+    {
+      "number": "3",
+      "level": 1,
+      "title": "Mô tả các yêu cầu chức năng của hệ thống",
+      "page": 13
+    },
+    {
+      "number": "3.1",
+      "level": 2,
+      "title": "Các yêu cầu chức năng của Người quản trị",
+      "page": 14
+    },
+    {
+      "number": "3.1.1",
+      "level": 3,
+      "title": "Quản lý người dùng",
+      "page": 15
+    },
+    {
+      "number": "3.1.2",
+      "level": 3,
+      "title": "Quản lý bác sĩ",
+      "page": 15
+    },
+    {
+      "number": "3.1.3",
+      "level": 3,
+      "title": "Duyệt đơn thành bác sĩ",
+      "page": 15
+    },
+    {
+      "number": "3.1.4",
+      "level": 3,
+      "title": "Quản lý hệ thống thông báo",
+      "page": 15
+    },
+    {
+      "number": "3.1.5",
+      "level": 3,
+      "title": "Quản lý các tiện ích khác",
+      "page": 16
+    },
+    {
+      "number": "3.2",
+      "level": 2,
+      "title": "Các yêu cầu chức năng của Người dùng",
+      "page": 16
+    },
+    {
+      "number": "3.2.1",
+      "level": 3,
+      "title": "Chức năng đăng nhập",
+      "page": 17
+    },
+    {
+      "number": "3.2.2",
+      "level": 3,
+      "title": "Chức năng đăng kí",
+      "page": 19
+    },
+    {
+      "number": "3.2.3",
+      "level": 3,
+      "title": "Chức năng xem thông tin cá nhân",
+      "page": 20
+    },
+    {
+      "number": "3.2.4",
+      "level": 3,
+      "title": "Chức năng tìm bác sĩ",
+      "page": 22
+    },
+    {
+      "number": "3.2.5",
+      "level": 3,
+      "title": "Chức năng đặt lịch hẹn",
+      "page": 23
+    },
+    {
+      "number": "3.2.6",
+      "level": 3,
+      "title": "Chức năng thông báo lịch hẹn",
+      "page": 25
+    },
+    {
+      "number": "3.2.7",
+      "level": 3,
+      "title": "Chức năng quản lý lịch hẹn với bác sĩ",
+      "page": 26
+    },
+    {
+      "number": "3.2.8",
+      "level": 3,
+      "title": "Chức năng đánh giá bác sĩ",
+      "page": 29
+    },
+    {
+      "number": "3.2.9",
+      "level": 3,
+      "title": "Chức năng chat với bác sĩ",
+      "page": 30
+    },
+    {
+      "number": "3.3",
+      "level": 2,
+      "title": "Các yêu cầu chức năng của Bác sĩ",
+      "page": 32
+    },
+    {
+      "number": "3.3.1",
+      "level": 3,
+      "title": "Chức năng đăng nhập",
+      "page": 33
+    },
+    {
+      "number": "3.3.2",
+      "level": 3,
+      "title": "Chức năng xem thông tin cá nhân",
+      "page": 34
+    },
+    {
+      "number": "3.3.3",
+      "level": 3,
+      "title": "Chức năng cập nhật lịch khám",
+      "page": 36
+    },
+    {
+      "number": "3.3.4",
+      "level": 3,
+      "title": "Chức năng xem thông tin bệnh nhân",
+      "page": 37
+    },
+    {
+      "number": "3.3.5",
+      "level": 3,
+      "title": "Chức năng thông báo lịch hẹn",
+      "page": 38
+    },
+    {
+      "number": "3.3.6",
+      "level": 3,
+      "title": "Chức năng quản lý lịch hẹn với bệnh nhân",
+      "page": 39
+    },
+    {
+      "number": "3.3.7",
+      "level": 3,
+      "title": "Chức năng chat với bệnh nhân",
+      "page": 40
+    },
+    {
+      "number": "4",
+      "level": 1,
+      "title": "Cơ sở dữ liệu",
+      "page": 41
+    },
+    {
+      "number": "4.1",
+      "level": 2,
+      "title": "Bảng User (người dùng)",
+      "page": 41
+    },
+    {
+      "number": "4.2",
+      "level": 2,
+      "title": "Bảng Doctor (bác sĩ)",
+      "page": 42
+    },
+    {
+      "number": "4.3",
+      "level": 2,
+      "title": "Bảng Specialization (chuyên môn bác sĩ)",
+      "page": 42
+    },
+    {
+      "number": "4.4",
+      "level": 2,
+      "title": "Bảng Role (vai trò)",
+      "page": 42
+    },
+    {
+      "number": "4.5",
+      "level": 2,
+      "title": "Bảng Location (địa chỉ)",
+      "page": 43
+    },
+    {
+      "number": "4.6",
+      "level": 2,
+      "title": "Bảng Appointment (lịch hẹn)",
+      "page": 43
+    },
+    {
+      "number": "4.7",
+      "level": 2,
+      "title": "Bảng AppointmentSetting (lịch hẹn được bác sĩ thiết lập)",
+      "page": 43
+    },
+    {
+      "number": "4.8",
+      "level": 2,
+      "title": "Bảng Notification (thông báo)",
+      "page": 44
+    },
+    {
+      "number": "5",
+      "level": 1,
+      "title": "Hiện thực ứng dụng",
+      "page": 45
+    },
+    {
+      "number": "5.1",
+      "level": 2,
+      "title": "Giao diện đăng nhập, đăng kí, lấy lại mật khẩu",
+      "page": 45
+    },
+    {
+      "number": "5.2",
+      "level": 2,
+      "title": "Giao diện Trang chủ",
+      "page": 48
+    },
+    {
+      "number": "5.3",
+      "level": 2,
+      "title": "Giao diện Trang chi tiết bác sĩ và đặt lịch hẹn",
+      "page": 49
+    },
+    {
+      "number": "5.4",
+      "level": 2,
+      "title": "Giao diện Chat",
+      "page": 55
+    },
+    {
+      "number": "5.5",
+      "level": 2,
+      "title": "Giao diện trang Quản lý lịch hẹn",
+      "page": 56
+    },
+    {
+      "number": "5.6",
+      "level": 2,
+      "title": "Giao diện trang Bác sĩ yêu thích",
+      "page": 59
+    },
+    {
+      "number": "5.7",
+      "level": 2,
+      "title": "Giao diện trang Thông tin cá nhân",
+      "page": 60
+    },
+    {
+      "number": "5.8",
+      "level": 2,
+      "title": "Giao diện trang Thông báo",
+      "page": 62
+    },
+    {
+      "number": "6",
+      "level": 1,
+      "title": "Kết luận",
+      "page": 63
+    },
+    {
+      "number": "6.1",
+      "level": 2,
+      "title": "Hạn chế:",
+      "page": 63
+    },
+    {
+      "number": "6.2",
+      "level": 2,
+      "title": "Hướng phát triển trong tương lai:",
+      "page": 63
+    }
+  ],
+  "figures": [
+    {
+      "id": "Hình 1",
+      "caption": "Sơ đồ tổng quan hệ thống",
+      "page": 5
+    },
+    {
+      "id": "Hình 2",
+      "caption": "Quy trình sơ bộ",
+      "page": 7
+    },
+    {
+      "id": "Hình 3",
+      "caption": "Mô hình Use Case tổng quát",
+      "page": 13
+    },
+    {
+      "id": "Hình 4",
+      "caption": "Mô hình Use Case của Người quản trị",
+      "page": 14
+    },
+    {
+      "id": "Hình 5",
+      "caption": "Mô hình Use Case của Người dùng",
+      "page": 17
+    },
+    {
+      "id": "Hình 6",
+      "caption": "Wireframe màn hình đăng nhập",
+      "page": 18
+    },
+    {
+      "id": "Hình 7",
+      "caption": "Wireframe màn hình đăng ký",
+      "page": 20
+    },
+    {
+      "id": "Hình 8",
+      "caption": "Wireframe người dùng cập nhật thông tin (trái) và màn hình đăng ký thành bác sĩ (phải)",
+      "page": 22
+    },
+    {
+      "id": "Hình 9",
+      "caption": "Wireframe trang chủ và tính năng tìm kiếm bác sĩ",
+      "page": 23
+    },
+    {
+      "id": "Hình 10",
+      "caption": "Wireframe trang chi tiết thông tin bác sĩ",
+      "page": 24
+    },
+    {
+      "id": "Hình 11",
+      "caption": "Wireframe màn hình chọn thời gian lịch hẹn",
+      "page": 24
+    },
+    {
+      "id": "Hình 12",
+      "caption": "Wireframe màn hình xác nhận lịch hẹn",
+      "page": 25
+    },
+    {
+      "id": "Hình 13",
+      "caption": "Wireframe màn hình đặt lịch hẹn thành công",
+      "page": 25
+    },
+    {
+      "id": "Hình 14",
+      "caption": "Wireframe màn hình thông báo",
+      "page": 26
+    },
+    {
+      "id": "Hình 15",
+      "caption": "Wireframe màn hình quản lý lịch hẹn",
+      "page": 28
+    },
+    {
+      "id": "Hình 16",
+      "caption": "Wireframe màn hình chi tiết lịch hẹn",
+      "page": 28
+    },
+    {
+      "id": "Hình 17",
+      "caption": "Wireframe cảnh báo hủy lịch hẹn",
+      "page": 29
+    },
+    {
+      "id": "Hình 18",
+      "caption": "Wireframe xác nhận lịch hẹn đã bị hủy",
+      "page": 29
+    },
+    {
+      "id": "Hình 19",
+      "caption": "Wireframe sau khi cuộc hẹn đã hoàn thành",
+      "page": 30
+    },
+    {
+      "id": "Hình 20",
+      "caption": "Wireframe đánh giá bác sĩ",
+      "page": 30
+    },
+    {
+      "id": "Hình 21",
+      "caption": "Wireframe màn hình trò chuyện",
+      "page": 31
+    },
+    {
+      "id": "Hình 22",
+      "caption": "Wireframe trò chuyện cùng người dùng khác",
+      "page": 31
+    },
+    {
+      "id": "Hình 23",
+      "caption": "Mô hình Use Case của Bác sĩ",
+      "page": 33
+    },
+    {
+      "id": "Hình 24",
+      "caption": "Wireframe profile người dùng",
+      "page": 35
+    },
+    {
+      "id": "Hình 25",
+      "caption": "Wireframe profile của người dùng bác sĩ",
+      "page": 35
+    },
+    {
+      "id": "Hình 26",
+      "caption": "Wireframe cung cấp thêm chứng nhận/chứng chỉ",
+      "page": 36
+    },
+    {
+      "id": "Hình 27",
+      "caption": "Wireframe cập nhật lịch hẹn của bác sĩ",
+      "page": 37
+    },
+    {
+      "id": "Hình 28",
+      "caption": "Wireframe ghi chú của bác sĩ",
+      "page": 38
+    },
+    {
+      "id": "Hình 29",
+      "caption": "Wireframe màn hình thông báo lịch hẹn của bác sĩ",
+      "page": 39
+    },
+    {
+      "id": "Hình 30",
+      "caption": "Giao diện giới thiệu ứng dụng Doctor Nearby",
+      "page": 45
+    },
+    {
+      "id": "Hình 31",
+      "caption": "Giao diện chức năng đăng nhập (bên trái) và đăng kí (bên phải)",
+      "page": 46
+    },
+    {
+      "id": "Hình 33",
+      "caption": "Giao diện chức năng Lấy lại mật khẩu",
+      "page": 47
+    },
+    {
+      "id": "Hình 34",
+      "caption": "Giao diện Homepage",
+      "page": 48
+    },
+    {
+      "id": "Hình 35",
+      "caption": "Chọn bác sĩ để đặt lịch hẹn",
+      "page": 49
+    },
+    {
+      "id": "Hình 36",
+      "caption": "Giao diện thông tin bác sĩ",
+      "page": 50
+    },
+    {
+      "id": "Hình 37",
+      "caption": "Chọn thời gian đặt lịch hẹn",
+      "page": 51
+    },
+    {
+      "id": "Hình 38",
+      "caption": "Xác nhận thông tin lịch hẹn",
+      "page": 52
+    },
+    {
+      "id": "Hình 39",
+      "caption": "Thông báo đặt lịch hẹn thành công",
+      "page": 53
+    },
+    {
+      "id": "Hình 40",
+      "caption": "Xem lịch hẹn ở Quản lý lịch hẹn",
+      "page": 54
+    },
+    {
+      "id": "Hình 41",
+      "caption": "Giao diện Chatpage",
+      "page": 55
+    },
+    {
+      "id": "Hình 42",
+      "caption": "Lịch hẹn và chi tiết lịch hẹn đang có",
+      "page": 56
+    },
+    {
+      "id": "Hình 43",
+      "caption": "Lịch hẹn và chi tiết lịch hẹn đã hoàn thành",
+      "page": 57
+    },
+    {
+      "id": "Hình 44",
+      "caption": "Chức năng đánh giá bác sĩ",
+      "page": 58
+    },
+    {
+      "id": "Hình 45",
+      "caption": "Giao diện MyDoctorPage",
+      "page": 59
+    },
+    {
+      "id": "Hình 46",
+      "caption": "Giao diện MyProfilePage",
+      "page": 60
+    },
+    {
+      "id": "Hình 47",
+      "caption": "Thông tin cá nhân",
+      "page": 61
+    },
+    {
+      "id": "Hình 48",
+      "caption": "Giao diện trang thông báo",
+      "page": 62
+    },
+    {
+      "id": "Hình 49",
+      "caption": "Lối vào trang thông báo tại trang Home",
+      "page": 62
+    }
+  ]
+}

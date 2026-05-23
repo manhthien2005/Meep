@@ -1,0 +1,137 @@
+{
+  "$comment": "Khung (schema) trừu tượng hoá từ SRS mẫu 'Doctor Nearby'. Mục tiêu: làm template tái dùng để sinh báo cáo SRS cho đề tài khác (vd Meep). Mỗi mục được gắn content_type + pattern để biết CÁCH viết, không chỉ tiêu đề. Outline gốc (instance mẫu) nằm ở srs-sample-outline.json.",
+  "template_name": "SRS - Đồ án môn học (PTIT HCM, Khoa CNTT2)",
+  "derived_from": "Nhom1_DieuLinh_XuanNghi_SRS_FinalProject (Doctor Nearby)",
+  "language": "vi",
+  "page_count_sample": 66,
+
+  "cover_page": {
+    "content_type": "cover",
+    "fields": [
+      "Tên học viện + cơ sở (vd: HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG – CƠ SỞ TP.HCM)",
+      "Khoa (vd: CÔNG NGHỆ THÔNG TIN 2)",
+      "Tên đề tài (IN HOA, có thể kèm tên app tiếng Anh)",
+      "Danh sách SV thực hiện: Họ tên + MSSV"
+    ]
+  },
+
+  "front_matter": [
+    { "name": "Mục lục", "content_type": "auto_toc", "note": "Heading tree tự sinh, kèm số trang" },
+    { "name": "Mục lục hình ảnh", "content_type": "auto_figure_index", "note": "Danh sách 'Hình N. Caption' + số trang" }
+  ],
+
+  "recurring_patterns": {
+    "function_block": {
+      "applies_to": "Mọi mục con trong chương 3 (yêu cầu chức năng)",
+      "structure": [
+        "Đoạn mô tả ngắn chức năng + gạch đầu dòng các biến thể (vd: đăng nhập Email, lấy lại mật khẩu, đăng xuất)",
+        "Mục con '.1 Các bước thực hiện': steps_table",
+        "Mục con '.2 Thiết kế màn hình': wireframe figure"
+      ]
+    },
+    "steps_table": {
+      "columns": ["Steps", "Description"],
+      "row_id_format": "S1, S2, S3, ...",
+      "note": "Mô tả luồng tuần tự; nhánh hợp lệ/không hợp lệ ghi bằng bullet trong cột Description"
+    },
+    "db_table": {
+      "columns": ["Tên trường", "Kiểu dữ liệu", "Mô tả"],
+      "precedes_with": "ERD figure ở đầu chương 4",
+      "note": "Mỗi bảng = 1 mục con. Kiểu dữ liệu kiểu SQL (INTEGER, VARCHAR(n), DATETIME, BOOL...)"
+    },
+    "comparison_table": {
+      "columns": ["Tiêu chí", "Phương án A", "Phương án B"],
+      "note": "Dùng ở 2.2 (Flutter vs React Native) và 2.3 (Firebase vs MongoDB) để biện minh lựa chọn công nghệ"
+    },
+    "use_case_diagram": {
+      "content_type": "figure",
+      "note": "1 UC tổng quát ở đầu chương 3 + 1 UC cho mỗi actor ở đầu mục 3.x"
+    },
+    "screenshot_block": {
+      "content_type": "figure+prose",
+      "note": "Ảnh chụp màn hình app thật + đoạn mô tả thao tác. Dùng xuyên suốt chương 5"
+    }
+  },
+
+  "chapters": [
+    {
+      "number": "1",
+      "title": "Đặt vấn đề",
+      "purpose": "Bối cảnh, lý do làm đề tài, phạm vi hệ thống, mô tả hệ thống hiện tại",
+      "subsections": [
+        { "number": "1.1", "title": "Mục đích, yêu cầu dự án", "content_type": "prose+bullets" },
+        { "number": "1.2", "title": "Xác định phạm vi hệ thống", "content_type": "container" },
+        { "number": "1.2.1", "title": "Kiến trúc hệ thống", "content_type": "prose+figure", "figure": "Sơ đồ tổng quan hệ thống" },
+        { "number": "1.2.2", "title": "Phạm vi chức năng", "content_type": "bullets" },
+        { "number": "1.2.3", "title": "Phạm vi triển khai", "content_type": "bullets" },
+        { "number": "1.3", "title": "Hệ thống hiện tại", "content_type": "container" },
+        { "number": "1.3.1", "title": "Các chức năng trong hệ thống", "content_type": "bullets_by_actor" },
+        { "number": "1.3.2", "title": "Quy trình sơ bộ", "content_type": "prose+figure", "figure": "Quy trình sơ bộ" }
+      ]
+    },
+    {
+      "number": "2",
+      "title": "Cơ sở lý thuyết",
+      "purpose": "Nền tảng kỹ thuật + biện minh lựa chọn công nghệ (so sánh có bảng)",
+      "subsections": [
+        { "number": "2.1", "title": "Khái niệm về Lập trình Mobile", "content_type": "prose" },
+        { "number": "2.1.1", "title": "Lập trình theo hướng Native", "content_type": "prose" },
+        { "number": "2.1.2", "title": "Lập trình theo hướng Hybrid", "content_type": "prose" },
+        { "number": "2.1.3", "title": "Lập trình theo hướng Cross-platform", "content_type": "prose" },
+        { "number": "2.2", "title": "Khái niệm và lý do chọn <Framework FE>", "content_type": "prose+comparison_table", "sample_topic": "Flutter vs React Native" },
+        { "number": "2.3", "title": "Khái niệm và lý do chọn <Backend>", "content_type": "prose+comparison_table", "sample_topic": "Firebase vs MongoDB" }
+      ]
+    },
+    {
+      "number": "3",
+      "title": "Mô tả các yêu cầu chức năng của hệ thống",
+      "purpose": "Yêu cầu chức năng chia theo actor; mỗi chức năng = mô tả + bảng Steps + wireframe",
+      "intro": "Đoạn giới thiệu các actor + use_case_diagram tổng quát",
+      "grouping": "by_actor",
+      "actor_subsection_pattern": {
+        "level2": "Các yêu cầu chức năng của <Actor> — intro actor + use_case_diagram của actor",
+        "level3": "function_block (xem recurring_patterns.function_block)"
+      },
+      "sample_actors": ["Người quản trị", "Người dùng", "Bác sĩ"]
+    },
+    {
+      "number": "4",
+      "title": "Cơ sở dữ liệu",
+      "purpose": "ERD + mô tả schema từng bảng",
+      "intro": "ERD figure thể hiện các thực thể",
+      "subsection_pattern": "db_table (mỗi bảng 1 mục con)",
+      "sample_tables": ["User", "Doctor", "Specialization", "Role", "Location", "Appointment", "AppointmentSetting", "Notification"]
+    },
+    {
+      "number": "5",
+      "title": "Hiện thực ứng dụng",
+      "purpose": "Ảnh chụp màn hình app thật + mô tả luồng theo từng nhóm màn hình",
+      "subsection_pattern": "screenshot_block (mỗi nhóm màn hình 1 mục con)"
+    },
+    {
+      "number": "6",
+      "title": "Kết luận",
+      "purpose": "Tổng kết + hạn chế + hướng phát triển",
+      "subsections": [
+        { "number": "6.1", "title": "Hạn chế", "content_type": "bullets" },
+        { "number": "6.2", "title": "Hướng phát triển trong tương lai", "content_type": "bullets" }
+      ]
+    }
+  ],
+
+  "back_matter": [
+    { "name": "LỜI CẢM ƠN", "content_type": "prose", "numbered": false }
+  ],
+
+  "meep_adaptation": {
+    "status": "DECIDED — leader (ThienPDM) đã chốt 2026-06-01",
+    "decisions": {
+      "scope": "Toàn bộ MVP (Tier 0 + Tier 0+). Chương 1-4 mô tả yêu cầu + thiết kế cả MVP; chương 5 'Hiện thực' chỉ screenshot phần đã ship trên develop.",
+      "chapter3_grouping": "by_feature (KHÔNG theo actor — Meep chỉ 1 actor User). Mỗi feature = function_block (mô tả + steps_table + wireframe).",
+      "output_format": "Nhiều file .md theo chương trong reports/, convert .docx bằng pandoc ở bước cuối."
+    },
+    "notes": "Doctor Nearby có 3 actor (Admin/User/Doctor) + domain lịch hẹn y tế. Meep là photo-sharing cho bạn thân, actor chính là User; quan hệ là Friend (bidirectional, không follow công khai). KHÔNG có Admin/Doctor.",
+    "db_note": "Chương 4: Meep dùng Firestore (NoSQL, collection/document) — mô tả theo collection thay vì bảng SQL. Giữ format 3 cột nhưng cột giữa là kiểu Firestore (string/number/timestamp/map/array/reference) thay vì VARCHAR/INTEGER.",
+    "todo_before_generate": "Khảo sát features thật trên develop để chốt danh sách feature cho chương 3 (không liệt kê feature chưa có code/spec)."
+  }
+}

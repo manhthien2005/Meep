@@ -1,0 +1,119 @@
+{
+  "$comment": "Outline cụ thể cho báo cáo SRS của Meep. Map từ srs-template.schema.json (khung mẫu Doctor Nearby) sang feature THẬT trên branch develop. Mỗi mục chương 3 trỏ tới spec nguồn trong docs/specs/ để viết không bịa. Chương 4 trỏ tới collection thật trong firestore.rules + freezed model. 'source' = file/spec để trích nội dung; 'status' = shipped|partial|planned theo code thực tế.",
+  "report_title": "Meep — Ứng dụng chia sẻ ảnh cho bạn bè thân thiết",
+  "based_on_template": "srs-template.schema.json",
+  "decisions": {
+    "scope": "Toàn bộ MVP (Tier 0 + Tier 0+)",
+    "chapter3_grouping": "by_feature",
+    "output_format": "Nhiều file .md theo chương -> pandoc .docx"
+  },
+  "cover": {
+    "fields": [
+      "Tên trường (TODO: anh điền — Học viện / Đại học)",
+      "Khoa",
+      "Tên đề tài: Meep — Ứng dụng chia sẻ ảnh cho bạn bè thân thiết",
+      "Nhóm + thành viên: ThienPDM, KhoaLND, HanDHG, NganTNK (TODO: họ tên + MSSV thật)"
+    ]
+  },
+  "chapters": [
+    {
+      "number": "1", "title": "Đặt vấn đề", "file": "01-dat-van-de.md",
+      "subsections": [
+        { "number": "1.1", "title": "Mục đích, yêu cầu dự án", "content_type": "prose+bullets", "source": "CLAUDE.md (Project Context); docs/specs/README.md" },
+        { "number": "1.2", "title": "Xác định phạm vi hệ thống", "content_type": "container" },
+        { "number": "1.2.1", "title": "Kiến trúc hệ thống", "content_type": "prose+figure", "figure": "Sơ đồ kiến trúc Flutter + Firebase + AppWidget", "source": "firebase/, apps/mobile/lib/core/" },
+        { "number": "1.2.2", "title": "Phạm vi chức năng", "content_type": "bullets", "source": "CLAUDE.md MVP Scope (Tier 0/0+)" },
+        { "number": "1.2.3", "title": "Phạm vi triển khai", "content_type": "bullets", "note": "Android-first, defer iOS — ADR-0002" },
+        { "number": "1.3", "title": "Khảo sát hệ thống tương tự", "content_type": "container", "note": "Thay 'hệ thống hiện tại' của mẫu y tế bằng khảo sát app cùng phân khúc" },
+        { "number": "1.3.1", "title": "Các ứng dụng tương tự (Locket, BeReal)", "content_type": "prose" },
+        { "number": "1.3.2", "title": "Định vị khác biệt của Meep", "content_type": "prose", "note": "Headline: home-screen widget + Space/Diary" }
+      ]
+    },
+    {
+      "number": "2", "title": "Cơ sở lý thuyết", "file": "02-co-so-ly-thuyet.md",
+      "subsections": [
+        { "number": "2.1", "title": "Khái niệm về Lập trình Mobile", "content_type": "prose" },
+        { "number": "2.1.1", "title": "Lập trình hướng Native", "content_type": "prose" },
+        { "number": "2.1.2", "title": "Lập trình hướng Hybrid", "content_type": "prose" },
+        { "number": "2.1.3", "title": "Lập trình hướng Cross-platform", "content_type": "prose" },
+        { "number": "2.2", "title": "Khái niệm và lý do chọn Flutter", "content_type": "prose+comparison_table", "comparison": "Flutter vs React Native" },
+        { "number": "2.3", "title": "Khái niệm và lý do chọn Firebase", "content_type": "prose+comparison_table", "comparison": "Firebase vs giải pháp BE truyền thống" },
+        { "number": "2.4", "title": "Kiến trúc ứng dụng (Riverpod + feature-first)", "content_type": "prose+figure", "source": "apps/mobile/CLAUDE.md (Layering)", "note": "THÊM so với mẫu — biện minh kiến trúc 3 lớp data/application/presentation" },
+        { "number": "2.5", "title": "Home-screen Widget Android (AppWidget)", "content_type": "prose", "source": "docs/specs/2026-05-23-widget-android.md", "note": "THÊM — differentiator chính, cơ sở lý thuyết AppWidget + WorkManager" }
+      ]
+    },
+    {
+      "number": "3", "title": "Mô tả các yêu cầu chức năng của hệ thống", "file": "03-yeu-cau-chuc-nang.md",
+      "grouping": "by_feature",
+      "intro": "Meep có 1 actor chính (User). Use case tổng quát + nhóm chức năng theo module. Mỗi chức năng: mô tả + bảng Steps (S1..Sn) + wireframe.",
+      "intro_figure": "Mô hình Use Case tổng quát của User",
+      "subsections": [
+        { "number": "3.1", "title": "Xác thực (Đăng ký / Đăng nhập / Lấy lại mật khẩu)", "status": "shipped", "source": "docs/specs/2026-05-04-auth.md", "code": "features/auth/" },
+        { "number": "3.2", "title": "Quản lý bạn bè", "status": "shipped", "source": "docs/specs/2026-05-22-friend.md", "code": "features/friend/" },
+        { "number": "3.3", "title": "Chụp ảnh và đăng bài", "status": "shipped", "source": "docs/specs/2026-05-22-home-camera-feed.md", "code": "features/feed/ (camera, caption, post)" },
+        { "number": "3.4", "title": "Bảng tin (Feed)", "status": "shipped", "source": "docs/specs/2026-05-22-home-camera-feed.md", "code": "features/feed/ (feed_section, grid_view)" },
+        { "number": "3.5", "title": "Thả cảm xúc (Reaction)", "status": "shipped", "source": "docs/specs/2026-05-23-reaction.md", "code": "features/reaction/" },
+        { "number": "3.6", "title": "Thông báo đẩy (Notification)", "status": "shipped", "source": "docs/specs/2026-05-23-notification.md", "code": "features/notification/ + functions" },
+        { "number": "3.7", "title": "Hồ sơ cá nhân (Profile)", "status": "shipped", "source": "docs/specs/2026-05-22-profile.md", "code": "features/profile/" },
+        { "number": "3.8", "title": "Không gian chung (Space)", "status": "shipped", "source": "docs/specs/2026-05-23-space.md", "code": "features/space/" },
+        { "number": "3.9", "title": "Nhật ký (Diary)", "status": "shipped", "source": "docs/specs/2026-05-23-diary.md", "code": "features/diary/" },
+        { "number": "3.10", "title": "Trò chuyện (Chat)", "status": "shipped", "source": "docs/specs/2026-05-23-chat.md", "code": "features/chat/" },
+        { "number": "3.11", "title": "Home-screen Widget Android", "status": "shipped", "source": "docs/specs/2026-05-23-widget-android.md", "code": "android/.../MeepWidget.kt, features/widget/" },
+        { "number": "3.12", "title": "Cài đặt (Settings: chặn, đăng xuất, xoá tài khoản)", "status": "shipped", "source": "docs/specs/2026-05-23-settings.md", "code": "features/settings/" },
+        { "number": "3.13", "title": "Streak / Kỷ niệm", "status": "planned", "source": "docs/specs/2026-05-22-streak.md", "code": "(chưa có module code)", "flag": "Tier 1 — có spec, chưa hiện thực. Cân nhắc đưa vào 'hướng phát triển' thay vì yêu cầu chức năng." },
+        { "number": "3.14", "title": "Điểm danh (RollCall)", "status": "planned", "source": "(KHÔNG có spec)", "code": "(KHÔNG có code)", "flag": "Tier 0+ theo CLAUDE.md NHƯNG chưa có spec lẫn code. CẦN ANH QUYẾT: (a) bỏ khỏi báo cáo, (b) mô tả ở 'hướng phát triển', (c) anh cấp spec để em viết." }
+      ]
+    },
+    {
+      "number": "4", "title": "Cơ sở dữ liệu", "file": "04-co-so-du-lieu.md",
+      "intro": "Meep dùng Cloud Firestore (NoSQL, document-oriented). Mô hình theo collection/document thay cho bảng quan hệ. Cột giữa = kiểu Firestore (string/number/timestamp/bool/array/map/reference).",
+      "intro_figure": "Sơ đồ quan hệ collection Firestore (ERD-style)",
+      "db_format": { "columns": ["Tên trường", "Kiểu Firestore", "Mô tả"] },
+      "collections_from_rules": [
+        { "path": "/users/{uid}", "model": "UserProfile", "code": "features/auth/data/user_profile.dart", "subcollections": ["private", "notifications", "feed", "fcmTokens"] },
+        { "path": "/usernames/{username}", "purpose": "Enforce username unique", "code": "firestore.rules:92" },
+        { "path": "/posts/{postId}", "model": "Post", "code": "features/feed/data/post.dart", "subcollections": ["reactions"] },
+        { "path": "/friendships/{pairId}", "model": "Friendship", "code": "features/friend/data/friendship.dart" },
+        { "path": "/friend_requests/{requestId}", "model": "FriendRequest", "code": "features/friend/data/friend_request.dart" },
+        { "path": "/blocks/{blockId}", "model": "Block", "code": "features/settings/data/block.dart" },
+        { "path": "/spaces/{spaceId}", "model": "Space", "code": "features/space/data/space.dart" },
+        { "path": "/space_members/{spaceId}/members/{uid}", "model": "SpaceMember", "code": "features/space/data/space_member.dart" },
+        { "path": "/conversations/{conversationId}", "model": "Conversation", "code": "features/chat/data/conversation.dart", "subcollections": ["messages"] },
+        { "path": "/diary/{entryId}", "model": "DiaryEntry", "code": "features/diary/data/diary_entry.dart" }
+      ]
+    },
+    {
+      "number": "5", "title": "Hiện thực ứng dụng", "file": "05-hien-thuc.md",
+      "note": "Chỉ screenshot phần ĐÃ SHIP. Mỗi nhóm màn = screenshot_block (ảnh thật + mô tả thao tác).",
+      "screen_groups": [
+        "Onboarding / Intro + Đăng nhập / Đăng ký / Lấy lại mật khẩu",
+        "Camera + chụp + caption + đăng bài",
+        "Bảng tin (Feed) + Grid view",
+        "Bạn bè (Friend sheet) + tìm + mời + accept",
+        "Reaction + danh sách reaction",
+        "Thông báo",
+        "Hồ sơ + sửa hồ sơ + hồ sơ bạn bè",
+        "Space (tạo space 3 bước + context)",
+        "Diary (list + tạo + canvas)",
+        "Chat (inbox + thread + group)",
+        "Home-screen widget Android",
+        "Settings (chặn, xoá tài khoản, logout)"
+      ]
+    },
+    {
+      "number": "6", "title": "Kết luận", "file": "06-ket-luan.md",
+      "subsections": [
+        { "number": "6.1", "title": "Kết quả đạt được", "content_type": "prose", "note": "THÊM nhẹ so với mẫu — tổng kết feature đã ship" },
+        { "number": "6.2", "title": "Hạn chế", "content_type": "bullets" },
+        { "number": "6.3", "title": "Hướng phát triển trong tương lai", "content_type": "bullets", "note": "iOS, RollCall, Streak, dual-camera..." }
+      ]
+    }
+  ],
+  "back_matter": [{ "name": "LỜI CẢM ƠN", "content_type": "prose", "numbered": false }],
+  "open_flags": [
+    "RollCall (3.14): Tier 0+ MVP nhưng KHÔNG có spec/code — cần anh quyết bỏ / đưa vào hướng phát triển / cấp spec.",
+    "Streak (3.13): có spec, chưa code — đề xuất đưa vào 'hướng phát triển'.",
+    "Cover: cần tên trường + họ tên/MSSV thật của 4 thành viên.",
+    "Wireframe/screenshot: cần export từ Figma (MCP chỉ chạy ở main session, không chạy trong worktree này) hoặc anh cung cấp."
+  ]
+}
