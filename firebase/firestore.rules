@@ -24,6 +24,14 @@ service cloud.firestore {
       );
     }
 
+    /// True if there is a block in either direction between the calling user and [uid].
+    function isBlocked(uid) {
+      return isAuthed() && (
+        exists(/databases/$(database)/documents/blocks/$(request.auth.uid + '_' + uid)) ||
+        exists(/databases/$(database)/documents/blocks/$(uid + '_' + request.auth.uid))
+      );
+    }
+
     // ===== /users/{uid} =====
     match /users/{uid} {
       allow read: if isAuthed();
@@ -89,6 +97,17 @@ service cloud.firestore {
         && request.resource.data.status == 'pending';
       // Status transitions handled server-side.
       allow update, delete: if false;
+    }
+
+    // ===== /blocks/{blockId} =====
+    // blockId = "{blockerUid}_{blockedUid}" — NOT sorted
+    match /blocks/{blockId} {
+      allow read: if isAuthed() && (
+        request.auth.uid == resource.data.blockerUid ||
+        request.auth.uid == resource.data.blockedUid
+      );
+      // Write is server-side only (via blockUser Cloud Function).
+      allow create, update, delete: if false;
     }
 
     // ===== Default deny =====

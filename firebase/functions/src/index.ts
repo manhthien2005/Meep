@@ -100,3 +100,35 @@ export const onFriendshipDeleted = onDocumentDeleted(
     // TODO(F/impl): see comment above.
   },
 );
+
+// ===== Settings module stubs =====
+
+/**
+ * Block a user: create /blocks doc + remove friendship + update conversation status.
+ *
+ * TODO(SE/impl):
+ *   - verify target exists + caller != target
+ *   - create /blocks/{blockerUid}_{targetUid}
+ *   - delete /friendships/{pairId} if exists
+ *   - update /conversations/{pairId}.status = 'blocked' if exists
+ */
+export const blockUser = onCall((request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
+  // TODO(SE/impl): see comment above.
+  return { ok: true };
+});
+
+/**
+ * Delete account: re-authenticate, then cascade-delete all user data.
+ *
+ * TODO(SE/impl):
+ *   - delete /users/{uid} + subcollections
+ *   - delete /posts by uid from Storage + Firestore
+ *   - delete /friendships where uid is member
+ *   - delete Firebase Auth account
+ */
+export const deleteAccount = onCall((request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
+  // TODO(SE/impl): see comment above.
+  return { ok: true };
+});
