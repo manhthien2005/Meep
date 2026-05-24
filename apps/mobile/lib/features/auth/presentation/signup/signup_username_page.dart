@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,9 +20,11 @@ class SignUpUsernamePage extends ConsumerStatefulWidget {
 
 class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
   final _usernameCtrl = TextEditingController();
+  Timer? _debounce;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _usernameCtrl.dispose();
     super.dispose();
   }
@@ -30,12 +34,14 @@ class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
     return state.isUsernameAvailable && !state.isCheckingUsername;
   }
 
-  Future<void> _onUsernameChanged(String value) async {
-    if (value.trim().length >= 3) {
-      await ref
-          .read(signUpControllerProvider.notifier)
-          .checkUsername(value.trim());
-    }
+  void _onUsernameChanged(String value) {
+    _debounce?.cancel();
+    if (value.trim().length < 3) return;
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        ref.read(signUpControllerProvider.notifier).checkUsername(value.trim());
+      }
+    });
   }
 
   Future<void> _onContinue() async {
