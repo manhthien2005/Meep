@@ -16,6 +16,9 @@ import 'package:meep/features/diary/presentation/diary_create_screen.dart';
 import 'package:meep/features/diary/presentation/diary_list_screen.dart';
 import 'package:meep/features/feed/presentation/home_screen.dart';
 import 'package:meep/features/home/presentation/home_page.dart';
+import 'package:meep/features/profile/presentation/edit_profile_screen.dart';
+import 'package:meep/features/profile/presentation/photo_detail_screen.dart';
+import 'package:meep/features/profile/presentation/profile_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -111,6 +114,25 @@ GoRouter appRouter(Ref ref) {
         builder: (_, __) => const HomeScreen(),
       ),
       GoRoute(path: '/grid-view', builder: (_, __) => const HomeScreen()),
+      // TODO(P/T10/TBD): wire Profile routes
+      GoRoute(
+        path: '/profile',
+        builder: (_, state) => ProfileScreen(uid: state.extra as String? ?? ''),
+      ),
+      GoRoute(
+        path: '/profile/edit',
+        builder: (_, __) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: '/profile/photo/:postId',
+        builder: (_, state) =>
+            PhotoDetailScreen(postId: state.pathParameters['postId'] ?? ''),
+      ),
+      GoRoute(
+        path: '/friend-profile/:uid',
+        builder: (_, state) =>
+            ProfileScreen(uid: state.pathParameters['uid'] ?? ''),
+      ),
     ],
   );
 }
