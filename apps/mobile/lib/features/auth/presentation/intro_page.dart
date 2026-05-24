@@ -14,9 +14,7 @@ class IntroPage extends StatelessWidget {
       backgroundColor: AppColors.bw900,
       body: Stack(
         children: [
-          // ── Beam: spotlight teal từ upper-center-right ────────────────
           const _Beam(),
-          // ── Content ───────────────────────────────────────────────────
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -27,26 +25,30 @@ class IntroPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // top gap: logo tại y=414 / 917 ≈ 45.1%
+                      // logo tại y=414/917 ≈ 45.1%
                       SizedBox(height: h * 0.451),
-                      // ── Logo ────────────────────────────────────────
-                      Container(
+                      // ── Logo ──────────────────────────────────────────
+                      // Frame 1461: NO fill (transparent) — beam shows through
+                      // Inner Logo frame (56×49): white fill
+                      SizedBox(
                         width: 90,
                         height: 90,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        alignment: Alignment.center,
-                        child: SvgPicture.asset(
-                          'assets/icons/ic_logo.svg',
-                          width: 56,
-                          height: 49,
+                        child: Center(
+                          child: Container(
+                            width: 56,
+                            height: 49,
+                            color: Colors.white,
+                            child: SvgPicture.asset(
+                              'assets/icons/ic_logo.svg',
+                              width: 56,
+                              height: 49,
+                            ),
+                          ),
                         ),
                       ),
-                      // logo→Meep: 511-504 = 7px
+                      // logo→Meep: 7px
                       const SizedBox(height: 7),
-                      // ── App name ────────────────────────────────────
+                      // ── App name ──────────────────────────────────────
                       Text(
                         'Meep',
                         style: AppTextStyles.xl2Bold.copyWith(
@@ -55,9 +57,9 @@ class IntroPage extends StatelessWidget {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      // Meep→tagline: 565-553 = 12px
+                      // Meep→tagline: 12px
                       const SizedBox(height: 12),
-                      // ── Tagline ─────────────────────────────────────
+                      // ── Tagline ───────────────────────────────────────
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
@@ -73,15 +75,15 @@ class IntroPage extends StatelessWidget {
                           textAlign: TextAlign.center,
                         ),
                       ),
-                      // tagline→btn1: 674-613 = 61px
+                      // tagline→btn1: 61px
                       const SizedBox(height: 61),
-                      // ── Button 1: glass pill ─────────────────────────
+                      // ── Button 1: glass pill ──────────────────────────
                       const _GlassButton(
                         label: 'Tạo tài khoản mới',
                         route: '/signup/email',
                         width: 249,
                       ),
-                      // btn1→btn2: 744-730 = 14px
+                      // btn1→btn2: 14px
                       const SizedBox(height: 14),
                       // ── Button 2: transparent ─────────────────────────
                       const _TransparentButton(
@@ -101,11 +103,9 @@ class IntroPage extends StatelessWidget {
   }
 }
 
-// ── Beam ────────────────────────────────────────────────────────────────────
-// Extracted từ Figma SVG:
-//   - Color: #85E9FF, mix-blend-mode: plus-lighter
-//   - 2 diagonal polygon paths, Gaussian blur 25px + 37.5px
-//   - ViewBox 412×841, scaled to actual screen size
+// ── Beam ─────────────────────────────────────────────────────────────────────
+// SVG-extracted: color #85E9FF, mix-blend-mode plus-lighter,
+// 2 diagonal paths with Gaussian blur 25px + 37.5px, viewBox 412×841.
 
 class _Beam extends StatelessWidget {
   const _Beam();
@@ -113,7 +113,11 @@ class _Beam extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Positioned.fill(
-      child: CustomPaint(painter: _BeamPainter()),
+      // opacity 0.65 → giảm sáng so với Figma reference screenshot
+      child: Opacity(
+        opacity: 0.65,
+        child: CustomPaint(painter: _BeamPainter()),
+      ),
     );
   }
 }
@@ -121,11 +125,10 @@ class _Beam extends StatelessWidget {
 class _BeamPainter extends CustomPainter {
   const _BeamPainter();
 
-  // SVG gradient: #85E9FF → #85E9FF@20% along this direction
-  Shader _gradient(Size size, double scaleX, double scaleY) {
+  Shader _gradient(Size size) {
     return const LinearGradient(
-      begin: Alignment(1.16, -0.90), // x1=444.922/412, y1=-69/841 → Alignment
-      end: Alignment(-0.001, 0.41), // x2=205.574/412, y2=591/841
+      begin: Alignment(1.16, -0.90),
+      end: Alignment(-0.001, 0.41),
       colors: [Color(0xFF85E9FF), Color(0x3385E9FF)],
     ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
   }
@@ -134,20 +137,17 @@ class _BeamPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-    // SVG viewBox: 0 0 412 841
     final sx = w / 412;
     final sy = h / 841;
+    final shader = _gradient(size);
 
-    final shader = _gradient(size, sx, sy);
-
-    // ── Path 2 (opacity 1.0, blur σ=37.5) — paint first (bottom layer) ──
+    // Path 2 — opacity 1.0, blur σ=37.5
     final path2 = Path()
       ..moveTo(400.807 * sx, -85.043 * sy)
       ..lineTo(513.076 * sx, -44.3794 * sy)
       ..lineTo(574.441 * sx, 765.157 * sy)
       ..lineTo(-164.711 * sx, 497.437 * sy)
       ..close();
-
     canvas.drawPath(
       path2,
       Paint()
@@ -156,17 +156,16 @@ class _BeamPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 37.5),
     );
 
-    // ── Path 1 (opacity 0.5, blur σ=25) — paint at 50% opacity on top ──
+    // Path 1 — opacity 0.5, blur σ=25
     final path1 = Path()
       ..moveTo(400.817 * sx, -85.0393 * sy)
       ..lineTo(513.086 * sx, -44.3756 * sy)
       ..lineTo(417.722 * sx, 708.393 * sy)
       ..lineTo(-7.99173 * sx, 554.2 * sy)
       ..close();
-
     canvas.saveLayer(
       Rect.fromLTWH(0, 0, w, h),
-      Paint()..color = const Color(0x80FFFFFF), // 50% opacity layer
+      Paint()..color = const Color(0x80FFFFFF),
     );
     canvas.drawPath(
       path1,
@@ -182,7 +181,8 @@ class _BeamPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// ── Glass button (Button 1) ─────────────────────────────────────────────────
+// ── Glass button ──────────────────────────────────────────────────────────────
+// btn_node.png: silver-gray gradient pill, subtle border, bottom shadow
 
 class _GlassButton extends StatelessWidget {
   const _GlassButton({
@@ -210,29 +210,27 @@ class _GlassButton extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                const Color(0xFFA8C4C8).withValues(alpha: 0.80),
-                const Color(0xFF6A9298).withValues(alpha: 0.65),
+                const Color(0xFFB8CCCE).withValues(alpha: 0.90),
+                const Color(0xFF7A9599).withValues(alpha: 0.75),
               ],
             ),
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: const Color(0xFFCCE8EA).withValues(alpha: 0.6),
-              width: 1.0,
+              color: const Color(0xFFD5E8EA).withValues(alpha: 0.8),
+              width: 0.8,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF1ABFC5).withValues(alpha: 0.25),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
+                color: Colors.black.withValues(alpha: 0.30),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           alignment: Alignment.center,
           child: Text(
             label,
-            style: AppTextStyles.mdBold.copyWith(
-              color: Colors.white,
-            ),
+            style: AppTextStyles.mdBold.copyWith(color: Colors.white),
           ),
         ),
       ),
@@ -240,7 +238,7 @@ class _GlassButton extends StatelessWidget {
   }
 }
 
-// ── Transparent button (Button 2) ───────────────────────────────────────────
+// ── Transparent button ────────────────────────────────────────────────────────
 
 class _TransparentButton extends StatelessWidget {
   const _TransparentButton({
