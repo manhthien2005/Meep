@@ -37,6 +37,9 @@ Thumbs.db
 
 # Cursor MCP local config (contains personal tokens) — commit only .cursor/mcp.example.json
 .cursor/mcp.json
+
+# Claude Code MCP local config
+.mcp.json
 .cursor/.cache/
 
 # ===== Flutter =====

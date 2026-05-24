@@ -1,20 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:meep/features/auth/data/auth_repository.dart';
+import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/user_repository.dart';
 
-/// Provider for [AuthRepository].
-///
-/// Override in tests with a fake implementation:
-/// ```dart
-/// ProviderScope(
-///   overrides: [authRepositoryProvider.overrideWithValue(FakeAuthRepository())],
-///   child: ...,
-/// )
-/// ```
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   throw UnimplementedError(
     'authRepositoryProvider must be overridden — '
     'wire FirebaseAuthRepository in main.dart after Firebase.initializeApp',
+  );
+});
+
+final userRepositoryProvider = Provider<UserRepository>((ref) {
+  throw UnimplementedError(
+    'userRepositoryProvider must be overridden — '
+    'wire FirebaseUserRepository in main.dart after Firebase.initializeApp',
   );
 });
 
@@ -24,6 +24,16 @@ final currentUidProvider = StreamProvider<String?>((ref) {
   return repo.watchUid();
 });
 
+/// Stream of the current user's full profile (null when signed out or profile not yet created).
+// TODO(A/T2/KhoaLND): watch profile from Firestore via UserRepository
+final currentUserProfileProvider = StreamProvider<UserProfile?>((ref) {
+  final uid = ref.watch(currentUidProvider).valueOrNull;
+  if (uid == null) return Stream.value(null);
+  throw UnimplementedError(
+    'currentUserProfileProvider — wire FirebaseUserRepository first',
+  );
+});
+
 /// Convenience — true when there's a signed-in user.
 final isSignedInProvider = Provider<bool>((ref) {
   return ref.watch(currentUidProvider).maybeWhen(
@@ -31,10 +41,3 @@ final isSignedInProvider = Provider<bool>((ref) {
         orElse: () => false,
       );
 });
-
-// TODO(impl): once auth flows are wired, add controllers per flow:
-//   - SignInController (handles loading / error / success states)
-//   - SignUpController
-//   - PasswordResetController
-//
-// Each as a Riverpod `@riverpod class` once you enable code-gen.
