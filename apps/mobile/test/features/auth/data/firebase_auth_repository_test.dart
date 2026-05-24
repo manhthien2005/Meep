@@ -1,9 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:meep/core/error/app_error.dart';
 import 'package:meep/features/auth/data/firebase_auth_repository.dart';
 import 'package:mock_exceptions/mock_exceptions.dart';
+import 'package:mocktail/mocktail.dart';
+
+class MockGoogleSignIn extends Mock implements GoogleSignIn {}
 
 void main() {
   late MockFirebaseAuth mockAuth;
@@ -160,10 +164,16 @@ void main() {
   });
 
   group('signInWithGoogle', () {
-    test('ném UnimplementedError (implement tại T7)', () async {
+    test('user huỷ Google Sign-In → UnauthenticatedError', () async {
+      final mockGoogle = MockGoogleSignIn();
+      when(() => mockGoogle.signIn()).thenAnswer((_) async => null);
+      final repoWithGoogle = FirebaseAuthRepository(
+        auth: mockAuth,
+        googleSignIn: mockGoogle,
+      );
       await expectLater(
-        repo.signInWithGoogle(),
-        throwsA(isA<UnimplementedError>()),
+        repoWithGoogle.signInWithGoogle(),
+        throwsA(isA<UnauthenticatedError>()),
       );
     });
   });
