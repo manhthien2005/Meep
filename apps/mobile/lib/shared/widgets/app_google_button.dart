@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+import 'package:meep/core/theme/app_colors.dart';
+import 'package:meep/core/theme/app_radii.dart';
+import 'package:meep/core/theme/app_text_styles.dart';
 
 class AppGoogleButton extends StatelessWidget {
   const AppGoogleButton({super.key, this.onPressed});
@@ -7,44 +12,35 @@ class AppGoogleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TODO(A/HanDHG): implement per Figma — 357×60, radius=30, bg=white, border=#EFF0F6
-    // Android only — do NOT show on iOS
     return SizedBox(
-      width: 357,
-      height: 60,
-      child: OutlinedButton.icon(
+      width: double.infinity,
+      child: TextButton(
         onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
+        style: TextButton.styleFrom(
           backgroundColor: Colors.white,
-          side: const BorderSide(color: Color(0xFFEFF0F6)),
+          padding: const EdgeInsets.symmetric(vertical: 19, horizontal: 24),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(AppRadii.pill),
+            side: const BorderSide(color: AppColors.bw200),
           ),
         ),
-        icon: const _GoogleIcon(),
-        label: const Text(
-          'Tiếp tục với Google',
-          style: TextStyle(
-            color: Color(0xFF1A1C1E),
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.asset(
+              'assets/icons/ic_google.svg',
+              width: 18,
+              height: 18,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'Tiếp tục với Google',
+              style: AppTextStyles.mdBold.copyWith(color: AppColors.bw900),
+            ),
+          ],
         ),
       ),
-    );
-  }
-}
-
-class _GoogleIcon extends StatelessWidget {
-  const _GoogleIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    // TODO(A/HanDHG): replace with actual Google SVG asset
-    return const SizedBox(
-      width: 18,
-      height: 18,
-      child: Placeholder(),
     );
   }
 }

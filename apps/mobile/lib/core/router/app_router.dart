@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:meep/dev/widget_catalog_page.dart';
 import 'package:meep/features/auth/application/auth_controller.dart';
 import 'package:meep/features/auth/presentation/intro_page.dart';
 import 'package:meep/features/auth/presentation/login/login_email_page.dart';
@@ -23,6 +24,7 @@ String? authRedirect({
   if (isLoading) return null;
   final onAuthRoute = location.startsWith('/login') ||
       location.startsWith('/signup') ||
+      location.startsWith('/dev') ||
       location == '/intro';
   if (isSignedIn && onAuthRoute) return '/home';
   if (!isSignedIn && !onAuthRoute) return '/intro';
@@ -70,6 +72,11 @@ GoRouter appRouter(Ref ref) {
         path: '/login/password',
         builder: (context, state) =>
             LoginPasswordPage(email: state.extra as String? ?? ''),
+      ),
+      // DEV ONLY — xóa trước khi merge
+      GoRoute(
+        path: '/dev/widgets',
+        builder: (_, __) => const WidgetCatalogPage(),
       ),
     ],
   );

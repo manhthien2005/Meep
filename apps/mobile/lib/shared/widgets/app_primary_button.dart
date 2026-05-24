@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
+import 'package:meep/core/theme/app_radii.dart';
+import 'package:meep/core/theme/app_text_styles.dart';
 
 class AppPrimaryButton extends StatelessWidget {
   const AppPrimaryButton({
@@ -8,38 +10,67 @@ class AppPrimaryButton extends StatelessWidget {
     required this.label,
     this.onPressed,
     this.isLoading = false,
+    this.showTrailingIcon = true,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool isLoading;
+  final bool showTrailingIcon;
+
+  bool get _enabled => onPressed != null && !isLoading;
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onPressed != null && !isLoading;
-    // TODO(A/HanDHG): implement per Figma — 338×57, radius=30, Nunito Bold 16
     return SizedBox(
-      width: 338,
-      height: 57,
-      child: ElevatedButton(
-        onPressed: enabled ? onPressed : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: enabled ? AppColors.turquoise300 : AppColors.bw700,
-          foregroundColor: enabled ? AppColors.turquoise800 : AppColors.bw400,
+      width: double.infinity,
+      child: TextButton(
+        onPressed: _enabled ? onPressed : null,
+        style: TextButton.styleFrom(
+          backgroundColor: _enabled ? AppColors.turquoise300 : AppColors.bw700,
+          foregroundColor: _enabled ? AppColors.turquoise800 : AppColors.bw400,
+          disabledBackgroundColor: AppColors.bw700,
+          disabledForegroundColor: AppColors.bw400,
+          padding: const EdgeInsets.symmetric(vertical: 18),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(AppRadii.pill),
           ),
         ),
-        child: isLoading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  color: AppColors.turquoise800,
-                  strokeWidth: 2,
-                ),
-              )
-            : Text(label),
+        child: isLoading ? _loadingIndicator() : _content(),
+      ),
+    );
+  }
+
+  Widget _content() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: AppTextStyles.mdBold.copyWith(
+            color: _enabled ? AppColors.turquoise800 : AppColors.bw400,
+          ),
+        ),
+        if (showTrailingIcon) ...[
+          const SizedBox(width: 8),
+          Icon(
+            Icons.arrow_forward_ios,
+            size: 14,
+            color: _enabled ? AppColors.turquoise800 : AppColors.bw400,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _loadingIndicator() {
+    return const SizedBox(
+      width: 20,
+      height: 20,
+      child: CircularProgressIndicator(
+        color: AppColors.turquoise800,
+        strokeWidth: 2,
       ),
     );
   }

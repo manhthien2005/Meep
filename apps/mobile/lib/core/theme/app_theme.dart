@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:meep/core/theme/app_colors.dart';
+
 class AppTheme {
   AppTheme._();
 
@@ -14,6 +16,8 @@ class AppTheme {
       colorScheme: colorScheme,
       useMaterial3: true,
       brightness: Brightness.light,
+      fontFamily: 'Nunito',
+      scaffoldBackgroundColor: AppColors.bw900,
       appBarTheme: AppBarTheme(
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
@@ -32,6 +36,8 @@ class AppTheme {
       colorScheme: colorScheme,
       useMaterial3: true,
       brightness: Brightness.dark,
+      fontFamily: 'Nunito',
+      scaffoldBackgroundColor: AppColors.bw900,
       appBarTheme: AppBarTheme(
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
