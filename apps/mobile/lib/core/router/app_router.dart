@@ -11,6 +11,8 @@ import 'package:meep/features/auth/presentation/signup/signup_email_page.dart';
 import 'package:meep/features/auth/presentation/signup/signup_name_page.dart';
 import 'package:meep/features/auth/presentation/signup/signup_password_page.dart';
 import 'package:meep/features/auth/presentation/signup/signup_username_page.dart';
+import 'package:meep/features/chat/presentation/chat_screen.dart';
+import 'package:meep/features/chat/presentation/inbox_screen.dart';
 import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
 import 'package:meep/features/diary/presentation/diary_create_screen.dart';
 import 'package:meep/features/diary/presentation/diary_list_screen.dart';
@@ -19,6 +21,10 @@ import 'package:meep/features/home/presentation/home_page.dart';
 import 'package:meep/features/profile/presentation/edit_profile_screen.dart';
 import 'package:meep/features/profile/presentation/photo_detail_screen.dart';
 import 'package:meep/features/profile/presentation/profile_screen.dart';
+import 'package:meep/features/space/presentation/space_context_bottom_sheet.dart';
+import 'package:meep/features/space/presentation/space_create_sheet.dart';
+import 'package:meep/features/streak/presentation/streak_photo_detail_screen.dart';
+import 'package:meep/features/streak/presentation/streak_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -54,7 +60,7 @@ GoRouter appRouter(Ref ref) {
     ),
     routes: [
       GoRoute(path: '/intro', builder: (_, __) => const IntroPage()),
-      GoRoute(path: '/home', builder: (_, __) => const HomePage()),
+      GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
       GoRoute(
         path: '/signup/email',
         builder: (_, __) => const SignUpEmailPage(),
@@ -104,7 +110,6 @@ GoRouter appRouter(Ref ref) {
         builder: (_, __) => const HomePage(),
       ),
       // TODO(FE/T20/KhoaLND): wire Feed routes
-      GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
       GoRoute(
         path: '/capture-preview',
         builder: (_, __) => const HomeScreen(),
@@ -132,6 +137,33 @@ GoRouter appRouter(Ref ref) {
         path: '/friend-profile/:uid',
         builder: (_, state) =>
             ProfileScreen(uid: state.pathParameters['uid'] ?? ''),
+      ),
+      // TODO(C/T8/TBD): wire Chat routes
+      GoRoute(path: '/inbox', builder: (_, __) => const InboxScreen()),
+      GoRoute(
+        path: '/chat/:conversationId',
+        builder: (_, state) => ChatScreen(
+          conversationId: state.pathParameters['conversationId'] ?? '',
+        ),
+      ),
+      // TODO(SP/T10/TBD): wire Space routes
+      GoRoute(
+        path: '/space/create',
+        builder: (_, __) => const SpaceCreateSheet(),
+      ),
+      GoRoute(
+        path: '/space/:spaceId',
+        builder: (_, state) => SpaceContextBottomSheet(
+          spaceId: state.pathParameters['spaceId'] ?? '',
+        ),
+      ),
+      // TODO(ST/T5/TBD): wire Streak routes
+      GoRoute(path: '/streak', builder: (_, __) => const StreakScreen()),
+      GoRoute(
+        path: '/streak/photo/:postId',
+        builder: (_, state) => StreakPhotoDetailScreen(
+          postId: state.pathParameters['postId'] ?? '',
+        ),
       ),
     ],
   );

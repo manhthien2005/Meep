@@ -1,6 +1,6 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { onDocumentCreated, onDocumentDeleted } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { initializeApp } from 'firebase-admin/app';
 import { z } from 'zod';
 
@@ -147,4 +147,60 @@ export const onPostDeleted = onDocumentDeleted(
   (_event) => {
     // TODO(FE/impl): see comment above.
   },
+);
+
+// ===== Notification module stubs =====
+
+/** TODO(N/impl): send FCM to receiver + persist /notifications doc */
+export const onFriendRequestCreated = onDocumentCreated(
+  { document: 'friend_requests/{requestId}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(N/impl) */ },
+);
+
+/** TODO(N/impl): send FCM to original sender + persist /notifications doc */
+export const onFriendRequestAccepted = onDocumentCreated(
+  { document: 'friendships/{pairId}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(N/impl) */ },
+);
+
+/** TODO(N/impl): send FCM to post owner + persist /notifications doc */
+export const onReactionCreated = onDocumentCreated(
+  { document: 'posts/{postId}/reactions/{reactionId}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(N/impl) */ },
+);
+
+// ===== Space module stubs =====
+
+export const createSpace = onCall((req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
+  return { ok: true }; // TODO(SP/impl)
+});
+export const leaveSpace = onCall((req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
+  return { ok: true }; // TODO(SP/impl)
+});
+export const kickMember = onCall((req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
+  return { ok: true }; // TODO(SP/impl)
+});
+export const transferOwnership = onCall((req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
+  return { ok: true }; // TODO(SP/impl)
+});
+
+export const onSpaceMemberAdded = onDocumentCreated(
+  { document: 'spaces/{spaceId}/members/{uid}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(SP/impl) */ },
+);
+export const onSpaceMemberRemoved = onDocumentDeleted(
+  { document: 'spaces/{spaceId}/members/{uid}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(SP/impl) */ },
+);
+export const onSpacePostCreated = onDocumentCreated(
+  { document: 'posts/{postId}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(SP/impl) — only processes posts where data.spaceId != null */ },
+);
+export const onSpaceDeleted = onDocumentUpdated(
+  { document: 'spaces/{spaceId}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(SP/impl) — fires when deletedAt field is set (soft delete) */ },
 );

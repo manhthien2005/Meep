@@ -19,6 +19,14 @@ void main() async {
   //   userRepositoryProvider.overrideWithValue(
   //     FirebaseUserRepository(firestore: FirebaseFirestore.instance),
   //   ),
+
+  // TODO(N/T2/TBD): FCM init sau khi firebase_messaging được add vào pubspec:
+  //   final messaging = FirebaseMessaging.instance;
+  //   await messaging.requestPermission();
+  //   final token = await messaging.getToken();
+  //   if (token != null) notificationController.initFcm();
+  //   FirebaseMessaging.onMessage.listen(notificationController.handleForeground);
+  //   FirebaseMessaging.onMessageOpenedApp.listen(notificationController.handleTap);
   runApp(const ProviderScope(child: MeepApp()));
 }
 
