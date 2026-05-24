@@ -56,8 +56,15 @@ service cloud.firestore {
     // ===== /users/{uid} =====
     match /users/{uid} {
       allow read: if isAuthed();
-      allow create: if isOwner(uid);
-      allow update: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'username', 'createdAt'])
+        && request.resource.data.username is string
+        && request.resource.data.username.size() >= 3
+        && request.resource.data.username.size() <= 20
+        && request.resource.data.username.matches('^[a-z0-9_]+$');
+      allow update: if isOwner(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['uid', 'createdAt', 'email']);
       allow delete: if false; // use deleteAccount CF
 
       match /private/{docId} {
@@ -77,6 +84,16 @@ service cloud.firestore {
       match /fcmTokens/{tokenId} {
         allow read, write: if isOwner(uid);
       }
+    }
+
+    // ===== /usernames/{username} =====
+    match /usernames/{username} {
+      allow read: if isAuthed();
+      allow create: if isAuthed()
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if isAuthed()
+        && resource.data.uid == request.auth.uid;
+      allow update: if false;
     }
 
     // ===== /posts/{postId} — combined: Feed + Space + Reaction =====

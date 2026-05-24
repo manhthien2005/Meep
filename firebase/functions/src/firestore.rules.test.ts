@@ -82,7 +82,13 @@ describe('/users/{uid}', () => {
   test('owner can create own doc', async () => {
     const alice = uid('alice');
     await assertSucceeds(
-      authed(alice).firestore().doc(`users/${alice}`).set({ displayName: 'Alice' }),
+      authed(alice).firestore().doc(`users/${alice}`).set({
+        uid: alice,
+        email: 'alice@example.com',
+        displayName: 'Alice',
+        username: 'alice',
+        createdAt: new Date(),
+      }),
     );
   });
 
@@ -107,6 +113,149 @@ describe('/users/{uid}', () => {
     await assertFails(
       authed(alice).firestore().doc(`users/${alice}/feed/post1`).set({ postId: 'post1' }),
     );
+  });
+});
+
+// ===== /users/{uid} — field validation (T5) =====
+
+describe('/users/{uid} — field validation', () => {
+  const alice = uid('alice');
+  const validProfile = {
+    uid: uid('alice'),
+    email: 'alice@example.com',
+    displayName: 'Alice Nguyen',
+    username: 'alice',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    postCount: 0,
+    friendCount: 0,
+    spaceCount: 0,
+  };
+
+  test('owner can create with valid fields', async () => {
+    await assertSucceeds(authed(alice).firestore().doc(`users/${alice}`).set(validProfile));
+  });
+
+  test('missing required field — rejected', async () => {
+    // omit displayName to test required field check
+    const { displayName: _, ...missingDisplayName } = validProfile;
+    void _;
+    await assertFails(authed(alice).firestore().doc(`users/${alice}`).set(missingDisplayName));
+  });
+
+  test('username too short (< 3) — rejected', async () => {
+    await assertFails(
+      authed(alice).firestore().doc(`users/${alice}`).set({ ...validProfile, username: 'ab' }),
+    );
+  });
+
+  test('username too long (> 20) — rejected', async () => {
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`users/${alice}`)
+        .set({ ...validProfile, username: 'a'.repeat(21) }),
+    );
+  });
+
+  test('username with uppercase — rejected (must be lowercase)', async () => {
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`users/${alice}`)
+        .set({ ...validProfile, username: 'Alice' }),
+    );
+  });
+
+  test('owner can update non-immutable field', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertSucceeds(
+      authed(alice).firestore().doc(`users/${alice}`).update({ displayName: 'Alice Updated' }),
+    );
+  });
+
+  test('owner cannot update uid — immutable', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertFails(
+      authed(alice).firestore().doc(`users/${alice}`).update({ uid: 'different-uid' }),
+    );
+  });
+
+  test('owner cannot update email — immutable', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`users/${alice}`)
+        .update({ email: 'newemail@example.com' }),
+    );
+  });
+
+  test('delete always denied', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertFails(authed(alice).firestore().doc(`users/${alice}`).delete());
+  });
+});
+
+// ===== /usernames/{username} (T5) =====
+
+describe('/usernames/{username}', () => {
+  const alice = uid('alice');
+  const bob = uid('bob');
+
+  test('authed user can read any username doc', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('usernames/alice').set({ uid: alice });
+    });
+    await assertSucceeds(authed(bob).firestore().doc('usernames/alice').get());
+  });
+
+  test('unauthenticated cannot read', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('usernames/alice').set({ uid: alice });
+    });
+    await assertFails(unauthed().firestore().doc('usernames/alice').get());
+  });
+
+  test('owner can create username doc with matching uid', async () => {
+    await assertSucceeds(
+      authed(alice).firestore().doc('usernames/alice').set({ uid: alice }),
+    );
+  });
+
+  test('cannot create username doc with different uid', async () => {
+    await assertFails(
+      authed(bob).firestore().doc('usernames/alice').set({ uid: alice }),
+    );
+  });
+
+  test('owner can delete own username doc', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('usernames/alice').set({ uid: alice });
+    });
+    await assertSucceeds(authed(alice).firestore().doc('usernames/alice').delete());
+  });
+
+  test('non-owner cannot delete', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('usernames/alice').set({ uid: alice });
+    });
+    await assertFails(authed(bob).firestore().doc('usernames/alice').delete());
+  });
+
+  test('update always denied', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('usernames/alice').set({ uid: alice });
+    });
+    await assertFails(authed(alice).firestore().doc('usernames/alice').update({ uid: bob }));
   });
 });
 
