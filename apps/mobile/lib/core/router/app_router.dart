@@ -23,6 +23,8 @@ import 'package:meep/features/profile/presentation/photo_detail_screen.dart';
 import 'package:meep/features/profile/presentation/profile_screen.dart';
 import 'package:meep/features/space/presentation/space_context_bottom_sheet.dart';
 import 'package:meep/features/space/presentation/space_create_sheet.dart';
+import 'package:meep/features/streak/presentation/streak_photo_detail_screen.dart';
+import 'package:meep/features/streak/presentation/streak_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -154,6 +156,14 @@ GoRouter appRouter(Ref ref) {
         path: '/space/:spaceId',
         builder: (_, state) => SpaceContextBottomSheet(
           spaceId: state.pathParameters['spaceId'] ?? '',
+        ),
+      ),
+      // TODO(ST/T5/TBD): wire Streak routes
+      GoRoute(path: '/streak', builder: (_, __) => const StreakScreen()),
+      GoRoute(
+        path: '/streak/photo/:postId',
+        builder: (_, state) => StreakPhotoDetailScreen(
+          postId: state.pathParameters['postId'] ?? '',
         ),
       ),
     ],
