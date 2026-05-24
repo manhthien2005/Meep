@@ -148,7 +148,7 @@ class _BeamPainter extends CustomPainter {
     final h = size.height;
     final sx = w / 412;
 
-    // ── Rect 4 (đậm, opacity 1.0) — viewBox 412×841, blur σ=37.5 ─────────
+    // ── Rect 4 (nền rộng, blur σ=37.5) — vẽ trước làm background layer ──────
     final sy4 = h / 841;
     final path2 = Path()
       ..moveTo(400.807 * sx, -85.043 * sy4)
@@ -164,7 +164,7 @@ class _BeamPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 37.5),
     );
 
-    // ── Rect 3 (nhạt, opacity 0.5) — viewBox 412×759, blur σ=25 ──────────
+    // ── Rect 3 (highlight tập trung, blur σ=25) — vẽ sau = trên cùng, sáng hơn ─
     final sy3 = h / 759;
     final path1 = Path()
       ..moveTo(400.817 * sx, -85.0393 * sy3)
@@ -218,9 +218,10 @@ class _GlassButton extends StatelessWidget {
           width: width,
           height: 56,
           decoration: BoxDecoration(
+            // Stroke: ánh sáng từ trên xuống centered — top bright → transparent
             gradient: const LinearGradient(
-              begin: Alignment(0.374, -0.892),
-              end: Alignment(0.338, 0.107),
+              begin: Alignment.topCenter,
+              end: Alignment(0.0, 0.107), // transparent at 55% down (y2=31/56)
               colors: [
                 Color(0xFF92FFFF),
                 Color(0x00666666),
@@ -232,10 +233,10 @@ class _GlassButton extends StatelessWidget {
             // 1px margin creates the stroke "inside" effect
             margin: const EdgeInsets.all(1),
             decoration: BoxDecoration(
-              // Fill at 20% opacity — begin Y=-1.25 (above top, from SVG y1=-7/56)
+              // Fill: top → bottom centered, 20% opacity
               gradient: LinearGradient(
-                begin: const Alignment(0.91, -1.25),
-                end: const Alignment(0.90, 0.826),
+                begin: const Alignment(0.0, -1.25),
+                end: const Alignment(0.0, 0.826),
                 colors: [
                   const Color(0xFFB7FFFF).withValues(alpha: 0.20),
                   const Color(0xFF284E55).withValues(alpha: 0.20),
