@@ -14,11 +14,86 @@ class IntroPage extends StatelessWidget {
       backgroundColor: AppColors.bw900,
       body: Stack(
         children: [
-          // ── Beam background (teal glow ở nửa trên) ───────────────────
+          // ── Beam: spotlight teal từ upper-center-right ────────────────
           const _Beam(),
           // ── Content ───────────────────────────────────────────────────
           SafeArea(
-            child: _Content(),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final h = constraints.maxHeight;
+                return SizedBox(
+                  width: double.infinity,
+                  height: h,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // top gap: logo tại y=414 / 917 ≈ 45.1%
+                      SizedBox(height: h * 0.451),
+                      // ── Logo ────────────────────────────────────────
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        alignment: Alignment.center,
+                        child: SvgPicture.asset(
+                          'assets/icons/ic_logo.svg',
+                          width: 56,
+                          height: 49,
+                        ),
+                      ),
+                      // logo→Meep: 511-504 = 7px
+                      const SizedBox(height: 7),
+                      // ── App name ────────────────────────────────────
+                      Text(
+                        'Meep',
+                        style: AppTextStyles.xl2Bold.copyWith(
+                          color: Colors.white,
+                          height: 42 / 32,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      // Meep→tagline: 565-553 = 12px
+                      const SizedBox(height: 12),
+                      // ── Tagline ─────────────────────────────────────
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'Bắt trọn từng khoảnh khắc,\n'
+                          'lưu giữ ký ức cùng những người thân yêu',
+                          style: TextStyle(
+                            fontFamily: 'Nunito',
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.bw300,
+                            height: 24 / 18,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      // tagline→btn1: 674-613 = 61px
+                      const SizedBox(height: 61),
+                      // ── Button 1: glass pill ─────────────────────────
+                      const _GlassButton(
+                        label: 'Tạo tài khoản mới',
+                        route: '/signup/email',
+                        width: 249,
+                      ),
+                      // btn1→btn2: 744-730 = 14px
+                      const SizedBox(height: 14),
+                      // ── Button 2: transparent ─────────────────────────
+                      const _TransparentButton(
+                        label: 'Đăng nhập',
+                        route: '/login/email',
+                        width: 198,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -26,31 +101,86 @@ class IntroPage extends StatelessWidget {
   }
 }
 
-// Gradient overlay tái tạo hiệu ứng "Beam" của Figma
+// ── Beam ────────────────────────────────────────────────────────────────────
+
 class _Beam extends StatelessWidget {
   const _Beam();
 
   @override
   Widget build(BuildContext context) {
+    // Figma beam: x=87, y=-199 (above frame), 786×740
+    // Visible area on 412px screen: bright teal spotlight upper-center-right
     return Positioned.fill(
-      child: OverflowBox(
-        maxWidth: double.infinity,
-        maxHeight: double.infinity,
-        alignment: Alignment.topCenter,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            // Slightly right of center, positioned above the screen top
+            center: const Alignment(0.25, -0.55),
+            radius: 1.05,
+            colors: [
+              const Color(0xFFAEF3F3), // bright teal/aqua center
+              const Color(0xFF45D4D8).withValues(alpha: 0.6),
+              const Color(0xFF00A8B0).withValues(alpha: 0.25),
+              AppColors.bw900.withValues(alpha: 0.0),
+            ],
+            stops: const [0.0, 0.3, 0.55, 0.9],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Glass button (Button 1) ─────────────────────────────────────────────────
+
+class _GlassButton extends StatelessWidget {
+  const _GlassButton({
+    required this.label,
+    required this.route,
+    required this.width,
+  });
+
+  final String label;
+  final String route;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        onTap: () => context.push(route),
         child: Container(
-          width: 900,
-          height: 750,
+          width: width,
+          height: 56,
           decoration: BoxDecoration(
-            gradient: RadialGradient(
-              center: const Alignment(0.15, -0.2),
-              radius: 0.75,
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
               colors: [
-                const Color(0xFFB8F5F8).withValues(alpha: 0.85),
-                const Color(0xFF5FE8EC).withValues(alpha: 0.55),
-                const Color(0xFF00C9E3).withValues(alpha: 0.25),
-                AppColors.bw900.withValues(alpha: 0.0),
+                const Color(0xFFB2C8CC).withValues(alpha: 0.75),
+                const Color(0xFF5E8288).withValues(alpha: 0.55),
               ],
-              stops: const [0.0, 0.35, 0.6, 1.0],
+            ),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: const Color(0xFFD0E8EB).withValues(alpha: 0.5),
+              width: 0.8,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF00C9E3).withValues(alpha: 0.2),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: AppTextStyles.mdBold.copyWith(
+              color: Colors.white,
             ),
           ),
         ),
@@ -59,111 +189,18 @@ class _Beam extends StatelessWidget {
   }
 }
 
-class _Content extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    // Proportions from Figma (frame 412×917):
-    // Logo top: 414, Meep: 511, Tagline: 565, Btn1: 674, Btn2: 744
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final h = constraints.maxHeight;
-        return SizedBox(
-          height: h,
-          child: Column(
-            children: [
-              // gap trước logo: 414/917 ≈ 45.1%
-              SizedBox(height: h * 0.451),
-              // ── Logo ──────────────────────────────────────────────
-              Center(
-                child: Container(
-                  width: 90,
-                  height: 90,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  alignment: Alignment.center,
-                  child: SvgPicture.asset(
-                    'assets/icons/ic_logo.svg',
-                    width: 56,
-                    height: 49,
-                  ),
-                ),
-              ),
-              // gap logo → Meep: (511-504) ≈ 7px
-              const SizedBox(height: 7),
-              // ── App name ──────────────────────────────────────────
-              Text(
-                'Meep',
-                style: AppTextStyles.xl2Bold.copyWith(
-                  color: Colors.white,
-                  height: 42 / 32,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              // gap Meep → tagline: (565-553) ≈ 12px
-              const SizedBox(height: 12),
-              // ── Tagline ───────────────────────────────────────────
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'Bắt trọn từng khoảnh khắc,\nlưu giữ ký ức cùng những người thân yêu',
-                  style: TextStyle(
-                    fontFamily: 'Nunito',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.bw300,
-                    height: 24 / 18,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              // gap tagline → btn1: (674-613) ≈ 61px
-              const SizedBox(height: 61),
-              // ── Tạo tài khoản mới ─────────────────────────────────
-              SizedBox(
-                width: 249,
-                height: 56,
-                child: _IntroButton(
-                  label: 'Tạo tài khoản mới',
-                  fillColor: AppColors.bw700,
-                  textColor: AppColors.bw200,
-                  onTap: () => context.push('/signup/email'),
-                ),
-              ),
-              // gap btn1 → btn2: (744-730) ≈ 14px
-              const SizedBox(height: 14),
-              // ── Đăng nhập ─────────────────────────────────────────
-              SizedBox(
-                width: 198,
-                height: 56,
-                child: _IntroButton(
-                  label: 'Đăng nhập',
-                  fillColor: Colors.transparent,
-                  textColor: Colors.white,
-                  onTap: () => context.push('/login/email'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
+// ── Transparent button (Button 2) ───────────────────────────────────────────
 
-class _IntroButton extends StatelessWidget {
-  const _IntroButton({
+class _TransparentButton extends StatelessWidget {
+  const _TransparentButton({
     required this.label,
-    required this.fillColor,
-    required this.textColor,
-    required this.onTap,
+    required this.route,
+    required this.width,
   });
 
   final String label;
-  final Color fillColor;
-  final Color textColor;
-  final VoidCallback onTap;
+  final String route;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
@@ -171,16 +208,15 @@ class _IntroButton extends StatelessWidget {
       button: true,
       label: label,
       child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            color: fillColor,
-            borderRadius: BorderRadius.circular(30),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: AppTextStyles.mdBold.copyWith(color: textColor),
+        onTap: () => context.push(route),
+        child: SizedBox(
+          width: width,
+          height: 56,
+          child: Center(
+            child: Text(
+              label,
+              style: AppTextStyles.mdBold.copyWith(color: Colors.white),
+            ),
           ),
         ),
       ),
