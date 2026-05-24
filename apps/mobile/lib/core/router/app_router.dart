@@ -11,6 +11,8 @@ import 'package:meep/features/auth/presentation/signup/signup_email_page.dart';
 import 'package:meep/features/auth/presentation/signup/signup_name_page.dart';
 import 'package:meep/features/auth/presentation/signup/signup_password_page.dart';
 import 'package:meep/features/auth/presentation/signup/signup_username_page.dart';
+import 'package:meep/features/chat/presentation/chat_screen.dart';
+import 'package:meep/features/chat/presentation/inbox_screen.dart';
 import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
 import 'package:meep/features/diary/presentation/diary_create_screen.dart';
 import 'package:meep/features/diary/presentation/diary_list_screen.dart';
@@ -132,6 +134,14 @@ GoRouter appRouter(Ref ref) {
         path: '/friend-profile/:uid',
         builder: (_, state) =>
             ProfileScreen(uid: state.pathParameters['uid'] ?? ''),
+      ),
+      // TODO(C/T8/TBD): wire Chat routes
+      GoRoute(path: '/inbox', builder: (_, __) => const InboxScreen()),
+      GoRoute(
+        path: '/chat/:conversationId',
+        builder: (_, state) => ChatScreen(
+          conversationId: state.pathParameters['conversationId'] ?? '',
+        ),
       ),
     ],
   );
