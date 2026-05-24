@@ -11,6 +11,9 @@ import 'package:meep/features/auth/presentation/signup/signup_email_page.dart';
 import 'package:meep/features/auth/presentation/signup/signup_name_page.dart';
 import 'package:meep/features/auth/presentation/signup/signup_password_page.dart';
 import 'package:meep/features/auth/presentation/signup/signup_username_page.dart';
+import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
+import 'package:meep/features/diary/presentation/diary_create_screen.dart';
+import 'package:meep/features/diary/presentation/diary_list_screen.dart';
 import 'package:meep/features/home/presentation/home_page.dart';
 
 part 'app_router.g.dart';
@@ -77,6 +80,19 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/dev/widgets',
         builder: (_, __) => const WidgetCatalogPage(),
+      ),
+      // TODO(D/T13/TBD): wire diary routes — DiaryListScreen/CreateScreen/CanvasScreen
+      GoRoute(path: '/diary', builder: (_, __) => const DiaryListScreen()),
+      GoRoute(
+        path: '/diary/create',
+        builder: (_, __) => const DiaryCreateScreen(),
+      ),
+      GoRoute(
+        path: '/diary/:entryId',
+        builder: (_, state) => DiaryCanvasScreen(
+          mode: DiaryCanvasMode.read,
+          entryId: state.pathParameters['entryId'],
+        ),
       ),
     ],
   );
