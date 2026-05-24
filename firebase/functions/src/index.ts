@@ -148,3 +148,23 @@ export const onPostDeleted = onDocumentDeleted(
     // TODO(FE/impl): see comment above.
   },
 );
+
+// ===== Notification module stubs =====
+
+/** TODO(N/impl): send FCM to receiver + persist /notifications doc */
+export const onFriendRequestCreated = onDocumentCreated(
+  { document: 'friend_requests/{requestId}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(N/impl) */ },
+);
+
+/** TODO(N/impl): send FCM to original sender + persist /notifications doc */
+export const onFriendRequestAccepted = onDocumentCreated(
+  { document: 'friendships/{pairId}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(N/impl) */ },
+);
+
+/** TODO(N/impl): send FCM to post owner + persist /notifications doc */
+export const onReactionCreated = onDocumentCreated(
+  { document: 'posts/{postId}/reactions/{reactionId}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(N/impl) */ },
+);
