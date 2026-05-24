@@ -25,28 +25,33 @@ class IntroPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // logo tại y=414/917 ≈ 45.1%
                       SizedBox(height: h * 0.451),
                       // ── Logo ──────────────────────────────────────────
-                      // Frame 1461: NO fill (transparent) — beam shows through
-                      // Inner Logo frame (56×49): white fill
-                      SizedBox(
+                      // Gradient từ Figma SVG: #B7FFFF→#9EFFFF→#5397A5
+                      // Direction upper-right → lower-left, cornerRadius 20
+                      Container(
                         width: 90,
                         height: 90,
-                        child: Center(
-                          child: Container(
-                            width: 56,
-                            height: 49,
-                            color: Colors.white,
-                            child: SvgPicture.asset(
-                              'assets/icons/ic_logo.svg',
-                              width: 56,
-                              height: 49,
-                            ),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment(0.81, -1.0),
+                            end: Alignment(-0.37, 1.0),
+                            colors: [
+                              Color(0xFFB7FFFF),
+                              Color(0xFF9EFFFF),
+                              Color(0xFF5397A5),
+                            ],
+                            stops: [0.10, 0.2115, 1.0],
                           ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        alignment: Alignment.center,
+                        child: SvgPicture.asset(
+                          'assets/icons/ic_logo.svg',
+                          width: 56,
+                          height: 49,
                         ),
                       ),
-                      // logo→Meep: 7px
                       const SizedBox(height: 7),
                       // ── App name ──────────────────────────────────────
                       Text(
@@ -57,7 +62,6 @@ class IntroPage extends StatelessWidget {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      // Meep→tagline: 12px
                       const SizedBox(height: 12),
                       // ── Tagline ───────────────────────────────────────
                       const Padding(
@@ -75,17 +79,15 @@ class IntroPage extends StatelessWidget {
                           textAlign: TextAlign.center,
                         ),
                       ),
-                      // tagline→btn1: 61px
                       const SizedBox(height: 61),
-                      // ── Button 1: glass pill ──────────────────────────
+                      // ── Button 1 ──────────────────────────────────────
                       const _GlassButton(
                         label: 'Tạo tài khoản mới',
                         route: '/signup/email',
                         width: 249,
                       ),
-                      // btn1→btn2: 14px
                       const SizedBox(height: 14),
-                      // ── Button 2: transparent ─────────────────────────
+                      // ── Button 2 ──────────────────────────────────────
                       const _TransparentButton(
                         label: 'Đăng nhập',
                         route: '/login/email',
@@ -104,8 +106,6 @@ class IntroPage extends StatelessWidget {
 }
 
 // ── Beam ─────────────────────────────────────────────────────────────────────
-// SVG-extracted: color #85E9FF, mix-blend-mode plus-lighter,
-// 2 diagonal paths with Gaussian blur 25px + 37.5px, viewBox 412×841.
 
 class _Beam extends StatelessWidget {
   const _Beam();
@@ -113,7 +113,6 @@ class _Beam extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Positioned.fill(
-      // opacity 0.65 → giảm sáng so với Figma reference screenshot
       child: Opacity(
         opacity: 0.65,
         child: CustomPaint(painter: _BeamPainter()),
@@ -141,7 +140,6 @@ class _BeamPainter extends CustomPainter {
     final sy = h / 841;
     final shader = _gradient(size);
 
-    // Path 2 — opacity 1.0, blur σ=37.5
     final path2 = Path()
       ..moveTo(400.807 * sx, -85.043 * sy)
       ..lineTo(513.076 * sx, -44.3794 * sy)
@@ -156,7 +154,6 @@ class _BeamPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 37.5),
     );
 
-    // Path 1 — opacity 0.5, blur σ=25
     final path1 = Path()
       ..moveTo(400.817 * sx, -85.0393 * sy)
       ..lineTo(513.086 * sx, -44.3756 * sy)
@@ -182,7 +179,9 @@ class _BeamPainter extends CustomPainter {
 }
 
 // ── Glass button ──────────────────────────────────────────────────────────────
-// btn_node.png: silver-gray gradient pill, subtle border, bottom shadow
+// Fill: #B7FFFF→#284E55 @ 20% opacity (nearly vertical, right side)
+// Stroke: #92FFFF→transparent @ 100%, Inside, 1px
+// Drop shadows: disabled in Figma (not applied)
 
 class _GlassButton extends StatelessWidget {
   const _GlassButton({
@@ -202,35 +201,43 @@ class _GlassButton extends StatelessWidget {
       label: label,
       child: GestureDetector(
         onTap: () => context.push(route),
+        // Outer container = stroke gradient (shows through 1px gap)
         child: Container(
           width: width,
           height: 56,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+            gradient: const LinearGradient(
+              begin: Alignment(0.374, -0.892),
+              end: Alignment(0.338, 0.107),
               colors: [
-                const Color(0xFFB8CCCE).withValues(alpha: 0.90),
-                const Color(0xFF7A9599).withValues(alpha: 0.75),
+                Color(0xFF92FFFF),
+                Color(0x00666666),
               ],
             ),
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-              color: const Color(0xFFD5E8EA).withValues(alpha: 0.8),
-              width: 0.8,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.30),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: AppTextStyles.mdBold.copyWith(color: Colors.white),
+          child: Container(
+            // 1px margin creates the stroke "inside" effect
+            margin: const EdgeInsets.all(1),
+            decoration: BoxDecoration(
+              // Fill at 20% opacity
+              gradient: LinearGradient(
+                begin: const Alignment(0.91, -1.0),
+                end: const Alignment(0.90, 0.826),
+                colors: [
+                  const Color(0xFFB7FFFF).withValues(alpha: 0.20),
+                  const Color(0xFF284E55).withValues(alpha: 0.20),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(29),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              style: AppTextStyles.mdBold.copyWith(
+                color: const Color(0xFFEEF2F3), // bw200
+              ),
+            ),
           ),
         ),
       ),
