@@ -60,7 +60,7 @@ GoRouter appRouter(Ref ref) {
     ),
     routes: [
       GoRoute(path: '/intro', builder: (_, __) => const IntroPage()),
-      GoRoute(path: '/home', builder: (_, __) => const HomePage()),
+      GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
       GoRoute(
         path: '/signup/email',
         builder: (_, __) => const SignUpEmailPage(),
@@ -110,7 +110,6 @@ GoRouter appRouter(Ref ref) {
         builder: (_, __) => const HomePage(),
       ),
       // TODO(FE/T20/KhoaLND): wire Feed routes
-      GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
       GoRoute(
         path: '/capture-preview',
         builder: (_, __) => const HomeScreen(),

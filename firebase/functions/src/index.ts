@@ -1,6 +1,6 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { onDocumentCreated, onDocumentDeleted } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { initializeApp } from 'firebase-admin/app';
 import { z } from 'zod';
 
@@ -198,9 +198,9 @@ export const onSpaceMemberRemoved = onDocumentDeleted(
 );
 export const onSpacePostCreated = onDocumentCreated(
   { document: 'posts/{postId}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(SP/impl) — only fires for posts with spaceId */ },
+  (_event) => { /* TODO(SP/impl) — only processes posts where data.spaceId != null */ },
 );
-export const onSpaceDeleted = onDocumentCreated(
+export const onSpaceDeleted = onDocumentUpdated(
   { document: 'spaces/{spaceId}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(SP/impl) — listens for deletedAt field */ },
+  (_event) => { /* TODO(SP/impl) — fires when deletedAt field is set (soft delete) */ },
 );
