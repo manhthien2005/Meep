@@ -108,22 +108,22 @@ class _Beam extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Figma beam: x=87, y=-199 (above frame), 786×740
-    // Visible area on 412px screen: bright teal spotlight upper-center-right
+    // Figma beam visible area: x=[87,412] (right 79%), y=[0,541] (top 59%).
+    // Peak glow ≈ x=65%, y=18% of screen → Alignment(0.30, -0.64).
+    // Màu peak = medium teal, không white. Radius nhỏ để tránh lấp kín màn hình.
     return Positioned.fill(
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: RadialGradient(
-            // Slightly right of center, positioned above the screen top
-            center: const Alignment(0.25, -0.55),
-            radius: 1.05,
+            center: const Alignment(0.30, -0.64),
+            radius: 0.82,
             colors: [
-              const Color(0xFFAEF3F3), // bright teal/aqua center
-              const Color(0xFF45D4D8).withValues(alpha: 0.6),
-              const Color(0xFF00A8B0).withValues(alpha: 0.25),
+              const Color(0xFF4CCBCB),
+              const Color(0xFF22A0A4).withValues(alpha: 0.65),
+              const Color(0xFF0D6366).withValues(alpha: 0.30),
               AppColors.bw900.withValues(alpha: 0.0),
             ],
-            stops: const [0.0, 0.3, 0.55, 0.9],
+            stops: const [0.0, 0.30, 0.58, 0.90],
           ),
         ),
       ),
@@ -159,20 +159,20 @@ class _GlassButton extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                const Color(0xFFB2C8CC).withValues(alpha: 0.75),
-                const Color(0xFF5E8288).withValues(alpha: 0.55),
+                const Color(0xFFA8C4C8).withValues(alpha: 0.80),
+                const Color(0xFF6A9298).withValues(alpha: 0.65),
               ],
             ),
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: const Color(0xFFD0E8EB).withValues(alpha: 0.5),
-              width: 0.8,
+              color: const Color(0xFFCCE8EA).withValues(alpha: 0.6),
+              width: 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF00C9E3).withValues(alpha: 0.2),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
+                color: const Color(0xFF1ABFC5).withValues(alpha: 0.25),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
