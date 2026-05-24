@@ -18,7 +18,7 @@ import { afterAll, beforeAll, beforeEach, describe, test } from 'vitest';
 
 let testEnv: RulesTestEnvironment;
 
-const RULES_PATH = resolve(__dirname, '../../../firestore.rules');
+const RULES_PATH = resolve(__dirname, '../../firestore.rules');
 
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
@@ -26,7 +26,7 @@ beforeAll(async () => {
     firestore: {
       rules: readFileSync(RULES_PATH, 'utf8'),
       host: '127.0.0.1',
-      port: 8080,
+      port: 8282,
     },
   });
 });
