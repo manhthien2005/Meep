@@ -1,14 +1,23 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:meep/core/error/app_error.dart';
 import 'package:meep/features/auth/data/auth_repository.dart';
 
 class FirebaseAuthRepository implements AuthRepository {
-  FirebaseAuthRepository({required FirebaseAuth auth}) : _auth = auth;
+  FirebaseAuthRepository({
+    required FirebaseAuth auth,
+    GoogleSignIn? googleSignIn,
+  })  : _auth = auth,
+        _googleSignIn = googleSignIn ?? GoogleSignIn();
 
   final FirebaseAuth _auth;
+  final GoogleSignIn _googleSignIn;
 
   @override
   String? get currentUid => _auth.currentUser?.uid;
+
+  @override
+  String? get currentEmail => _auth.currentUser?.email;
 
   @override
   Stream<String?> watchUid() =>
@@ -46,8 +55,20 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Future<void> signInWithGoogle() async {
-    // TODO(A/T7/ThienPDM): implement Google Sign-In với GoogleSignIn package
-    throw UnimplementedError('signInWithGoogle — implement at T7');
+    final googleUser = await _googleSignIn.signIn();
+    if (googleUser == null) {
+      throw const UnauthenticatedError(message: 'Google Sign-In đã bị huỷ');
+    }
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+    try {
+      await _auth.signInWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      throw _mapSignInError(e);
+    }
   }
 
   @override
