@@ -102,33 +102,84 @@ class IntroPage extends StatelessWidget {
 }
 
 // ── Beam ────────────────────────────────────────────────────────────────────
+// Extracted từ Figma SVG:
+//   - Color: #85E9FF, mix-blend-mode: plus-lighter
+//   - 2 diagonal polygon paths, Gaussian blur 25px + 37.5px
+//   - ViewBox 412×841, scaled to actual screen size
 
 class _Beam extends StatelessWidget {
   const _Beam();
 
   @override
   Widget build(BuildContext context) {
-    // Figma beam visible area: x=[87,412] (right 79%), y=[0,541] (top 59%).
-    // Peak glow ≈ x=65%, y=18% of screen → Alignment(0.30, -0.64).
-    // Màu peak = medium teal, không white. Radius nhỏ để tránh lấp kín màn hình.
-    return Positioned.fill(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: const Alignment(0.30, -0.64),
-            radius: 0.82,
-            colors: [
-              const Color(0xFF4CCBCB),
-              const Color(0xFF22A0A4).withValues(alpha: 0.65),
-              const Color(0xFF0D6366).withValues(alpha: 0.30),
-              AppColors.bw900.withValues(alpha: 0.0),
-            ],
-            stops: const [0.0, 0.30, 0.58, 0.90],
-          ),
-        ),
-      ),
+    return const Positioned.fill(
+      child: CustomPaint(painter: _BeamPainter()),
     );
   }
+}
+
+class _BeamPainter extends CustomPainter {
+  const _BeamPainter();
+
+  // SVG gradient: #85E9FF → #85E9FF@20% along this direction
+  Shader _gradient(Size size, double scaleX, double scaleY) {
+    return const LinearGradient(
+      begin: Alignment(1.16, -0.90), // x1=444.922/412, y1=-69/841 → Alignment
+      end: Alignment(-0.001, 0.41), // x2=205.574/412, y2=591/841
+      colors: [Color(0xFF85E9FF), Color(0x3385E9FF)],
+    ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    // SVG viewBox: 0 0 412 841
+    final sx = w / 412;
+    final sy = h / 841;
+
+    final shader = _gradient(size, sx, sy);
+
+    // ── Path 2 (opacity 1.0, blur σ=37.5) — paint first (bottom layer) ──
+    final path2 = Path()
+      ..moveTo(400.807 * sx, -85.043 * sy)
+      ..lineTo(513.076 * sx, -44.3794 * sy)
+      ..lineTo(574.441 * sx, 765.157 * sy)
+      ..lineTo(-164.711 * sx, 497.437 * sy)
+      ..close();
+
+    canvas.drawPath(
+      path2,
+      Paint()
+        ..shader = shader
+        ..blendMode = BlendMode.plus
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 37.5),
+    );
+
+    // ── Path 1 (opacity 0.5, blur σ=25) — paint at 50% opacity on top ──
+    final path1 = Path()
+      ..moveTo(400.817 * sx, -85.0393 * sy)
+      ..lineTo(513.086 * sx, -44.3756 * sy)
+      ..lineTo(417.722 * sx, 708.393 * sy)
+      ..lineTo(-7.99173 * sx, 554.2 * sy)
+      ..close();
+
+    canvas.saveLayer(
+      Rect.fromLTWH(0, 0, w, h),
+      Paint()..color = const Color(0x80FFFFFF), // 50% opacity layer
+    );
+    canvas.drawPath(
+      path1,
+      Paint()
+        ..shader = shader
+        ..blendMode = BlendMode.plus
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 25),
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // ── Glass button (Button 1) ─────────────────────────────────────────────────
