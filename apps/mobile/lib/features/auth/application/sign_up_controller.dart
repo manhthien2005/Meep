@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:meep/core/error/app_error.dart';
 import 'package:meep/features/auth/application/auth_controller.dart';
 import 'package:meep/features/auth/application/sign_up_state.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
@@ -106,10 +107,12 @@ class SignUpController extends _$SignUpController {
       }
 
       final uid = authRepo.currentUid!;
+      final email =
+          state.isGoogleSignIn ? (authRepo.currentEmail ?? '') : state.email;
       await userRepo.createProfile(
         UserProfile(
           uid: uid,
-          email: state.email,
+          email: email,
           displayName: state.displayName,
           username: state.username,
           createdAt: DateTime.now(),
@@ -126,7 +129,7 @@ class SignUpController extends _$SignUpController {
       }
       state = state.copyWith(
         isLoading: false,
-        errorMessage: e.toString(),
+        errorMessage: e is AppError ? e.message : 'Đã có lỗi xảy ra',
       );
     }
   }

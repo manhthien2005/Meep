@@ -17,6 +17,9 @@ class FirebaseAuthRepository implements AuthRepository {
   String? get currentUid => _auth.currentUser?.uid;
 
   @override
+  String? get currentEmail => _auth.currentUser?.email;
+
+  @override
   Stream<String?> watchUid() =>
       _auth.authStateChanges().map((user) => user?.uid);
 

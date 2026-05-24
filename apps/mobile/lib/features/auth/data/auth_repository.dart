@@ -9,6 +9,9 @@ abstract class AuthRepository {
   /// Returns the currently signed-in user's uid, or null.
   String? get currentUid;
 
+  /// Returns the currently signed-in user's email, or null.
+  String? get currentEmail;
+
   /// Stream of auth state — emits new uid (or null) on every change.
   Stream<String?> watchUid();
 

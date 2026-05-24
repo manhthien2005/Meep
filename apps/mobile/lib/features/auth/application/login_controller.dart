@@ -33,8 +33,9 @@ class LoginController extends _$LoginController {
       state = state.copyWith(isLoading: false, isSuccess: true);
     } on AppError catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.message);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+    } catch (_) {
+      state =
+          state.copyWith(isLoading: false, errorMessage: 'Đã có lỗi xảy ra');
     }
   }
 
@@ -55,8 +56,9 @@ class LoginController extends _$LoginController {
       }
     } on AppError catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.message);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+    } catch (_) {
+      state =
+          state.copyWith(isLoading: false, errorMessage: 'Đã có lỗi xảy ra');
     }
   }
 
