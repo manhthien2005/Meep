@@ -8,6 +8,8 @@ class LoginState with _$LoginState {
     required String email,
     required String password,
     required bool isLoading,
+    @Default(false) bool isSuccess,
+    @Default(false) bool needsProfile,
     String? errorMessage,
   }) = _LoginState;
 }
