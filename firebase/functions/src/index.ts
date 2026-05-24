@@ -1,6 +1,6 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentDeleted } from 'firebase-functions/v2/firestore';
 import { initializeApp } from 'firebase-admin/app';
 import { z } from 'zod';
 
@@ -94,7 +94,7 @@ export const acceptFriendRequest = onCall((request) => {
  * TODO(F/impl):
  *   - remove each member from the other's cached friend list
  */
-export const onFriendshipDeleted = onDocumentCreated(
+export const onFriendshipDeleted = onDocumentDeleted(
   { document: 'friendships/{pairId}', region: 'asia-southeast1' },
   (_event) => {
     // TODO(F/impl): see comment above.
