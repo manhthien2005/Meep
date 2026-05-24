@@ -69,6 +69,7 @@ dev_dependencies:
   # Testing
   fake_cloud_firestore: ^3.0.3
   firebase_auth_mocks: ^0.14.1
+  mock_exceptions: ^0.8.2
   mocktail: ^1.0.4
 
   # Lints
