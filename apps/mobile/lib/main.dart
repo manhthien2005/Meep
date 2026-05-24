@@ -1,33 +1,30 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:meep/core/router/app_router.dart';
 import 'package:meep/core/theme/app_theme.dart';
+import 'package:meep/features/auth/application/auth_controller.dart';
+import 'package:meep/features/auth/data/firebase_auth_repository.dart';
 import 'package:meep/firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // TODO(T2+3/KhoaLND): override authRepositoryProvider + userRepositoryProvider
-  // sau khi FirebaseAuthRepository + FirebaseUserRepository được implement.
-  // Ví dụ:
-  //   authRepositoryProvider.overrideWithValue(
-  //     FirebaseAuthRepository(auth: FirebaseAuth.instance),
-  //   ),
-  //   userRepositoryProvider.overrideWithValue(
-  //     FirebaseUserRepository(firestore: FirebaseFirestore.instance),
-  //   ),
-
-  // TODO(N/T2/TBD): FCM init sau khi firebase_messaging được add vào pubspec:
-  //   final messaging = FirebaseMessaging.instance;
-  //   await messaging.requestPermission();
-  //   final token = await messaging.getToken();
-  //   if (token != null) notificationController.initFcm();
-  //   FirebaseMessaging.onMessage.listen(notificationController.handleForeground);
-  //   FirebaseMessaging.onMessageOpenedApp.listen(notificationController.handleTap);
-  runApp(const ProviderScope(child: MeepApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        authRepositoryProvider.overrideWithValue(
+          FirebaseAuthRepository(auth: FirebaseAuth.instance),
+        ),
+        // TODO(A/T4/ThienPDM): override userRepositoryProvider khi
+        // FirebaseUserRepository được implement.
+      ],
+      child: const MeepApp(),
+    ),
+  );
 }
 
 class MeepApp extends ConsumerWidget {
