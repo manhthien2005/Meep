@@ -4,6 +4,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===== Helpers =====
+
     function isAuthed() {
       return request.auth != null;
     }
@@ -12,7 +13,7 @@ service cloud.firestore {
       return isAuthed() && request.auth.uid == uid;
     }
 
-    // pair_id is the alphabetically-sorted "uidA_uidB"
+    /// Sorted pair ID — same as Dart pairIdOf().
     function pairId(a, b) {
       return a < b ? a + '_' + b : b + '_' + a;
     }
@@ -32,15 +33,32 @@ service cloud.firestore {
       );
     }
 
+    /// True when the calling user is a member of [spaceId].
+    function isMember(spaceId) {
+      return isAuthed() && exists(
+        /databases/$(database)/documents/space_members/$(spaceId)/members/$(request.auth.uid)
+      );
+    }
+
+    /// True when the calling user is the creator of [spaceId].
+    function isCreator(spaceId) {
+      return isAuthed() &&
+        get(/databases/$(database)/documents/spaces/$(spaceId)).data.creatorId == request.auth.uid;
+    }
+
+    /// True when the calling user is a participant in [conversationId].
+    function isParticipant(conversationId) {
+      return isAuthed() &&
+        get(/databases/$(database)/documents/conversations/$(conversationId))
+          .data.participantIds.hasAll([request.auth.uid]);
+    }
+
     // ===== /users/{uid} =====
     match /users/{uid} {
       allow read: if isAuthed();
-      allow create: if isOwner(uid)
-        && request.resource.data.keys().hasOnly(
-          ['displayName', 'avatarUrl', 'createdAt']
-        );
+      allow create: if isOwner(uid);
       allow update: if isOwner(uid);
-      allow delete: if false;  // no client delete; use a Function
+      allow delete: if false; // use deleteAccount CF
 
       match /private/{docId} {
         allow read, write: if isOwner(uid);
@@ -48,55 +66,78 @@ service cloud.firestore {
 
       match /notifications/{notifId} {
         allow read: if isOwner(uid);
-        allow create, update, delete: if false;  // server-side only
+        allow create, update, delete: if false; // server-side only
+      }
+
+      match /feed/{postId} {
+        allow read: if isOwner(uid);
+        allow create, update, delete: if false; // CF onPostCreated fan-out only
+      }
+
+      match /fcmTokens/{tokenId} {
+        allow read, write: if isOwner(uid);
       }
     }
 
-    // ===== /posts/{postId} =====
+    // ===== /posts/{postId} — combined: Feed + Space + Reaction =====
     match /posts/{postId} {
+      // Fan-out approach: check feed subcollection (covers All-friends + Space posts)
       allow read: if isAuthed() && (
-        isOwner(resource.data.authorId) ||
-        isFriend(resource.data.authorId)
+        resource.data.authorId == request.auth.uid ||
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)/feed/$(postId))
       );
 
       allow create: if isOwner(request.resource.data.authorId)
         && request.resource.data.keys().hasAll(
-          ['authorId', 'caption', 'imageUrl', 'createdAt']
+          ['authorId', 'authorName', 'imageUrl', 'audienceType', 'createdAt']
         )
-        && request.resource.data.caption is string
-        && request.resource.data.caption.size() <= 200
-        && request.resource.data.imageUrl is string;
+        && request.resource.data.imageUrl is string
+        && (
+          !('caption' in request.resource.data) ||
+          (request.resource.data.caption is string &&
+           request.resource.data.caption.size() <= 200)
+        );
 
       allow update: if isOwner(resource.data.authorId)
         && request.resource.data.authorId == resource.data.authorId;
 
       allow delete: if isOwner(resource.data.authorId);
+
+      // /posts/{postId}/reactions/{reactorUid}
+      match /reactions/{reactorUid} {
+        allow read: if isAuthed() && (
+          request.auth.uid ==
+            get(/databases/$(database)/documents/posts/$(postId)).data.authorId ||
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)/feed/$(postId))
+        );
+        allow create: if isAuthed()
+          && request.auth.uid == reactorUid
+          && request.auth.uid == request.resource.data.reactorUid
+          && request.resource.data.emoji.size() > 0;
+        allow update: if isAuthed() && request.auth.uid == reactorUid;
+        allow delete: if isAuthed() && request.auth.uid == reactorUid;
+      }
     }
 
     // ===== /friendships/{pairId} =====
     match /friendships/{pid} {
-      // Both members can read; nobody else can.
-      allow read: if isAuthed() && (
-        request.auth.uid == resource.data.uidA ||
-        request.auth.uid == resource.data.uidB
-      );
-      // Server-side creation only (via friend_request acceptance Function).
-      allow create, update, delete: if false;
+      allow read: if isAuthed() &&
+        resource.data.members.hasAll([request.auth.uid]);
+      allow create, update, delete: if false; // CF acceptFriendRequest only
     }
 
     // ===== /friend_requests/{requestId} =====
     match /friend_requests/{requestId} {
       allow read: if isAuthed() && (
-        request.auth.uid == resource.data.fromUid ||
-        request.auth.uid == resource.data.toUid
+        request.auth.uid == resource.data.senderId ||
+        request.auth.uid == resource.data.receiverId
       );
-      allow create: if isOwner(request.resource.data.fromUid)
+      allow create: if isOwner(request.resource.data.senderId)
         && request.resource.data.keys().hasAll(
-          ['fromUid', 'toUid', 'status', 'createdAt']
+          ['senderId', 'receiverId', 'status', 'createdAt', 'updatedAt']
         )
         && request.resource.data.status == 'pending';
-      // Status transitions handled server-side.
-      allow update, delete: if false;
+      allow update, delete: if false; // server-side only
     }
 
     // ===== /blocks/{blockId} =====
@@ -106,8 +147,63 @@ service cloud.firestore {
         request.auth.uid == resource.data.blockerUid ||
         request.auth.uid == resource.data.blockedUid
       );
-      // Write is server-side only (via blockUser Cloud Function).
-      allow create, update, delete: if false;
+      allow create, update, delete: if false; // CF blockUser only
+    }
+
+    // ===== /spaces/{spaceId} =====
+    match /spaces/{spaceId} {
+      allow read: if isMember(spaceId);
+      allow create: if false; // CF createSpace (Admin SDK) only
+      allow update: if isCreator(spaceId);
+      allow delete: if false; // soft-delete via update deletedAt
+    }
+
+    // ===== /space_members/{spaceId}/members/{uid} =====
+    match /space_members/{spaceId}/members/{uid} {
+      allow read: if isMember(spaceId);
+      allow create, update, delete: if false; // CF leaveSpace/kickMember only
+    }
+
+    // ===== /conversations/{conversationId} =====
+    match /conversations/{conversationId} {
+      allow read: if isParticipant(conversationId);
+      allow create: if isAuthed()
+        && request.resource.data.participantIds.hasAll([request.auth.uid]);
+      allow update: if isParticipant(conversationId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId']);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isParticipant(conversationId);
+        allow create: if isParticipant(conversationId)
+          && get(/databases/$(database)/documents/conversations/$(conversationId))
+               .data.status == 'active'
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 500;
+        allow update, delete: if false;
+      }
+    }
+
+    // ===== /diary/{entryId} =====
+    match /diary/{entryId} {
+      allow read: if isAuthed() && (
+        resource.data.authorUid == request.auth.uid ||
+        (resource.data.privacy == 'public' && isFriend(resource.data.authorUid))
+      );
+      allow create: if isAuthed()
+        && request.auth.uid == request.resource.data.authorUid
+        && request.resource.data.privacy in ['private', 'public']
+        && request.resource.data.content.size() <= 20
+        && request.resource.data.moodCaption.size() <= 50;
+      allow update: if isAuthed()
+        && resource.data.authorUid == request.auth.uid
+        && request.resource.data.authorUid == resource.data.authorUid
+        && request.resource.data.content.size() <= 20
+        && request.resource.data.moodCaption.size() <= 50;
+      allow delete: if isAuthed()
+        && resource.data.authorUid == request.auth.uid;
     }
 
     // ===== Default deny =====
