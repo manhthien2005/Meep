@@ -29,19 +29,37 @@ import 'package:meep/features/streak/presentation/streak_screen.dart';
 part 'app_router.g.dart';
 
 /// Pure redirect logic — testable without GoRouter.
+///
+/// 3-state machine:
+///   uid = null                           → /intro
+///   uid != null, profileExists = null    → wait (still resolving)
+///   uid != null, profileExists = false   → /signup/name (Google Sign-In incomplete)
+///   uid != null, profileExists = true    → /home
 String? authRedirect({
   required bool isLoading,
-  required bool isSignedIn,
+  required String? uid,
+  required bool? profileExists,
   required String location,
 }) {
   if (isLoading) return null;
+
   final onAuthRoute = location.startsWith('/login') ||
       location.startsWith('/signup') ||
       location.startsWith('/dev') ||
       location == '/intro';
-  if (isSignedIn && onAuthRoute) return '/home';
-  if (!isSignedIn && !onAuthRoute) return '/intro';
-  return null;
+
+  if (uid == null) return onAuthRoute ? null : '/intro';
+
+  // uid != null — wait until profile state is resolved
+  if (profileExists == null) return null;
+
+  if (!profileExists) {
+    // Google Sign-In first time or incomplete signup — resume from name step
+    return location.startsWith('/signup') ? null : '/signup/name';
+  }
+
+  // uid != null, profile exists
+  return onAuthRoute ? '/home' : null;
 }
 
 // NOTE: mỗi khi currentUidProvider emit giá trị mới, provider này rebuild và tạo
@@ -49,13 +67,25 @@ String? authRedirect({
 // lúc login/logout). Post-MVP nên refactor sang RouterNotifier + refreshListenable.
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
-  final authState = ref.watch(currentUidProvider);
+  final uidState = ref.watch(currentUidProvider);
+  final profileState = ref.watch(currentUserProfileProvider);
+
+  final uid = uidState.valueOrNull;
+  // isLoading: uid resolving OR (uid exists but profile still loading)
+  final isLoading =
+      uidState.isLoading || (uid != null && profileState.isLoading);
+  // profileExists: null when error/loading (unknown), else whether profile doc exists
+  final bool? profileExists = switch (profileState) {
+    AsyncData(:final value) => value != null,
+    _ => null,
+  };
 
   return GoRouter(
     initialLocation: '/intro',
     redirect: (context, state) => authRedirect(
-      isLoading: authState.isLoading,
-      isSignedIn: authState.valueOrNull != null,
+      isLoading: isLoading,
+      uid: uid,
+      profileExists: profileExists,
       location: state.matchedLocation,
     ),
     routes: [
