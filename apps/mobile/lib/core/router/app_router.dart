@@ -14,6 +14,7 @@ import 'package:meep/features/auth/presentation/signup/signup_username_page.dart
 import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
 import 'package:meep/features/diary/presentation/diary_create_screen.dart';
 import 'package:meep/features/diary/presentation/diary_list_screen.dart';
+import 'package:meep/features/feed/presentation/home_screen.dart';
 import 'package:meep/features/home/presentation/home_page.dart';
 
 part 'app_router.g.dart';
@@ -99,6 +100,17 @@ GoRouter appRouter(Ref ref) {
         path: '/invite/:uid',
         builder: (_, __) => const HomePage(),
       ),
+      // TODO(FE/T20/KhoaLND): wire Feed routes
+      GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
+      GoRoute(
+        path: '/capture-preview',
+        builder: (_, __) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: '/caption-modal',
+        builder: (_, __) => const HomeScreen(),
+      ),
+      GoRoute(path: '/grid-view', builder: (_, __) => const HomeScreen()),
     ],
   );
 }

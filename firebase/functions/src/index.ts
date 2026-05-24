@@ -132,3 +132,19 @@ export const deleteAccount = onCall((request) => {
   // TODO(SE/impl): see comment above.
   return { ok: true };
 });
+
+// ===== Feed module stubs =====
+
+/**
+ * Clean up Storage assets when a post is deleted.
+ *
+ * TODO(FE/impl):
+ *   - delete posts/{uid}/{postId}/photo.jpg from Storage
+ *   - remove fan-out feed entries in /users/{uid}/feed/{postId}
+ */
+export const onPostDeleted = onDocumentDeleted(
+  { document: 'posts/{postId}', region: 'asia-southeast1' },
+  (_event) => {
+    // TODO(FE/impl): see comment above.
+  },
+);
