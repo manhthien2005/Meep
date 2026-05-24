@@ -94,6 +94,11 @@ GoRouter appRouter(Ref ref) {
           entryId: state.pathParameters['entryId'],
         ),
       ),
+      // TODO(F/T11/KhoaLND): implement InvitePage — profile invite link landing
+      GoRoute(
+        path: '/invite/:uid',
+        builder: (_, __) => const HomePage(),
+      ),
     ],
   );
 }

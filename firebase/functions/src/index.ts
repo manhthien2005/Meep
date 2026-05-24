@@ -1,6 +1,6 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentDeleted } from 'firebase-functions/v2/firestore';
 import { initializeApp } from 'firebase-admin/app';
 import { z } from 'zod';
 
@@ -67,5 +67,36 @@ export const onPostCreated = onDocumentCreated(
     if (!post) return;
     // TODO(impl): see comment above.
     console.warn(`onPostCreated fired for ${event.params.postId} — TODO: fan out`);
+  },
+);
+
+// ===== Friend module stubs =====
+
+/**
+ * Accept a pending friend request and create the friendship doc.
+ *
+ * TODO(F/impl):
+ *   - verify request exists + status == 'pending'
+ *   - verify request.auth.uid == receiverId
+ *   - create /friendships/{pairId} doc
+ *   - update request status to 'accepted'
+ *   - send FCM notification to sender
+ */
+export const acceptFriendRequest = onCall((request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
+  // TODO(F/impl): see comment above.
+  return { ok: true };
+});
+
+/**
+ * Clean up friend-related data when a friendship is deleted.
+ *
+ * TODO(F/impl):
+ *   - remove each member from the other's cached friend list
+ */
+export const onFriendshipDeleted = onDocumentDeleted(
+  { document: 'friendships/{pairId}', region: 'asia-southeast1' },
+  (_event) => {
+    // TODO(F/impl): see comment above.
   },
 );

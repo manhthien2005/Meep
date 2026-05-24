@@ -17,9 +17,10 @@ service cloud.firestore {
       return a < b ? a + '_' + b : b + '_' + a;
     }
 
-    function isFriend(uidA, uidB) {
-      return exists(
-        /databases/$(database)/documents/friendships/$(pairId(uidA, uidB))
+    /// True when the calling user is friends with [uid].
+    function isFriend(uid) {
+      return isAuthed() && exists(
+        /databases/$(database)/documents/friendships/$(pairId(request.auth.uid, uid))
       );
     }
 
@@ -47,7 +48,7 @@ service cloud.firestore {
     match /posts/{postId} {
       allow read: if isAuthed() && (
         isOwner(resource.data.authorId) ||
-        isFriend(request.auth.uid, resource.data.authorId)
+        isFriend(resource.data.authorId)
       );
 
       allow create: if isOwner(request.resource.data.authorId)
