@@ -3,22 +3,23 @@
 > Plan: `docs/plans/2026-05-04-auth.md`
 > Spec: `docs/specs/2026-05-04-auth.md`
 > Tier: T0 · Milestone M1
+> Owner: ThienPDM (toàn bộ module — sample module cho team)
 > Blocked by: —
 
 ---
 
 ## Phase 1 — Setup & Shared
 
-- [ ] **T1** — Firebase init + `main.dart` + `AppRouter` với redirect guard 3 states
-- [ ] **T11** — Shared widgets (`AppPrimaryButton`, `AppBackButton`, `AppGoogleButton`, `AppTextInput`) + design tokens (`app_colors.dart`)
+- [x] **T1** — Firebase init + `main.dart` + `AppRouter` với redirect guard 3 states — PR #165
+- [x] **T11** — Shared widgets (`AppPrimaryButton`, `AppBackButton`, `AppGoogleButton`, `AppTextInput`) + design tokens — PR #157
 
 ---
 
 ## Phase 2 — Data layer
 
 - [ ] **T2** — `UserProfile` model — full schema (auth + profile fields), freezed + TimestampConverter
-- [ ] **T3** — `AuthRepository` abstract (incl. `deleteCurrentUser`, `reauthenticateWithCredential`, `updateEmail`) + `FirebaseAuthRepository` impl
-- [ ] **T4** — `UserRepository` abstract + `FirebaseUserRepository` (atomic batch write users + usernames)
+- [ ] **T3** — `FirebaseAuthRepository` impl (signUp, signIn, Google, signOut, deleteCurrentUser, reauthenticate, updateEmail)
+- [ ] **T4** — `FirebaseUserRepository` (atomic batch write users + usernames)
 - [ ] **T5** — Firestore rules `/users/{uid}` + `/usernames/{username}` + rules tests
 
 ## Checkpoint: Data layer ✓
