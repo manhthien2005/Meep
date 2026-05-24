@@ -25,13 +25,11 @@ final currentUidProvider = StreamProvider<String?>((ref) {
 });
 
 /// Stream of the current user's full profile (null when signed out or profile not yet created).
-// TODO(A/T2/KhoaLND): watch profile from Firestore via UserRepository
 final currentUserProfileProvider = StreamProvider<UserProfile?>((ref) {
   final uid = ref.watch(currentUidProvider).valueOrNull;
   if (uid == null) return Stream.value(null);
-  throw UnimplementedError(
-    'currentUserProfileProvider — wire FirebaseUserRepository first',
-  );
+  final repo = ref.watch(userRepositoryProvider);
+  return repo.watchProfile(uid);
 });
 
 /// Convenience — true when there's a signed-in user.

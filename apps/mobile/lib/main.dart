@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:meep/core/router/app_router.dart';
 import 'package:meep/core/theme/app_theme.dart';
 import 'package:meep/features/auth/application/auth_controller.dart';
 import 'package:meep/features/auth/data/firebase_auth_repository.dart';
+import 'package:meep/features/auth/data/firebase_user_repository.dart';
 import 'package:meep/firebase_options.dart';
 
 void main() async {
@@ -19,8 +21,9 @@ void main() async {
         authRepositoryProvider.overrideWithValue(
           FirebaseAuthRepository(auth: FirebaseAuth.instance),
         ),
-        // TODO(A/T4/ThienPDM): override userRepositoryProvider khi
-        // FirebaseUserRepository được implement.
+        userRepositoryProvider.overrideWithValue(
+          FirebaseUserRepository(firestore: FirebaseFirestore.instance),
+        ),
       ],
       child: const MeepApp(),
     ),
