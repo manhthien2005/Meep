@@ -21,6 +21,8 @@ import 'package:meep/features/home/presentation/home_page.dart';
 import 'package:meep/features/profile/presentation/edit_profile_screen.dart';
 import 'package:meep/features/profile/presentation/photo_detail_screen.dart';
 import 'package:meep/features/profile/presentation/profile_screen.dart';
+import 'package:meep/features/space/presentation/space_context_bottom_sheet.dart';
+import 'package:meep/features/space/presentation/space_create_sheet.dart';
 
 part 'app_router.g.dart';
 
@@ -141,6 +143,17 @@ GoRouter appRouter(Ref ref) {
         path: '/chat/:conversationId',
         builder: (_, state) => ChatScreen(
           conversationId: state.pathParameters['conversationId'] ?? '',
+        ),
+      ),
+      // TODO(SP/T10/TBD): wire Space routes
+      GoRoute(
+        path: '/space/create',
+        builder: (_, __) => const SpaceCreateSheet(),
+      ),
+      GoRoute(
+        path: '/space/:spaceId',
+        builder: (_, state) => SpaceContextBottomSheet(
+          spaceId: state.pathParameters['spaceId'] ?? '',
         ),
       ),
     ],

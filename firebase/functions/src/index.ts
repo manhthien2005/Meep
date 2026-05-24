@@ -168,3 +168,39 @@ export const onReactionCreated = onDocumentCreated(
   { document: 'posts/{postId}/reactions/{reactionId}', region: 'asia-southeast1' },
   (_event) => { /* TODO(N/impl) */ },
 );
+
+// ===== Space module stubs =====
+
+export const createSpace = onCall((req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
+  return { ok: true }; // TODO(SP/impl)
+});
+export const leaveSpace = onCall((req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
+  return { ok: true }; // TODO(SP/impl)
+});
+export const kickMember = onCall((req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
+  return { ok: true }; // TODO(SP/impl)
+});
+export const transferOwnership = onCall((req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
+  return { ok: true }; // TODO(SP/impl)
+});
+
+export const onSpaceMemberAdded = onDocumentCreated(
+  { document: 'spaces/{spaceId}/members/{uid}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(SP/impl) */ },
+);
+export const onSpaceMemberRemoved = onDocumentDeleted(
+  { document: 'spaces/{spaceId}/members/{uid}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(SP/impl) */ },
+);
+export const onSpacePostCreated = onDocumentCreated(
+  { document: 'posts/{postId}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(SP/impl) — only fires for posts with spaceId */ },
+);
+export const onSpaceDeleted = onDocumentCreated(
+  { document: 'spaces/{spaceId}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(SP/impl) — listens for deletedAt field */ },
+);
