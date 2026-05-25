@@ -1,12 +1,81 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 
-class IntroPage extends StatelessWidget {
+class IntroPage extends StatefulWidget {
   const IntroPage({super.key});
+
+  @override
+  State<IntroPage> createState() => _IntroPageState();
+}
+
+class _IntroPageState extends State<IntroPage> with TickerProviderStateMixin {
+  // Staggered entry: 1.0s total
+  late final AnimationController _entryCtrl;
+  // Beam "breathing": 6s per cycle
+  late final AnimationController _beamCtrl;
+  // Logo slow rotation: 8s per revolution, starts after entry
+  late final AnimationController _logoCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _entryCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+
+    // Beam starts immediately with breathing
+    _beamCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 6000),
+    )..repeat(reverse: true);
+
+    _logoCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 8000),
+    );
+
+    // Start entry → after done, start logo rotation
+    _entryCtrl.forward().then((_) {
+      if (mounted) _logoCtrl.repeat();
+    });
+  }
+
+  @override
+  void dispose() {
+    _entryCtrl.dispose();
+    _beamCtrl.dispose();
+    _logoCtrl.dispose();
+    super.dispose();
+  }
+
+  // Helper: fade + slide-up with interval
+  Widget _stagger({
+    required double start,
+    required double end,
+    required Widget child,
+  }) {
+    final anim = CurvedAnimation(
+      parent: _entryCtrl,
+      curve: Interval(start, end, curve: Curves.easeOut),
+    );
+    return FadeTransition(
+      opacity: anim,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.22),
+          end: Offset.zero,
+        ).animate(anim),
+        child: child,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +83,14 @@ class IntroPage extends StatelessWidget {
       backgroundColor: AppColors.bw900,
       body: Stack(
         children: [
-          const _Beam(),
+          // Beam với breathing opacity
+          AnimatedBuilder(
+            animation: _beamCtrl,
+            builder: (_, __) => _Beam(
+              // 0.85 → 1.0 breathing (±8% opacity, barely noticeable but alive)
+              opacity: 0.85 + 0.15 * _beamCtrl.value,
+            ),
+          ),
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -25,73 +101,75 @@ class IntroPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      // Figma: logo tại y=414/917 ≈ 45.1%
                       SizedBox(height: h * 0.451),
-                      // ── Logo ──────────────────────────────────────────
-                      // Gradient từ Figma SVG: #B7FFFF→#9EFFFF→#5397A5
-                      // Direction upper-right → lower-left, cornerRadius 20
-                      Container(
-                        width: 90,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment(0.81, -1.0),
-                            end: Alignment(-0.37, 1.0),
-                            colors: [
-                              Color(0xFFB7FFFF),
-                              Color(0xFF9EFFFF),
-                              Color(0xFF5397A5),
-                            ],
-                            stops: [0.10, 0.2115, 1.0],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        alignment: Alignment.center,
-                        child: SvgPicture.asset(
-                          'assets/icons/ic_logo.svg',
-                          width: 56,
-                          height: 49,
-                        ),
+
+                      // Logo: entry stagger [0.10-0.60] + rotation after entry
+                      _stagger(
+                        start: 0.10,
+                        end: 0.60,
+                        child: _AnimatedLogo(rotationCtrl: _logoCtrl),
                       ),
                       const SizedBox(height: 7),
-                      // ── App name ──────────────────────────────────────
-                      Text(
-                        'Meep',
-                        style: AppTextStyles.xl2Bold.copyWith(
-                          color: Colors.white,
-                          height: 42 / 32,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 12),
-                      // ── Tagline ───────────────────────────────────────
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
+
+                      // "Meep": [0.25-0.70]
+                      _stagger(
+                        start: 0.25,
+                        end: 0.70,
                         child: Text(
-                          'Bắt trọn từng khoảnh khắc,\n'
-                          'lưu giữ ký ức cùng những người thân yêu',
-                          style: TextStyle(
-                            fontFamily: 'Nunito',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.bw300,
-                            height: 24 / 18,
+                          'Meep',
+                          style: AppTextStyles.xl2Bold.copyWith(
+                            color: Colors.white,
+                            height: 42 / 32,
                           ),
                           textAlign: TextAlign.center,
                         ),
                       ),
+                      const SizedBox(height: 12),
+
+                      // Tagline: [0.35-0.80]
+                      _stagger(
+                        start: 0.35,
+                        end: 0.80,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            'Bắt trọn từng khoảnh khắc,\n'
+                            'lưu giữ ký ức cùng những người thân yêu',
+                            style: TextStyle(
+                              fontFamily: 'Nunito',
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.bw300,
+                              height: 24 / 18,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 61),
-                      // ── Button 1 ──────────────────────────────────────
-                      const _GlassButton(
-                        label: 'Tạo tài khoản mới',
-                        route: '/signup/email',
-                        width: 249,
+
+                      // Button 1: [0.50-0.90]
+                      _stagger(
+                        start: 0.50,
+                        end: 0.90,
+                        child: const _GlassButton(
+                          label: 'Tạo tài khoản mới',
+                          route: '/signup/email',
+                          width: 249,
+                        ),
                       ),
                       const SizedBox(height: 14),
-                      // ── Button 2 ──────────────────────────────────────
-                      const _TransparentButton(
-                        label: 'Đăng nhập',
-                        route: '/login/email',
-                        width: 198,
+
+                      // Button 2: [0.62-1.00]
+                      _stagger(
+                        start: 0.62,
+                        end: 1.00,
+                        child: const _TransparentButton(
+                          label: 'Đăng nhập',
+                          route: '/login/email',
+                          width: 198,
+                        ),
                       ),
                     ],
                   ),
@@ -108,14 +186,16 @@ class IntroPage extends StatelessWidget {
 // ── Beam ─────────────────────────────────────────────────────────────────────
 
 class _Beam extends StatelessWidget {
-  const _Beam();
+  const _Beam({this.opacity = 1.0});
+
+  final double opacity;
 
   @override
   Widget build(BuildContext context) {
-    return const Positioned.fill(
+    return Positioned.fill(
       child: Opacity(
-        opacity: 0.65,
-        child: CustomPaint(painter: _BeamPainter()),
+        opacity: opacity.clamp(0.0, 1.0),
+        child: const CustomPaint(painter: _BeamPainter()),
       ),
     );
   }
@@ -129,7 +209,7 @@ class _BeamPainter extends CustomPainter {
     return const LinearGradient(
       begin: Alignment(1.16, -0.90),
       end: Alignment(-0.001, 0.41),
-      colors: [Color(0xFF85E9FF), Color(0x3385E9FF)], // @20%
+      colors: [Color(0xFF85E9FF), Color(0x3385E9FF)],
     ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
   }
 
@@ -138,7 +218,7 @@ class _BeamPainter extends CustomPainter {
     return const LinearGradient(
       begin: Alignment(1.16, -0.90),
       end: Alignment(-0.001, 0.41),
-      colors: [Color(0xFF85E9FF), Color(0x0085E9FF)], // @0% transparent
+      colors: [Color(0xFF85E9FF), Color(0x0085E9FF)],
     ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
   }
 
@@ -174,7 +254,7 @@ class _BeamPainter extends CustomPainter {
       ..close();
     canvas.saveLayer(
       Rect.fromLTWH(0, 0, w, h),
-      Paint()..color = const Color(0x80FFFFFF), // group opacity 0.5
+      Paint()..color = const Color(0x80FFFFFF),
     );
     canvas.drawPath(
       path1,
@@ -190,11 +270,39 @@ class _BeamPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// ── Glass button ──────────────────────────────────────────────────────────────
-// Background = ic_btn_glass.svg (fill @20% + stroke gradient, no complex filter)
-// SVG extracted trực tiếp từ Figma node 556:2139, coords adjusted to 249×56 space.
+// ── Logo với rotation ─────────────────────────────────────────────────────────
 
-class _GlassButton extends StatelessWidget {
+class _AnimatedLogo extends StatelessWidget {
+  const _AnimatedLogo({required this.rotationCtrl});
+
+  final AnimationController rotationCtrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 90,
+      height: 90,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      alignment: Alignment.center,
+      // Chỉ rotate inner logomark, white container đứng yên
+      child: RotationTransition(
+        turns: rotationCtrl,
+        child: SvgPicture.asset(
+          'assets/icons/ic_logo.svg',
+          width: 56,
+          height: 49,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Glass button (StatefulWidget cho press state) ─────────────────────────────
+
+class _GlassButton extends StatefulWidget {
   const _GlassButton({
     required this.label,
     required this.route,
@@ -206,34 +314,51 @@ class _GlassButton extends StatelessWidget {
   final double width;
 
   @override
+  State<_GlassButton> createState() => _GlassButtonState();
+}
+
+class _GlassButtonState extends State<_GlassButton> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: label,
+      label: widget.label,
       child: GestureDetector(
-        onTap: () => context.push(route),
-        child: SizedBox(
-          width: width,
-          height: 56,
-          child: Stack(
-            children: [
-              // Background: SVG chính xác từ Figma
-              SvgPicture.asset(
-                'assets/icons/ic_btn_glass.svg',
-                width: width,
-                height: 56,
-                fit: BoxFit.fill,
-              ),
-              // Text overlay
-              Center(
-                child: Text(
-                  label,
-                  style: AppTextStyles.mdBold.copyWith(
-                    color: const Color(0xFFEEF2F3),
+        onTapDown: (_) {
+          setState(() => _pressed = true);
+          HapticFeedback.lightImpact();
+        },
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: () => context.push(widget.route),
+        child: AnimatedScale(
+          scale: _pressed ? 0.96 : 1.0,
+          // Down: fast (80ms) | Up: slight overshoot spring (220ms)
+          duration: Duration(milliseconds: _pressed ? 80 : 220),
+          curve: _pressed ? Curves.easeIn : Curves.easeOutBack,
+          child: SizedBox(
+            width: widget.width,
+            height: 56,
+            child: Stack(
+              children: [
+                SvgPicture.asset(
+                  'assets/icons/ic_btn_glass.svg',
+                  width: widget.width,
+                  height: 56,
+                  fit: BoxFit.fill,
+                ),
+                Center(
+                  child: Text(
+                    widget.label,
+                    style: AppTextStyles.mdBold.copyWith(
+                      color: const Color(0xFFEEF2F3),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -241,9 +366,9 @@ class _GlassButton extends StatelessWidget {
   }
 }
 
-// ── Transparent button ────────────────────────────────────────────────────────
+// ── Transparent button (StatefulWidget cho press state) ───────────────────────
 
-class _TransparentButton extends StatelessWidget {
+class _TransparentButton extends StatefulWidget {
   const _TransparentButton({
     required this.label,
     required this.route,
@@ -255,19 +380,33 @@ class _TransparentButton extends StatelessWidget {
   final double width;
 
   @override
+  State<_TransparentButton> createState() => _TransparentButtonState();
+}
+
+class _TransparentButtonState extends State<_TransparentButton> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: label,
+      label: widget.label,
       child: GestureDetector(
-        onTap: () => context.push(route),
-        child: SizedBox(
-          width: width,
-          height: 56,
-          child: Center(
-            child: Text(
-              label,
-              style: AppTextStyles.mdBold.copyWith(color: Colors.white),
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: () => context.push(widget.route),
+        child: AnimatedOpacity(
+          opacity: _pressed ? 0.55 : 1.0,
+          duration: Duration(milliseconds: _pressed ? 60 : 180),
+          child: SizedBox(
+            width: widget.width,
+            height: 56,
+            child: Center(
+              child: Text(
+                widget.label,
+                style: AppTextStyles.mdBold.copyWith(color: Colors.white),
+              ),
             ),
           ),
         ),
