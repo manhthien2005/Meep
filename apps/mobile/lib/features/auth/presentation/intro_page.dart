@@ -191,10 +191,8 @@ class _BeamPainter extends CustomPainter {
 }
 
 // ── Glass button ──────────────────────────────────────────────────────────────
-// SVG viewBox 294×101, button rect at (42,3) size 249×56, rx=28.
-// Fill:   paint0 — #B7FFFF→#284E55 @20%, begin=(78.7%,above top), end=(78.2%,86%)
-// Stroke: paint1 — #92FFFF→transparent, begin=(51.8%, top), end=(50%, center)
-// Shadows: 4× bottom-left dark (light from top-right)
+// Background = ic_btn_glass.svg (fill @20% + stroke gradient, no complex filter)
+// SVG extracted trực tiếp từ Figma node 556:2139, coords adjusted to 249×56 space.
 
 class _GlassButton extends StatelessWidget {
   const _GlassButton({
@@ -214,44 +212,28 @@ class _GlassButton extends StatelessWidget {
       label: label,
       child: GestureDetector(
         onTap: () => context.push(route),
-        // Outer = stroke gradient + drop shadows
-        child: Container(
+        child: SizedBox(
           width: width,
           height: 56,
-          decoration: BoxDecoration(
-            // Stroke: top-center (#92FFFF) → center (transparent)
-            gradient: const LinearGradient(
-              begin: Alignment(0.036, -1.0),
-              end: Alignment(0.0, 0.0),
-              colors: [Color(0xFF92FFFF), Color(0x00666666)],
-            ),
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: Container(
-            // 1px margin = inside stroke effect
-            margin: const EdgeInsets.all(1),
-            decoration: BoxDecoration(
-              // Fill @20% opacity:
-              // x1=238→(238-42)/249=0.787→Alignment=0.574, y1=-7→(-7-3)/56=-0.179→Alignment=-1.358
-              // x2=236.8→0.782→Alignment=0.564, y2=51.1→(51.1-3)/56=0.860→Alignment=0.720
-              gradient: LinearGradient(
-                begin: const Alignment(0.574, -1.358),
-                end: const Alignment(0.564, 0.720),
-                stops: const [0.034, 1.0],
-                colors: [
-                  const Color(0xFFB7FFFF).withValues(alpha: 0.20),
-                  const Color(0xFF284E55).withValues(alpha: 0.20),
-                ],
+          child: Stack(
+            children: [
+              // Background: SVG chính xác từ Figma
+              SvgPicture.asset(
+                'assets/icons/ic_btn_glass.svg',
+                width: width,
+                height: 56,
+                fit: BoxFit.fill,
               ),
-              borderRadius: BorderRadius.circular(27),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              label,
-              style: AppTextStyles.mdBold.copyWith(
-                color: const Color(0xFFEEF2F3),
+              // Text overlay
+              Center(
+                child: Text(
+                  label,
+                  style: AppTextStyles.mdBold.copyWith(
+                    color: const Color(0xFFEEF2F3),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
