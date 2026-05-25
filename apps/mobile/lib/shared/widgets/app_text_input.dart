@@ -33,11 +33,28 @@ class AppTextInput extends StatefulWidget {
 }
 
 class _AppTextInputState extends State<AppTextInput> {
+  FocusNode? _internalFocus;
+  bool _hasFocus = false;
   bool _obscure = true;
+
   bool get _isPassword => widget.inputType == AppTextInputType.password;
 
+  FocusNode get _focusNode => widget.focusNode ?? _internalFocus!;
+
+  // Active overrides normal when focused; error/success take precedence
+  AppTextInputStatus get _effectiveStatus {
+    if (widget.status == AppTextInputStatus.error) {
+      return AppTextInputStatus.error;
+    }
+    if (widget.status == AppTextInputStatus.success) {
+      return AppTextInputStatus.success;
+    }
+    if (_hasFocus) return AppTextInputStatus.active;
+    return AppTextInputStatus.normal;
+  }
+
   Color get _borderColor {
-    return switch (widget.status) {
+    return switch (_effectiveStatus) {
       AppTextInputStatus.active => AppColors.turquoise500,
       AppTextInputStatus.error => AppColors.error700,
       AppTextInputStatus.success => AppColors.success700,
@@ -46,10 +63,30 @@ class _AppTextInputState extends State<AppTextInput> {
   }
 
   Color get _fillColor {
-    return switch (widget.status) {
+    return switch (_effectiveStatus) {
       AppTextInputStatus.normal => AppColors.bw600,
       _ => AppColors.bw800,
     };
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.focusNode == null) {
+      _internalFocus = FocusNode();
+    }
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    if (mounted) setState(() => _hasFocus = _focusNode.hasFocus);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _internalFocus?.dispose();
+    super.dispose();
   }
 
   @override
@@ -58,23 +95,28 @@ class _AppTextInputState extends State<AppTextInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
           decoration: BoxDecoration(
             color: _fillColor,
             borderRadius: BorderRadius.circular(AppRadii.pill),
-            border: Border.all(color: _borderColor),
+            border: Border.all(
+              color: _borderColor,
+              width: _effectiveStatus == AppTextInputStatus.normal ? 0 : 1,
+            ),
           ),
           child: TextField(
             controller: widget.controller,
-            focusNode: widget.focusNode,
+            focusNode: _focusNode,
             onChanged: widget.onChanged,
             keyboardType: _keyboardType(),
             obscureText: _isPassword && _obscure,
             style: AppTextStyles.mdSemiBold.copyWith(
-              color: widget.status == AppTextInputStatus.error
+              color: _effectiveStatus == AppTextInputStatus.error
                   ? AppColors.error700
                   : AppColors.bw100,
             ),
+            cursorColor: AppColors.bw100,
             decoration: InputDecoration(
               hintText: widget.hint ?? _defaultHint(),
               hintStyle: AppTextStyles.mdSemiBold.copyWith(
@@ -92,7 +134,7 @@ class _AppTextInputState extends State<AppTextInput> {
         if (widget.errorText != null) ...[
           const SizedBox(height: 6),
           Padding(
-            padding: const EdgeInsets.only(left: 20),
+            padding: const EdgeInsets.only(left: 21),
             child: Text(
               widget.errorText!,
               style: AppTextStyles.xsSemiBold.copyWith(
@@ -116,7 +158,7 @@ class _AppTextInputState extends State<AppTextInput> {
         onPressed: () => setState(() => _obscure = !_obscure),
       );
     }
-    if (widget.status == AppTextInputStatus.success) {
+    if (_effectiveStatus == AppTextInputStatus.success) {
       return const Padding(
         padding: EdgeInsets.only(right: 16),
         child: Icon(
