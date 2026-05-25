@@ -18,8 +18,6 @@ class _IntroPageState extends State<IntroPage> with TickerProviderStateMixin {
   late final AnimationController _entryCtrl;
   // Beam "breathing": 6s per cycle
   late final AnimationController _beamCtrl;
-  // Logo slow rotation: 8s per revolution, starts after entry
-  late final AnimationController _logoCtrl;
 
   @override
   void initState() {
@@ -36,12 +34,6 @@ class _IntroPageState extends State<IntroPage> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 6000),
     )..repeat(reverse: true);
 
-    _logoCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 8000),
-    );
-
-    // Start entry only — logo rotation triggered by tap
     _entryCtrl.forward();
   }
 
@@ -49,7 +41,6 @@ class _IntroPageState extends State<IntroPage> with TickerProviderStateMixin {
   void dispose() {
     _entryCtrl.dispose();
     _beamCtrl.dispose();
-    _logoCtrl.dispose();
     super.dispose();
   }
 
@@ -106,16 +97,10 @@ class _IntroPageState extends State<IntroPage> with TickerProviderStateMixin {
                       _stagger(
                         start: 0.10,
                         end: 0.60,
-                        child: _AnimatedLogo(
-                          rotationCtrl: _logoCtrl,
-                          onTap: () {
-                            _logoCtrl.reset();
-                            _logoCtrl.animateTo(
-                              1.0,
-                              duration: const Duration(milliseconds: 420),
-                              curve: Curves.easeOut,
-                            );
-                          },
+                        child: SvgPicture.asset(
+                          'assets/icons/ic_logo_full.svg',
+                          width: 90,
+                          height: 90,
                         ),
                       ),
                       const SizedBox(height: 7),
@@ -276,30 +261,6 @@ class _BeamPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// ── Logo với rotation ─────────────────────────────────────────────────────────
-
-class _AnimatedLogo extends StatelessWidget {
-  const _AnimatedLogo({required this.rotationCtrl, required this.onTap});
-
-  final AnimationController rotationCtrl;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: RotationTransition(
-        turns: rotationCtrl,
-        child: SvgPicture.asset(
-          'assets/icons/ic_logo_full.svg',
-          width: 90,
-          height: 90,
-        ),
-      ),
-    );
-  }
 }
 
 // ── Glass button (StatefulWidget cho press state) ─────────────────────────────
