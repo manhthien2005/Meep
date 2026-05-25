@@ -41,10 +41,8 @@ class _IntroPageState extends State<IntroPage> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 8000),
     );
 
-    // Start entry → after done, start logo rotation
-    _entryCtrl.forward().then((_) {
-      if (mounted) _logoCtrl.repeat();
-    });
+    // Start entry only — logo rotation triggered by tap
+    _entryCtrl.forward();
   }
 
   @override
@@ -108,7 +106,17 @@ class _IntroPageState extends State<IntroPage> with TickerProviderStateMixin {
                       _stagger(
                         start: 0.10,
                         end: 0.60,
-                        child: _AnimatedLogo(rotationCtrl: _logoCtrl),
+                        child: _AnimatedLogo(
+                          rotationCtrl: _logoCtrl,
+                          onTap: () {
+                            _logoCtrl.reset();
+                            _logoCtrl.animateTo(
+                              1.0,
+                              duration: const Duration(milliseconds: 420),
+                              curve: Curves.easeOut,
+                            );
+                          },
+                        ),
                       ),
                       const SizedBox(height: 7),
 
@@ -273,27 +281,21 @@ class _BeamPainter extends CustomPainter {
 // ── Logo với rotation ─────────────────────────────────────────────────────────
 
 class _AnimatedLogo extends StatelessWidget {
-  const _AnimatedLogo({required this.rotationCtrl});
+  const _AnimatedLogo({required this.rotationCtrl, required this.onTap});
 
   final AnimationController rotationCtrl;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 90,
-      height: 90,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      alignment: Alignment.center,
-      // Chỉ rotate inner logomark, white container đứng yên
+    return GestureDetector(
+      onTap: onTap,
       child: RotationTransition(
         turns: rotationCtrl,
         child: SvgPicture.asset(
-          'assets/icons/ic_logo.svg',
-          width: 56,
-          height: 49,
+          'assets/icons/ic_logo_full.svg',
+          width: 90,
+          height: 90,
         ),
       ),
     );
