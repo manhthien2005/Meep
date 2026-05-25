@@ -191,9 +191,10 @@ class _BeamPainter extends CustomPainter {
 }
 
 // ── Glass button ──────────────────────────────────────────────────────────────
-// Fill: #B7FFFF→#284E55 @ 20% opacity (nearly vertical, right side)
-// Stroke: #92FFFF→transparent @ 100%, Inside, 1px
-// Drop shadows: disabled in Figma (not applied)
+// SVG viewBox 294×101, button rect at (42,3) size 249×56, rx=28.
+// Fill:   paint0 — #B7FFFF→#284E55 @20%, begin=(78.7%,above top), end=(78.2%,86%)
+// Stroke: paint1 — #92FFFF→transparent, begin=(51.8%, top), end=(50%, center)
+// Shadows: 4× bottom-left dark (light from top-right)
 
 class _GlassButton extends StatelessWidget {
   const _GlassButton({
@@ -213,42 +214,69 @@ class _GlassButton extends StatelessWidget {
       label: label,
       child: GestureDetector(
         onTap: () => context.push(route),
-        // Outer container = stroke gradient (shows through 1px gap)
+        // Outer = stroke gradient + drop shadows
         child: Container(
           width: width,
           height: 56,
           decoration: BoxDecoration(
-            // Stroke: ánh sáng từ trên xuống centered — top bright → transparent
+            // Stroke: from top-center (#92FFFF) → center (transparent)
+            // x1=171→(171-42)/249=0.518 → Alignment=0.036
+            // y1=3  → (3-3)/56=0 → Alignment=-1.0  (top)
+            // x2=166.5→(166.5-42)/249=0.500 → Alignment=0.0
+            // y2=31 → (31-3)/56=0.5 → Alignment=0.0  (center)
             gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment(0.0, 0.107), // transparent at 55% down (y2=31/56)
-              colors: [
-                Color(0xFF92FFFF),
-                Color(0x00666666),
-              ],
+              begin: Alignment(0.036, -1.0),
+              end: Alignment(0.0, 0.0),
+              colors: [Color(0xFF92FFFF), Color(0x00666666)],
             ),
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(28),
+            // 4 drop shadows — offset toward bottom-left
+            boxShadow: [
+              BoxShadow(
+                offset: const Offset(-2, 2),
+                blurRadius: 5,
+                color: Colors.black.withValues(alpha: 0.10),
+              ),
+              BoxShadow(
+                offset: const Offset(-7, 7),
+                blurRadius: 10,
+                color: Colors.black.withValues(alpha: 0.09),
+              ),
+              BoxShadow(
+                offset: const Offset(-15, 15),
+                blurRadius: 13,
+                color: Colors.black.withValues(alpha: 0.05),
+              ),
+              BoxShadow(
+                offset: const Offset(-27, 27),
+                blurRadius: 15,
+                color: Colors.black.withValues(alpha: 0.01),
+              ),
+            ],
           ),
           child: Container(
-            // 1px margin creates the stroke "inside" effect
+            // 1px margin = inside stroke effect
             margin: const EdgeInsets.all(1),
             decoration: BoxDecoration(
-              // Fill: top → bottom centered, 20% opacity
+              // Fill @20% opacity:
+              // x1=238→(238-42)/249=0.787→Alignment=0.574, y1=-7→(-7-3)/56=-0.179→Alignment=-1.358
+              // x2=236.8→0.782→Alignment=0.564, y2=51.1→(51.1-3)/56=0.860→Alignment=0.720
               gradient: LinearGradient(
-                begin: const Alignment(0.0, -1.25),
-                end: const Alignment(0.0, 0.826),
+                begin: const Alignment(0.574, -1.358),
+                end: const Alignment(0.564, 0.720),
+                stops: const [0.034, 1.0],
                 colors: [
                   const Color(0xFFB7FFFF).withValues(alpha: 0.20),
                   const Color(0xFF284E55).withValues(alpha: 0.20),
                 ],
               ),
-              borderRadius: BorderRadius.circular(29),
+              borderRadius: BorderRadius.circular(27),
             ),
             alignment: Alignment.center,
             child: Text(
               label,
               style: AppTextStyles.mdBold.copyWith(
-                color: const Color(0xFFEEF2F3), // bw200
+                color: const Color(0xFFEEF2F3),
               ),
             ),
           ),
