@@ -219,40 +219,13 @@ class _GlassButton extends StatelessWidget {
           width: width,
           height: 56,
           decoration: BoxDecoration(
-            // Stroke: from top-center (#92FFFF) → center (transparent)
-            // x1=171→(171-42)/249=0.518 → Alignment=0.036
-            // y1=3  → (3-3)/56=0 → Alignment=-1.0  (top)
-            // x2=166.5→(166.5-42)/249=0.500 → Alignment=0.0
-            // y2=31 → (31-3)/56=0.5 → Alignment=0.0  (center)
+            // Stroke: top-center (#92FFFF) → center (transparent)
             gradient: const LinearGradient(
               begin: Alignment(0.036, -1.0),
               end: Alignment(0.0, 0.0),
               colors: [Color(0xFF92FFFF), Color(0x00666666)],
             ),
             borderRadius: BorderRadius.circular(28),
-            // 4 drop shadows — offset toward bottom-left
-            boxShadow: [
-              BoxShadow(
-                offset: const Offset(-2, 2),
-                blurRadius: 5,
-                color: Colors.black.withValues(alpha: 0.10),
-              ),
-              BoxShadow(
-                offset: const Offset(-7, 7),
-                blurRadius: 10,
-                color: Colors.black.withValues(alpha: 0.09),
-              ),
-              BoxShadow(
-                offset: const Offset(-15, 15),
-                blurRadius: 13,
-                color: Colors.black.withValues(alpha: 0.05),
-              ),
-              BoxShadow(
-                offset: const Offset(-27, 27),
-                blurRadius: 15,
-                color: Colors.black.withValues(alpha: 0.01),
-              ),
-            ],
           ),
           child: Container(
             // 1px margin = inside stroke effect
