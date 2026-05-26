@@ -130,6 +130,19 @@ test('user cannot read non-friend post', async () => {
 | Data layer (repositories) | ≥ 70% |
 | UI widgets | ≥ 50% |
 
+## Reference — AUTH test stratification
+
+> AUTH module có 142 tests qua 5 layers — copy pattern khi test module mới.
+> Detailed reference: [`.claude/reference-architectures/auth.md`](../reference-architectures/auth.md) §10
+
+| Layer | File mẫu | Tool |
+|---|---|---|
+| Data (Firestore) | [`firebase_user_repository_test.dart`](../../apps/mobile/test/features/auth/data/firebase_user_repository_test.dart) | `fake_cloud_firestore` |
+| Data (Auth) | [`firebase_auth_repository_test.dart`](../../apps/mobile/test/features/auth/data/firebase_auth_repository_test.dart) | `firebase_auth_mocks` + `mock_exceptions` |
+| Application (Controller) | [`login_controller_test.dart`](../../apps/mobile/test/features/auth/application/login_controller_test.dart) | `ProviderContainer` + mock repos |
+| Pure logic | [`orphan_auth_check_test.dart`](../../apps/mobile/test/features/auth/application/orphan_auth_check_test.dart), [`auth_validators_test.dart`](../../apps/mobile/test/core/validators/auth_validators_test.dart) | Direct fn call |
+| Rules | [`firestore.rules.test.ts`](../../firebase/functions/src/firestore.rules.test.ts) | `@firebase/rules-unit-testing` + emulator |
+
 ## Verify before declaring done
 
 ```bash

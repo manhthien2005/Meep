@@ -12,6 +12,7 @@ Build a clear spec **before** writing code. Align on requirements, constraints, 
 
 1. Read `docs/specs/` to understand context and prior specs.
 2. `git status --short` — no uncommitted intentional changes.
+3. Read [`docs/specs/2026-05-04-auth.md`](../../docs/specs/2026-05-04-auth.md) — reference spec format (Goal/User stories/Scope/Technical/Security/Testing/Boundaries/Worst path/Risks). Cấu trúc này đã proven qua AUTH module — copy structure khi viết spec module mới.
 
 ## Phase 1 — Discovery (one question at a time)
 

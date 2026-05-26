@@ -226,6 +226,24 @@ Refs #N hoặc Closes #N
 
 ---
 
+## Reference Architectures
+
+**Module chuẩn của Meep — copy patterns khi tạo module mới.**
+
+| Module | Status | Reference doc | Khi nào copy |
+|---|---|---|---|
+| `auth` | ✅ Ready (PR #170 Round D, 2026-05-26) | [.claude/reference-architectures/auth.md](.claude/reference-architectures/auth.md) | Mọi module có user data + multi-step UI + Firestore collection |
+
+**Khi giao module mới cho dev:**
+1. Leader define spec + contract (xem ADR-0004 §2)
+2. Module owner đọc reference architecture trước khi code
+3. Copy folder layout + repository pattern + controller pattern + test stratification
+4. KHÔNG copy mù — Pattern #9 (session lifecycle) chỉ apply cho auth; Pattern #6 keepAlive chỉ cần khi controller xuyên route transitions
+
+**Khi pattern không khớp:** discuss với leader, có thể viết reference architecture mới (vd `feed.md` cho Feed module). AUTH là chuẩn, không phải dogma.
+
+---
+
 ## Dev Code Standards — Solo-Dev Model
 
 Meep dùng **solo-dev model**: mỗi dev own một module **end-to-end** (data + logic + UI + test). Không tách FE/BE.

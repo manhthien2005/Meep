@@ -2,6 +2,22 @@
 
 > Run this before `/build`. Never start coding without completing this checklist.
 
+## Step 0 — Load reference architecture (NEW module owner only)
+
+Nếu task là implement **module đầu tiên** của dev (vd HanDHG mới bắt đầu Profile, NganTNK mới bắt đầu Camera) → đọc reference trước khi start:
+
+```bash
+cat .claude/reference-architectures/auth.md   # 11 patterns chuẩn
+```
+
+Bookmark file paths của AUTH cho 4 layer:
+- Repository contract: `apps/mobile/lib/features/auth/data/auth_repository.dart`
+- Controller pattern: `apps/mobile/lib/features/auth/application/login_controller.dart`
+- Error model: `apps/mobile/lib/core/error/app_error.dart`
+- Test stratification: `apps/mobile/test/features/auth/` (5 layers)
+
+**Skip Step 0** nếu dev đã thuộc patterns từ module trước. Continue Step 1.
+
 ## Step 1 — Fetch issue details
 
 ```bash
