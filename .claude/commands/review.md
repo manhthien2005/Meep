@@ -25,6 +25,7 @@ Override: `--deep` forces full 6 axes regardless of size.
 1. Read spec: `docs/specs/<feature>.md` + `docs/plans/<feature>.md`.
 2. Check commit messages: what did the author intend?
 3. Map changed files to layers (data / application / presentation / config / rules / functions).
+4. So sánh với [reference architecture AUTH](../reference-architectures/auth.md): module có deviate khỏi 11 patterns chuẩn không? Nếu có → có lý do rõ ràng trong PR description hay đang drift?
 
 ## Phase 2 — Run automated checks
 

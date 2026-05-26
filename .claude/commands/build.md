@@ -143,7 +143,13 @@ pwsh -File scripts/set-issue-status.ps1 -IssueNum <issue-id> -Status "Review"
 
 ## Flutter + Firebase patterns (quick reference)
 
+> **Reference architecture:** `.claude/reference-architectures/auth.md` có 11 patterns chuẩn với file paths cụ thể. Snippets dưới đây là intro — đọc reference khi cần chi tiết / edge cases.
+
 ### Repository pattern
+
+> Full pattern: AUTH reference §2 — abstract + Firebase impl + `_mapXxxError` boundary
+> Files: [auth_repository.dart](../../apps/mobile/lib/features/auth/data/auth_repository.dart), [firebase_auth_repository.dart](../../apps/mobile/lib/features/auth/data/firebase_auth_repository.dart)
+
 ```dart
 abstract class PostRepository {
   Future<Post> createPost({required String caption, required String imageUrl});
@@ -152,10 +158,15 @@ abstract class PostRepository {
 
 class FirestorePostRepository implements PostRepository {
   // All Firebase I/O here. NEVER in widgets/controllers.
+  // try { ... } on FirebaseException catch (e) { throw _mapXxxError(e); }
 }
 ```
 
 ### Riverpod controller
+
+> Full pattern: AUTH reference §4 — `_afterFailure(e)` helper + `clearError()`
+> File: [login_controller.dart](../../apps/mobile/lib/features/auth/application/login_controller.dart)
+
 ```dart
 @riverpod
 class FeedController extends _$FeedController {
@@ -167,6 +178,10 @@ class FeedController extends _$FeedController {
 ```
 
 ### freezed data class
+
+> Full pattern: AUTH reference §1 — folder layout
+> File: [user_profile.dart](../../apps/mobile/lib/features/auth/data/user_profile.dart)
+
 ```dart
 @freezed
 class Post with _$Post {
@@ -183,9 +198,18 @@ class Post with _$Post {
 ```
 
 ### Error model
+
+> Full pattern: AUTH reference §3 — `AppError.fromUnknown` + `OperationCancelledError`
+> File: [app_error.dart](../../apps/mobile/lib/core/error/app_error.dart)
+
 ```dart
 // ✅ Typed AppError — never raw Exception
 if (uid == null) throw const UnauthenticatedError();
+
+// Helper to collapse try-catch boilerplate
+} catch (e) {
+  state = _afterFailure(e);   // uses AppError.fromUnknown internally
+}
 ```
 
 ## Anti-patterns

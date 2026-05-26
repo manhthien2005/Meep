@@ -8,6 +8,7 @@ Transform a spec → an ordered list of small verifiable tasks. Each task delive
 
 1. Read the spec at `docs/specs/<feature>.md` (must be approved).
 2. Does the spec have measurable acceptance criteria? If not → go back to `/spec`.
+3. Read [`docs/plans/2026-05-04-auth.md`](../../docs/plans/2026-05-04-auth.md) — reference plan format (Part 1 Contract artifacts, Part 2 Tasks T1-Tn với acceptance criteria + cross-module imports, Part 3 Dependency graph, Part 4 Open questions). Format đã proven qua AUTH — copy structure khi plan module mới.
 
 ## Phase 1 — Analysis (read-only)
 
