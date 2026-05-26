@@ -1,6 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:meep/features/auth/application/auth_controller.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/application/login_state.dart';
 import 'package:meep/features/auth/application/sign_up_controller.dart';
 import 'package:meep/core/error/app_error.dart';
@@ -39,7 +39,12 @@ class LoginController extends _$LoginController {
   }
 
   Future<void> signIn() async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(
+      isLoading: true,
+      errorMessage: null,
+      needsProfile: false,
+      isSuccess: false,
+    );
     try {
       await ref.read(authRepositoryProvider).signInWithEmail(
             email: state.email,
@@ -60,7 +65,12 @@ class LoginController extends _$LoginController {
   ///   → router redirect tự chuyển về /signup/name (không navigate thủ công)
   /// - User cũ → `isSuccess = true` → UI navigate /home
   Future<void> continueWithGoogle() async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(
+      isLoading: true,
+      errorMessage: null,
+      needsProfile: false,
+      isSuccess: false,
+    );
     try {
       await ref.read(authRepositoryProvider).signInWithGoogle();
       final uid = ref.read(authRepositoryProvider).currentUid!;
@@ -76,40 +86,6 @@ class LoginController extends _$LoginController {
       } else {
         state = state.copyWith(isLoading: false, isSuccess: true);
       }
-    } on AppError catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
-    } catch (_) {
-      state =
-          state.copyWith(isLoading: false, errorMessage: 'Đã có lỗi xảy ra');
-    }
-  }
-
-  Future<void> sendPasswordReset() async {
-    try {
-      await ref.read(authRepositoryProvider).sendPasswordResetEmail(
-            email: state.email,
-          );
-    } on AppError catch (e) {
-      state = state.copyWith(errorMessage: e.message);
-    }
-  }
-
-  Future<void> confirmPasswordReset({
-    required String oobCode,
-    required String newPassword,
-  }) async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
-    try {
-      final auth = ref.read(authRepositoryProvider);
-      // Lấy email từ oobCode để auto-sign-in sau reset
-      final email = await auth.verifyPasswordResetCode(oobCode: oobCode);
-      await auth.confirmPasswordReset(
-        oobCode: oobCode,
-        newPassword: newPassword,
-      );
-      // Auto-sign-in — đổi mật khẩu = đã xác thực email ownership
-      await auth.signInWithEmail(email: email, password: newPassword);
-      state = state.copyWith(isLoading: false, isSuccess: true);
     } on AppError catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.message);
     } catch (_) {

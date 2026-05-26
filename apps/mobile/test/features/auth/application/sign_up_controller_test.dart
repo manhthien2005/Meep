@@ -2,7 +2,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meep/features/auth/application/auth_controller.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/application/sign_up_controller.dart';
 import 'package:meep/features/auth/application/sign_up_state.dart';
 import 'package:meep/features/auth/data/firebase_auth_repository.dart';

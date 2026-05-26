@@ -4,7 +4,7 @@ import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:meep/features/auth/application/auth_controller.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/application/login_controller.dart';
 import 'package:meep/features/auth/data/firebase_auth_repository.dart';
 import 'package:meep/features/auth/data/firebase_user_repository.dart';
@@ -186,20 +186,6 @@ void main() {
           .read(loginControllerProvider.notifier)
           .continueWithGoogle();
       expect(container.read(loginControllerProvider).isSuccess, true);
-    });
-  });
-
-  group('LoginController — sendPasswordReset', () {
-    test('gửi reset email thành công', () async {
-      final container = makeContainer();
-      addTearDown(container.dispose);
-      container
-          .read(loginControllerProvider.notifier)
-          .setEmail('anyone@example.com');
-      await expectLater(
-        container.read(loginControllerProvider.notifier).sendPasswordReset(),
-        completes,
-      );
     });
   });
 }

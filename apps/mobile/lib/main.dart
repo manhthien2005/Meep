@@ -5,9 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import 'package:meep/core/config/app_config.dart';
 import 'package:meep/core/router/app_router.dart';
 import 'package:meep/core/theme/app_theme.dart';
-import 'package:meep/features/auth/application/auth_controller.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/application/login_controller.dart';
 import 'package:meep/features/auth/application/sign_up_controller.dart';
 import 'package:meep/features/auth/data/firebase_auth_repository.dart';
@@ -26,8 +27,7 @@ void main() async {
           FirebaseAuthRepository(
             auth: FirebaseAuth.instance,
             googleSignIn: GoogleSignIn(
-              serverClientId:
-                  '96172476682-sun74ljt6a3q3376vn1fvsfev8o2qhgv.apps.googleusercontent.com',
+              serverClientId: AppConfig.googleServerClientId,
             ),
           ),
         ),

@@ -1,7 +1,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:meep/core/error/app_error.dart';
-import 'package:meep/features/auth/application/auth_controller.dart';
+import 'package:meep/core/validators/auth_validators.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/application/sign_up_state.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 
@@ -40,9 +41,10 @@ class SignUpController extends _$SignUpController {
 
   void setDisplayName(String displayName) {
     final name = displayName.trim();
-    if (name.length < 2) {
+    if (!AuthValidators.isDisplayNameValid(name)) {
       state = state.copyWith(
-        errorMessage: 'Tên phải có ít nhất 2 ký tự',
+        errorMessage:
+            'Tên phải có ít nhất ${AuthValidators.displayNameMinLength} ký tự',
       );
       return;
     }
@@ -67,9 +69,7 @@ class SignUpController extends _$SignUpController {
     final lower = username.toLowerCase().trim();
 
     // Validate format trước khi gọi API — luôn set username để UI biết đã check
-    if (lower.length < 3 ||
-        lower.length > 20 ||
-        !RegExp(r'^[a-z0-9_]+$').hasMatch(lower)) {
+    if (!AuthValidators.isUsernameFormatValid(lower)) {
       state = state.copyWith(
         username: lower,
         isCheckingUsername: false,

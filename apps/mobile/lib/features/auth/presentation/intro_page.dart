@@ -324,7 +324,7 @@ class _GlassButtonState extends State<_GlassButton> {
                   child: Text(
                     widget.label,
                     style: AppTextStyles.mdBold.copyWith(
-                      color: const Color(0xFFEEF2F3),
+                      color: AppColors.bw200,
                     ),
                   ),
                 ),

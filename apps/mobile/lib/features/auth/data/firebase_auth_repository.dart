@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:meep/core/config/app_config.dart';
 import 'package:meep/core/error/app_error.dart';
 import 'package:meep/features/auth/data/auth_repository.dart';
 
@@ -83,9 +84,9 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<void> sendPasswordResetEmail({required String email}) async {
     try {
       final settings = ActionCodeSettings(
-        url: 'https://meep-staging.firebaseapp.com/login/reset-password',
+        url: AppConfig.passwordResetActionUrl,
         handleCodeInApp: true,
-        androidPackageName: 'dev.meep.meep',
+        androidPackageName: AppConfig.androidPackageName,
         androidInstallApp: true,
         androidMinimumVersion: '21',
       );

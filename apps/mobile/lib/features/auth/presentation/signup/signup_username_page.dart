@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/core/validators/auth_validators.dart';
 import 'package:meep/features/auth/application/sign_up_controller.dart';
 import 'package:meep/shared/widgets/app_back_button.dart';
 import 'package:meep/shared/widgets/app_primary_button.dart';
@@ -28,7 +29,8 @@ class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
     super.dispose();
   }
 
-  bool get _hasEnoughInput => _usernameCtrl.text.trim().length >= 3;
+  bool get _hasEnoughInput =>
+      _usernameCtrl.text.trim().length >= AuthValidators.usernameMinLength;
 
   // Flow: ấn "Tiếp tục" → check → nếu available → createAccount → navigate
   Future<void> _onContinue() async {
