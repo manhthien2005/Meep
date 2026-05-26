@@ -31,6 +31,40 @@ class SignUpController extends _$SignUpController {
     );
   }
 
+  /// Kiểm tra email chưa được đăng ký, rồi advance step → password.
+  /// Trả về true nếu email available và step đã advance.
+  Future<bool> checkEmailAvailable(String email) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final available =
+          await ref.read(authRepositoryProvider).isEmailAvailable(email.trim());
+      if (!available) {
+        state = state.copyWith(
+          isLoading: false,
+          step: SignUpStep.email,
+          errorMessage: 'Email này đã được đăng ký. Thử đăng nhập?',
+        );
+        return false;
+      }
+      state = state.copyWith(
+        email: email.trim(),
+        step: SignUpStep.password,
+        isLoading: false,
+        errorMessage: null,
+      );
+      return true;
+    } on AppError catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Không thể kiểm tra email, thử lại',
+      );
+      return false;
+    }
+  }
+
   void setPassword(String password) {
     state = state.copyWith(
       password: password,

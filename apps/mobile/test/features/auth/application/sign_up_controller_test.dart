@@ -1,4 +1,5 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,7 @@ import 'package:meep/features/auth/application/sign_up_controller.dart';
 import 'package:meep/features/auth/application/sign_up_state.dart';
 import 'package:meep/features/auth/data/firebase_auth_repository.dart';
 import 'package:meep/features/auth/data/firebase_user_repository.dart';
+import 'package:mock_exceptions/mock_exceptions.dart';
 
 ProviderContainer makeContainer({
   MockFirebaseAuth? auth,
@@ -139,6 +141,40 @@ void main() {
       ctrl.setDisplayName('Alice');
       // username NOT available
       await ctrl.createAccount();
+      expect(
+        container.read(signUpControllerProvider).errorMessage,
+        isNotNull,
+      );
+    });
+  });
+
+  group('SignUpController — checkEmailAvailable', () {
+    test('email chưa đăng ký → trả true + step=password', () async {
+      // MockFirebaseAuth.fetchSignInMethodsForEmail trả [] (chưa đăng ký)
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      final ok = await container
+          .read(signUpControllerProvider.notifier)
+          .checkEmailAvailable('new@example.com');
+      expect(ok, true);
+      expect(
+        container.read(signUpControllerProvider).step,
+        SignUpStep.password,
+      );
+      expect(container.read(signUpControllerProvider).email, 'new@example.com');
+    });
+
+    test('Firebase lỗi khi check → trả false + errorMessage', () async {
+      final mockAuth = MockFirebaseAuth();
+      whenCalling(Invocation.method(#fetchSignInMethodsForEmail, null))
+          .on(mockAuth)
+          .thenThrow(FirebaseAuthException(code: 'network-request-failed'));
+      final container = makeContainer(auth: mockAuth);
+      addTearDown(container.dispose);
+      final ok = await container
+          .read(signUpControllerProvider.notifier)
+          .checkEmailAvailable('test@example.com');
+      expect(ok, false);
       expect(
         container.read(signUpControllerProvider).errorMessage,
         isNotNull,

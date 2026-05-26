@@ -121,6 +121,19 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<bool> isEmailAvailable(String email) async {
+    try {
+      // fetchSignInMethodsForEmail bị deprecate về mặt bảo mật (email enumeration)
+      // nhưng vẫn hoạt động nếu "Email Enumeration Protection" tắt trong Firebase Console.
+      // ignore: deprecated_member_use
+      final methods = await _auth.fetchSignInMethodsForEmail(email);
+      return methods.isEmpty;
+    } on FirebaseAuthException catch (e) {
+      throw _mapGenericError(e);
+    }
+  }
+
+  @override
   Future<void> signOut() => _auth.signOut();
 
   @override

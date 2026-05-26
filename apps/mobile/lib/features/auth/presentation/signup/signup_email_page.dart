@@ -43,9 +43,12 @@ class _SignUpEmailPageState extends ConsumerState<SignUpEmailPage> {
 
   bool get _canContinue => AuthValidators.isEmailValid(_emailCtrl.text);
 
-  void _onContinue() {
-    ref.read(signUpControllerProvider.notifier).setEmail(_emailCtrl.text);
-    context.push('/signup/password');
+  Future<void> _onContinue() async {
+    final ok = await ref
+        .read(signUpControllerProvider.notifier)
+        .checkEmailAvailable(_emailCtrl.text);
+    if (!mounted || !ok) return;
+    unawaited(context.push('/signup/password'));
   }
 
   Future<void> _onGoogle() async {

@@ -59,9 +59,11 @@ class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
     final hasChecked = state.username.isNotEmpty;
     AppTextInputStatus inputStatus = AppTextInputStatus.normal;
     if (hasChecked && !state.isCheckingUsername) {
-      inputStatus = state.isUsernameAvailable
-          ? AppTextInputStatus.success
-          : AppTextInputStatus.error;
+      if (!state.isUsernameAvailable || state.errorMessage != null) {
+        inputStatus = AppTextInputStatus.error;
+      } else {
+        inputStatus = AppTextInputStatus.success;
+      }
     }
 
     return Scaffold(
@@ -102,10 +104,16 @@ class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
                       onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 20),
-                    if (hasChecked &&
-                        !state.isCheckingUsername &&
-                        state.isUsernameAvailable)
-                      Center(child: _AvailablePill())
+                    if (hasChecked && !state.isCheckingUsername)
+                      if (state.isUsernameAvailable &&
+                          state.errorMessage == null)
+                        Center(child: _AvailablePill())
+                      else if (state.errorMessage != null &&
+                          state.isUsernameAvailable)
+                        // createAccount() failed (e.g. email đã dùng, mạng lỗi)
+                        _ErrorPill(message: state.errorMessage!)
+                      else
+                        _HintPill()
                     else
                       _HintPill(),
                   ],
@@ -139,6 +147,29 @@ class _HintPill extends StatelessWidget {
       child: Text(
         'Việc này sẽ giúp bạn kết nối bạn bè nhanh chóng.',
         style: AppTextStyles.smSemiBold.copyWith(color: AppColors.bw100),
+      ),
+    );
+  }
+}
+
+class _ErrorPill extends StatelessWidget {
+  const _ErrorPill({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+      decoration: BoxDecoration(
+        color: AppColors.error700.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(40),
+      ),
+      child: Text(
+        message,
+        style: AppTextStyles.smSemiBold.copyWith(color: AppColors.error400),
+        textAlign: TextAlign.center,
       ),
     );
   }

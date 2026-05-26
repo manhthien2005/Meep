@@ -48,6 +48,13 @@ abstract class AuthRepository {
     required String newPassword,
   });
 
+  /// Trả về true nếu email chưa được đăng ký với bất kỳ provider nào.
+  ///
+  /// Yêu cầu "Email Enumeration Protection" TẮT trong Firebase Console
+  /// (Authentication > Settings > User Actions).
+  /// Nếu protection bật, method này luôn trả về true (không dùng được).
+  Future<bool> isEmailAvailable(String email);
+
   /// Sign out the current user.
   Future<void> signOut();
 
