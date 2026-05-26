@@ -48,7 +48,8 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
     final controllerState = ref.read(passwordResetControllerProvider);
     if (controllerState.errorMessage == null && !controllerState.isLoading) {
       setState(() => _isResetSuccess = true);
-      await Future<void>.delayed(const Duration(milliseconds: 1000));
+      // Delay ngắn để user thấy trạng thái thành công trước khi vào app
+      await Future<void>.delayed(const Duration(milliseconds: 800));
       if (mounted) context.go('/home');
     }
   }
@@ -121,7 +122,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
               padding: const EdgeInsets.fromLTRB(37, 0, 37, 33),
               child: _isResetSuccess
                   ? _PasswordSavedButton(
-                      onTap: () => context.go('/login/email'),
+                      onTap: () => context.go('/home'),
                     )
                   : AppPrimaryButton(
                       label: 'Lưu mật khẩu',
