@@ -29,6 +29,9 @@ class _LoginPasswordPageState extends ConsumerState<LoginPasswordPage> {
   Timer? _cooldownTimer;
   bool _emailSent = false;
   int _cooldownSeconds = 0;
+  // Local — không watch từ controller để tránh markNeedsBuild trên defunct element
+  // khi router redirect dispose page trước khi signIn() future trả về.
+  bool _isSignInSuccess = false;
 
   @override
   void initState() {
@@ -56,6 +59,8 @@ class _LoginPasswordPageState extends ConsumerState<LoginPasswordPage> {
     await ref.read(loginControllerProvider.notifier).signIn();
     if (!mounted) return;
     if (ref.read(loginControllerProvider).isSuccess) {
+      setState(() => _isSignInSuccess = true);
+      // Router sẽ tự redirect khi profile stream resolve. Timer là backup.
       _successTimer = Timer(const Duration(milliseconds: 1500), () {
         if (mounted) context.go('/home');
       });
@@ -100,8 +105,13 @@ class _LoginPasswordPageState extends ConsumerState<LoginPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(loginControllerProvider);
-    final isSuccess = state.isSuccess;
+    // Chỉ watch isLoading + errorMessage — không watch isSuccess (local state)
+    final state = ref.watch(
+      loginControllerProvider.select(
+        (s) => (isLoading: s.isLoading, errorMessage: s.errorMessage),
+      ),
+    );
+    final isSuccess = _isSignInSuccess;
 
     return Scaffold(
       backgroundColor: AppColors.bw900,
