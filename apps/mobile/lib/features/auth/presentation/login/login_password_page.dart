@@ -9,6 +9,7 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_radii.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/login_controller.dart';
+import 'package:meep/features/auth/application/password_reset_controller.dart';
 import 'package:meep/shared/widgets/app_back_button.dart';
 import 'package:meep/shared/widgets/app_primary_button.dart';
 import 'package:meep/shared/widgets/app_text_input.dart';
@@ -68,14 +69,18 @@ class _LoginPasswordPageState extends ConsumerState<LoginPasswordPage> {
       builder: (_) => const _ForgotPasswordDialog(),
     );
     if (confirmed != true || !mounted) return;
-    await ref.read(loginControllerProvider.notifier).sendPasswordReset();
+    await ref
+        .read(passwordResetControllerProvider.notifier)
+        .sendResetEmail(email: widget.email);
     if (!mounted) return;
     _startCooldown();
     setState(() => _emailSent = true);
   }
 
   Future<void> _onResend() async {
-    await ref.read(loginControllerProvider.notifier).sendPasswordReset();
+    await ref
+        .read(passwordResetControllerProvider.notifier)
+        .sendResetEmail(email: widget.email);
     if (!mounted) return;
     _startCooldown();
   }
