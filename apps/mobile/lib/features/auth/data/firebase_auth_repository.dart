@@ -20,6 +20,9 @@ class FirebaseAuthRepository implements AuthRepository {
   String? get currentEmail => _auth.currentUser?.email;
 
   @override
+  String? get currentDisplayName => _auth.currentUser?.displayName;
+
+  @override
   Stream<String?> watchUid() =>
       _auth.authStateChanges().map((user) => user?.uid);
 
@@ -79,7 +82,38 @@ class FirebaseAuthRepository implements AuthRepository {
   @override
   Future<void> sendPasswordResetEmail({required String email}) async {
     try {
-      await _auth.sendPasswordResetEmail(email: email);
+      final settings = ActionCodeSettings(
+        url: 'https://meep-staging.firebaseapp.com/login/reset-password',
+        handleCodeInApp: true,
+        androidPackageName: 'dev.meep.meep',
+        androidInstallApp: true,
+        androidMinimumVersion: '21',
+      );
+      await _auth.sendPasswordResetEmail(
+        email: email,
+        actionCodeSettings: settings,
+      );
+    } on FirebaseAuthException catch (e) {
+      throw _mapGenericError(e);
+    }
+  }
+
+  @override
+  Future<String> verifyPasswordResetCode({required String oobCode}) async {
+    try {
+      return await _auth.verifyPasswordResetCode(oobCode);
+    } on FirebaseAuthException catch (e) {
+      throw _mapGenericError(e);
+    }
+  }
+
+  @override
+  Future<void> confirmPasswordReset({
+    required String oobCode,
+    required String newPassword,
+  }) async {
+    try {
+      await _auth.confirmPasswordReset(code: oobCode, newPassword: newPassword);
     } on FirebaseAuthException catch (e) {
       throw _mapGenericError(e);
     }

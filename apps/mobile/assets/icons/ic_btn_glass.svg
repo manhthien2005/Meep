@@ -1,0 +1,19 @@
+<svg width="249" height="56" viewBox="0 0 249 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fill rect @20% opacity -->
+  <rect width="249" height="56" rx="28" fill="url(#btnFill)" fill-opacity="0.2"/>
+  <!-- Stroke rect 1px inside -->
+  <rect x="0.5" y="0.5" width="248" height="55" rx="27.5" stroke="url(#btnStroke)"/>
+  <defs>
+    <!-- Fill gradient — coords relative to this 249x56 rect                 -->
+    <!-- Original SVG had button at (42,3); paint0 x1=238,y1=-7 → (196,-10) -->
+    <linearGradient id="btnFill" x1="196" y1="-10" x2="194.836" y2="48.149" gradientUnits="userSpaceOnUse">
+      <stop offset="0.0337" stop-color="#B7FFFF"/>
+      <stop offset="1" stop-color="#284E55"/>
+    </linearGradient>
+    <!-- Stroke gradient — paint1 x1=171,y1=3 → (129,0)                    -->
+    <linearGradient id="btnStroke" x1="129" y1="0" x2="124.5" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#92FFFF"/>
+      <stop offset="1" stop-color="#666666" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+</svg>

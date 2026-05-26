@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:meep/core/error/app_error.dart';
@@ -11,8 +9,6 @@ part 'sign_up_controller.g.dart';
 
 @riverpod
 class SignUpController extends _$SignUpController {
-  Timer? _usernameDebounce;
-
   @override
   SignUpState build() => const SignUpState(
         step: SignUpStep.email,
@@ -68,12 +64,26 @@ class SignUpController extends _$SignUpController {
   }
 
   Future<void> checkUsername(String username) async {
-    _usernameDebounce?.cancel();
-    final lower = username.toLowerCase();
+    final lower = username.toLowerCase().trim();
+
+    // Validate format trước khi gọi API — luôn set username để UI biết đã check
+    if (lower.length < 3 ||
+        lower.length > 20 ||
+        !RegExp(r'^[a-z0-9_]+$').hasMatch(lower)) {
+      state = state.copyWith(
+        username: lower,
+        isCheckingUsername: false,
+        isUsernameAvailable: false,
+        errorMessage: 'Tên người dùng không hợp lệ.',
+      );
+      return;
+    }
+
     state = state.copyWith(
       username: lower,
       isCheckingUsername: true,
       isUsernameAvailable: false,
+      errorMessage: null,
     );
     try {
       final repo = ref.read(userRepositoryProvider);
@@ -81,9 +91,16 @@ class SignUpController extends _$SignUpController {
       state = state.copyWith(
         isCheckingUsername: false,
         isUsernameAvailable: available,
+        errorMessage: available
+            ? null
+            : 'Tên người dùng này đã tồn tại. Vui lòng chọn tên khác.',
       );
-    } catch (_) {
-      state = state.copyWith(isCheckingUsername: false);
+    } catch (e) {
+      state = state.copyWith(
+        isCheckingUsername: false,
+        isUsernameAvailable: false,
+        errorMessage: 'Không thể kiểm tra tên người dùng, thử lại',
+      );
     }
   }
 

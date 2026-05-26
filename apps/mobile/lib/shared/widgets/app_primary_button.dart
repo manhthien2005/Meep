@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_radii.dart';
@@ -54,10 +55,14 @@ class AppPrimaryButton extends StatelessWidget {
         ),
         if (showTrailingIcon) ...[
           const SizedBox(width: 8),
-          Icon(
-            Icons.arrow_forward_ios,
-            size: 14,
-            color: _enabled ? AppColors.turquoise800 : AppColors.bw400,
+          SvgPicture.asset(
+            'assets/icons/ic_move_right.svg',
+            width: 20,
+            height: 20,
+            colorFilter: ColorFilter.mode(
+              _enabled ? AppColors.turquoise800 : AppColors.bw400,
+              BlendMode.srcIn,
+            ),
           ),
         ],
       ],
