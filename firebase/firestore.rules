@@ -64,7 +64,8 @@ service cloud.firestore {
         && request.resource.data.username.matches('^[a-z0-9_]+$');
       allow update: if isOwner(uid)
         && !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['uid', 'createdAt', 'email']);
+            .hasAny(['uid', 'createdAt', 'email', 'username',
+                     'postCount', 'friendCount', 'spaceCount']);
       allow delete: if false; // use deleteAccount CF
 
       match /private/{docId} {

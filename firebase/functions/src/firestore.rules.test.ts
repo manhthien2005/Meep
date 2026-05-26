@@ -197,6 +197,42 @@ describe('/users/{uid} — field validation', () => {
     );
   });
 
+  test('owner cannot update username — immutable once set', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertFails(
+      authed(alice).firestore().doc(`users/${alice}`).update({ username: 'newname' }),
+    );
+  });
+
+  test('owner cannot update postCount — server-only counter', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertFails(
+      authed(alice).firestore().doc(`users/${alice}`).update({ postCount: 999 }),
+    );
+  });
+
+  test('owner cannot update friendCount — server-only counter', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertFails(
+      authed(alice).firestore().doc(`users/${alice}`).update({ friendCount: 999 }),
+    );
+  });
+
+  test('owner cannot update spaceCount — server-only counter', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertFails(
+      authed(alice).firestore().doc(`users/${alice}`).update({ spaceCount: 999 }),
+    );
+  });
+
   test('delete always denied', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc(`users/${alice}`).set(validProfile);
@@ -218,11 +254,13 @@ describe('/usernames/{username}', () => {
     await assertSucceeds(authed(bob).firestore().doc('usernames/alice').get());
   });
 
-  test('unauthenticated cannot read', async () => {
+  // allow read: if true — unauthenticated có thể check username availability
+  // trước khi signup (email flow chưa có Firebase Auth session khi đến bước này).
+  test('unauthenticated CAN read — needed for pre-auth username check', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc('usernames/alice').set({ uid: alice });
     });
-    await assertFails(unauthed().firestore().doc('usernames/alice').get());
+    await assertSucceeds(unauthed().firestore().doc('usernames/alice').get());
   });
 
   test('owner can create username doc with matching uid', async () => {

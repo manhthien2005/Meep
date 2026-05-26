@@ -177,4 +177,81 @@ void main() {
       );
     });
   });
+
+  group('verifyPasswordResetCode', () {
+    test('hoàn thành khi oobCode hợp lệ', () async {
+      // MockFirebaseAuth có real impl — verify không throw
+      await expectLater(
+        repo.verifyPasswordResetCode(oobCode: 'valid-code-123'),
+        completes,
+      );
+    });
+
+    test('ném AppError khi oobCode hết hạn', () async {
+      whenCalling(Invocation.method(#verifyPasswordResetCode, null))
+          .on(mockAuth)
+          .thenThrow(FirebaseAuthException(code: 'expired-action-code'));
+      await expectLater(
+        repo.verifyPasswordResetCode(oobCode: 'expired-code'),
+        throwsA(isA<AppError>()),
+      );
+    });
+  });
+
+  group('confirmPasswordReset', () {
+    test('hoàn thành với oobCode và mật khẩu hợp lệ', () async {
+      // MockFirebaseAuth có real impl — verify không throw
+      await expectLater(
+        repo.confirmPasswordReset(
+          oobCode: 'valid-code',
+          newPassword: 'newPassword123',
+        ),
+        completes,
+      );
+    });
+
+    test('ném AppError khi oobCode không hợp lệ', () async {
+      whenCalling(Invocation.method(#confirmPasswordReset, null))
+          .on(mockAuth)
+          .thenThrow(FirebaseAuthException(code: 'invalid-action-code'));
+      await expectLater(
+        repo.confirmPasswordReset(
+          oobCode: 'bad-code',
+          newPassword: 'newPassword123',
+        ),
+        throwsA(isA<AppError>()),
+      );
+    });
+  });
+
+  group('deleteCurrentUser', () {
+    test('no-op khi chưa sign in', () async {
+      await expectLater(repo.deleteCurrentUser(), completes);
+    });
+
+    test('xoá user khi đã sign in', () async {
+      final authWithUser = MockFirebaseAuth(
+        mockUser: MockUser(uid: 'uid-to-delete'),
+        signedIn: true,
+      );
+      final repoWithUser = FirebaseAuthRepository(auth: authWithUser);
+      await expectLater(repoWithUser.deleteCurrentUser(), completes);
+    });
+
+    test('ném AppError khi Firebase từ chối xoá', () async {
+      final mockUser = MockUser(uid: 'uid-1');
+      final authWithUser = MockFirebaseAuth(
+        mockUser: mockUser,
+        signedIn: true,
+      );
+      whenCalling(Invocation.method(#delete, null))
+          .on(mockUser)
+          .thenThrow(FirebaseAuthException(code: 'requires-recent-login'));
+      final repoWithUser = FirebaseAuthRepository(auth: authWithUser);
+      await expectLater(
+        repoWithUser.deleteCurrentUser(),
+        throwsA(isA<AppError>()),
+      );
+    });
+  });
 }
