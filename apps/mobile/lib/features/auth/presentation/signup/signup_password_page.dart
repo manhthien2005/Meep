@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/core/validators/auth_validators.dart';
 import 'package:meep/features/auth/application/sign_up_controller.dart';
 import 'package:meep/shared/widgets/app_back_button.dart';
 import 'package:meep/shared/widgets/app_primary_button.dart';
@@ -41,7 +42,7 @@ class _SignUpPasswordPageState extends ConsumerState<SignUpPasswordPage> {
     super.dispose();
   }
 
-  bool get _canContinue => _pwCtrl.text.length >= 8;
+  bool get _canContinue => AuthValidators.isPasswordValid(_pwCtrl.text);
 
   bool get _showError =>
       _hasBlurred && _pwCtrl.text.isNotEmpty && !_canContinue;
@@ -84,8 +85,9 @@ class _SignUpPasswordPageState extends ConsumerState<SignUpPasswordPage> {
                       controller: _pwCtrl,
                       focusNode: _pwFocus,
                       hint: 'Mật khẩu',
-                      errorText:
-                          _showError ? 'Mật khẩu tối thiểu 8 ký tự.' : null,
+                      errorText: _showError
+                          ? 'Mật khẩu tối thiểu ${AuthValidators.passwordMinLength} ký tự.'
+                          : null,
                       status: _showError
                           ? AppTextInputStatus.error
                           : _canContinue
@@ -95,7 +97,8 @@ class _SignUpPasswordPageState extends ConsumerState<SignUpPasswordPage> {
                     ),
                     const SizedBox(height: 16),
                     const _InfoPill(
-                      text: 'Mật khẩu của bạn phải dài tối thiểu 8 ký tự',
+                      text:
+                          'Mật khẩu của bạn phải dài tối thiểu ${AuthValidators.passwordMinLength} ký tự',
                     ),
                   ],
                 ),

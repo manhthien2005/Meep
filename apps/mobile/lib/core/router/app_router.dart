@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:meep/features/auth/application/auth_controller.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/application/login_controller.dart';
+import 'package:meep/features/auth/application/sign_up_controller.dart';
 import 'package:meep/features/auth/presentation/intro_page.dart';
 import 'package:meep/features/auth/presentation/login/login_email_page.dart';
 import 'package:meep/features/auth/presentation/login/login_password_page.dart';
@@ -87,6 +88,14 @@ String? authRedirect({
 
 /// ChangeNotifier kích hoạt GoRouter redirect re-evaluation khi auth state thay đổi.
 /// Không recreate GoRouter (tránh navigation stack reset).
+///
+/// Phụ chức năng: giữ `signUpControllerProvider` alive xuyên route transitions.
+/// `@riverpod` codegen mặc định là autoDispose → khi `SignUpEmailPage` dispose
+/// và `SignUpNamePage` chưa kịp watch, controller bị tháo → mất state
+/// `isGoogleSignIn`, `displayName` đã prefill từ Google → bước cuối
+/// `createAccount` chạy nhầm nhánh email signup với creds trống → Firebase
+/// throw Pigeon channel error leak ra UI. Listen với callback rỗng đủ để
+/// Riverpod giữ provider sống trong suốt vòng đời router (keepAlive).
 class _RouterNotifier extends ChangeNotifier {
   _RouterNotifier(Ref ref) {
     ref.listen(currentUidProvider, (_, __) => notifyListeners());
@@ -95,6 +104,8 @@ class _RouterNotifier extends ChangeNotifier {
       loginControllerProvider.select((s) => s.needsProfile),
       (_, __) => notifyListeners(),
     );
+    // No-op listen — chỉ để keepAlive, không trigger redirect re-eval.
+    ref.listen(signUpControllerProvider, (_, __) {});
   }
 }
 

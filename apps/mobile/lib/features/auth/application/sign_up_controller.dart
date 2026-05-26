@@ -1,7 +1,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:meep/core/error/app_error.dart';
-import 'package:meep/features/auth/application/auth_controller.dart';
+import 'package:meep/core/validators/auth_validators.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/application/sign_up_state.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 
@@ -30,6 +31,42 @@ class SignUpController extends _$SignUpController {
     );
   }
 
+  /// Clear pending error without touching other fields. Use from
+  /// `TextField.onChanged` để xoá inline error ngay khi user gõ tiếp.
+  void clearError() {
+    if (state.errorMessage != null) {
+      state = state.copyWith(errorMessage: null);
+    }
+  }
+
+  /// Kiểm tra email chưa được đăng ký, rồi advance step → password.
+  /// Trả về true nếu email available và step đã advance.
+  Future<bool> checkEmailAvailable(String email) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final available =
+          await ref.read(authRepositoryProvider).isEmailAvailable(email.trim());
+      if (!available) {
+        state = state.copyWith(
+          isLoading: false,
+          step: SignUpStep.email,
+          errorMessage: 'Email này đã được đăng ký. Thử đăng nhập?',
+        );
+        return false;
+      }
+      state = state.copyWith(
+        email: email.trim(),
+        step: SignUpStep.password,
+        isLoading: false,
+        errorMessage: null,
+      );
+      return true;
+    } catch (e) {
+      state = _afterFailure(e, fallback: 'Không thể kiểm tra email, thử lại');
+      return false;
+    }
+  }
+
   void setPassword(String password) {
     state = state.copyWith(
       password: password,
@@ -40,9 +77,10 @@ class SignUpController extends _$SignUpController {
 
   void setDisplayName(String displayName) {
     final name = displayName.trim();
-    if (name.length < 2) {
+    if (!AuthValidators.isDisplayNameValid(name)) {
       state = state.copyWith(
-        errorMessage: 'Tên phải có ít nhất 2 ký tự',
+        errorMessage:
+            'Tên phải có ít nhất ${AuthValidators.displayNameMinLength} ký tự',
       );
       return;
     }
@@ -67,9 +105,7 @@ class SignUpController extends _$SignUpController {
     final lower = username.toLowerCase().trim();
 
     // Validate format trước khi gọi API — luôn set username để UI biết đã check
-    if (lower.length < 3 ||
-        lower.length > 20 ||
-        !RegExp(r'^[a-z0-9_]+$').hasMatch(lower)) {
+    if (!AuthValidators.isUsernameFormatValid(lower)) {
       state = state.copyWith(
         username: lower,
         isCheckingUsername: false,
@@ -99,7 +135,10 @@ class SignUpController extends _$SignUpController {
       state = state.copyWith(
         isCheckingUsername: false,
         isUsernameAvailable: false,
-        errorMessage: 'Không thể kiểm tra tên người dùng, thử lại',
+        errorMessage: AppError.fromUnknown(
+          e,
+          fallback: 'Không thể kiểm tra tên người dùng, thử lại',
+        ).message,
       );
     }
   }
@@ -117,6 +156,17 @@ class SignUpController extends _$SignUpController {
       final userRepo = ref.read(userRepositoryProvider);
 
       if (!state.isGoogleSignIn) {
+        // Defensive: nếu state mất giữa các page (vd controller autoDispose
+        // trong lúc router redirect), email/password có thể trống → tránh gọi
+        // Firebase với creds rỗng (Pigeon channel error leak ra UI).
+        if (state.email.isEmpty || state.password.isEmpty) {
+          state = state.copyWith(
+            isLoading: false,
+            errorMessage:
+                'Thiếu thông tin đăng ký. Vui lòng bắt đầu lại từ đầu.',
+          );
+          return;
+        }
         await authRepo.signUpWithEmail(
           email: state.email,
           password: state.password,
@@ -138,16 +188,27 @@ class SignUpController extends _$SignUpController {
       );
       state = state.copyWith(isLoading: false);
     } catch (e) {
-      // Rollback: remove Firebase Auth account if Firestore write failed
+      // Rollback: nếu Firebase Auth user đã tạo nhưng Firestore batch fail →
+      // xoá Auth user để tránh orphan. Nếu rollback fail → router guard self-heal
+      // (`uid != null && profile == null && !needsProfile` → /intro → signOut).
       if (!state.isGoogleSignIn) {
         try {
           await ref.read(authRepositoryProvider).deleteCurrentUser();
-        } catch (_) {}
+        } catch (_) {/* fall back to router self-heal */}
       }
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: e is AppError ? e.message : 'Đã có lỗi xảy ra',
-      );
+      state = _afterFailure(e);
     }
+  }
+
+  /// Reset isLoading + map error to message (null for [OperationCancelledError]).
+  SignUpState _afterFailure(
+    Object e, {
+    String fallback = 'Đã có lỗi xảy ra',
+  }) {
+    final err = AppError.fromUnknown(e, fallback: fallback);
+    return state.copyWith(
+      isLoading: false,
+      errorMessage: err is OperationCancelledError ? null : err.message,
+    );
   }
 }

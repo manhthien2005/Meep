@@ -9,6 +9,8 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_radii.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/login_controller.dart';
+import 'package:meep/features/auth/application/password_reset_controller.dart';
+import 'package:meep/features/auth/presentation/widgets/forgot_password_dialog.dart';
 import 'package:meep/shared/widgets/app_back_button.dart';
 import 'package:meep/shared/widgets/app_primary_button.dart';
 import 'package:meep/shared/widgets/app_text_input.dart';
@@ -28,6 +30,9 @@ class _LoginPasswordPageState extends ConsumerState<LoginPasswordPage> {
   Timer? _cooldownTimer;
   bool _emailSent = false;
   int _cooldownSeconds = 0;
+  // Local — không watch từ controller để tránh markNeedsBuild trên defunct element
+  // khi router redirect dispose page trước khi signIn() future trả về.
+  bool _isSignInSuccess = false;
 
   @override
   void initState() {
@@ -43,8 +48,10 @@ class _LoginPasswordPageState extends ConsumerState<LoginPasswordPage> {
     _pwCtrl.dispose();
     _successTimer?.cancel();
     _cooldownTimer?.cancel();
-    // Clear lỗi khi back về trang email — tránh state leak
-    ref.read(loginControllerProvider.notifier).clearError();
+    // KHÔNG đụng `ref` trong dispose — router redirect có thể tear down element
+    // trước khi dispose chạy → "Cannot use ref after the widget was disposed".
+    // State cleanup được handle bởi: (1) clear-on-keystroke trong AppTextInput
+    // và (2) resetResult() trong initState lần re-enter page.
     super.dispose();
   }
 
@@ -55,6 +62,8 @@ class _LoginPasswordPageState extends ConsumerState<LoginPasswordPage> {
     await ref.read(loginControllerProvider.notifier).signIn();
     if (!mounted) return;
     if (ref.read(loginControllerProvider).isSuccess) {
+      setState(() => _isSignInSuccess = true);
+      // Router sẽ tự redirect khi profile stream resolve. Timer là backup.
       _successTimer = Timer(const Duration(milliseconds: 1500), () {
         if (mounted) context.go('/home');
       });
@@ -65,17 +74,21 @@ class _LoginPasswordPageState extends ConsumerState<LoginPasswordPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       barrierColor: const Color(0x73000000),
-      builder: (_) => const _ForgotPasswordDialog(),
+      builder: (_) => const ForgotPasswordDialog(),
     );
     if (confirmed != true || !mounted) return;
-    await ref.read(loginControllerProvider.notifier).sendPasswordReset();
+    await ref
+        .read(passwordResetControllerProvider.notifier)
+        .sendResetEmail(email: widget.email);
     if (!mounted) return;
     _startCooldown();
     setState(() => _emailSent = true);
   }
 
   Future<void> _onResend() async {
-    await ref.read(loginControllerProvider.notifier).sendPasswordReset();
+    await ref
+        .read(passwordResetControllerProvider.notifier)
+        .sendResetEmail(email: widget.email);
     if (!mounted) return;
     _startCooldown();
   }
@@ -95,8 +108,13 @@ class _LoginPasswordPageState extends ConsumerState<LoginPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(loginControllerProvider);
-    final isSuccess = state.isSuccess;
+    // Chỉ watch isLoading + errorMessage — không watch isSuccess (local state)
+    final state = ref.watch(
+      loginControllerProvider.select(
+        (s) => (isLoading: s.isLoading, errorMessage: s.errorMessage),
+      ),
+    );
+    final isSuccess = _isSignInSuccess;
 
     return Scaffold(
       backgroundColor: AppColors.bw900,
@@ -132,7 +150,15 @@ class _LoginPasswordPageState extends ConsumerState<LoginPasswordPage> {
                           : (state.errorMessage != null
                               ? AppTextInputStatus.error
                               : AppTextInputStatus.normal),
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) {
+                        if (ref.read(loginControllerProvider).errorMessage !=
+                            null) {
+                          ref
+                              .read(loginControllerProvider.notifier)
+                              .clearError();
+                        }
+                        setState(() {});
+                      },
                     ),
                     const SizedBox(height: 16),
                     Align(
@@ -293,97 +319,6 @@ class _LoginSuccessButton extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Confirmation dialog "Đặt lại mật khẩu?" ──────────────────────────────────
-
-class _ForgotPasswordDialog extends StatelessWidget {
-  const _ForgotPasswordDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: AppColors.bw800,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.pill),
-        side: BorderSide(color: AppColors.bw600.withValues(alpha: 0.5)),
-      ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 64),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Đặt lại mật khẩu?',
-              style: AppTextStyles.mdSemiBold.copyWith(color: AppColors.bw100),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Bạn sẽ nhận được một email kèm theo hướng dẫn để đặt lại mật khẩu của mình.',
-              style: AppTextStyles.smRegular.copyWith(color: AppColors.bw400),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: _DialogButton(
-                    label: 'Huỷ',
-                    textColor: AppColors.bw100,
-                    onTap: () => Navigator.of(context).pop(false),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: _DialogButton(
-                    label: 'Đặt lại',
-                    textColor: AppColors.error800,
-                    onTap: () => Navigator.of(context).pop(true),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DialogButton extends StatelessWidget {
-  const _DialogButton({
-    required this.label,
-    required this.textColor,
-    required this.onTap,
-  });
-
-  final String label;
-  final Color textColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: label,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 15),
-          decoration: BoxDecoration(
-            color: AppColors.bw700,
-            borderRadius: BorderRadius.circular(AppRadii.pill),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: AppTextStyles.smSemiBold.copyWith(color: textColor),
-          ),
-        ),
       ),
     );
   }

@@ -6,7 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_radii.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
-import 'package:meep/features/auth/application/login_controller.dart';
+import 'package:meep/core/validators/auth_validators.dart';
+import 'package:meep/features/auth/application/password_reset_controller.dart';
 import 'package:meep/shared/widgets/app_back_button.dart';
 import 'package:meep/shared/widgets/app_primary_button.dart';
 import 'package:meep/shared/widgets/app_text_input.dart';
@@ -32,31 +33,32 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
   void dispose() {
     _pwCtrl.dispose();
     _pwFocus.dispose();
-    // Clear state tránh leak sang LoginPasswordPage
-    ref.read(loginControllerProvider.notifier).resetResult();
+    // KHÔNG đụng `ref` trong dispose — router redirect có thể tear down element
+    // trước khi dispose chạy. Controller autoDispose sẽ tự reset state khi
+    // widget cuối cùng watch nó bị tháo.
     super.dispose();
   }
 
-  bool get _canSave => _pwCtrl.text.length >= 8;
+  bool get _canSave => AuthValidators.isPasswordValid(_pwCtrl.text);
 
   Future<void> _onSave() async {
-    await ref.read(loginControllerProvider.notifier).confirmPasswordReset(
+    await ref.read(passwordResetControllerProvider.notifier).confirmReset(
           oobCode: widget.oobCode,
           newPassword: _pwCtrl.text,
         );
     if (!mounted) return;
-    final controllerState = ref.read(loginControllerProvider);
+    final controllerState = ref.read(passwordResetControllerProvider);
     if (controllerState.errorMessage == null && !controllerState.isLoading) {
       setState(() => _isResetSuccess = true);
-      // Delay ngắn để user thấy "Đã thay đổi mật khẩu" trước khi vào app
-      await Future<void>.delayed(const Duration(milliseconds: 1000));
+      // Delay ngắn để user thấy trạng thái thành công trước khi vào app
+      await Future<void>.delayed(const Duration(milliseconds: 800));
       if (mounted) context.go('/home');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(loginControllerProvider);
+    final state = ref.watch(passwordResetControllerProvider);
 
     // Input status: dùng _isResetSuccess (local) thay state.isSuccess
     AppTextInputStatus inputStatus;
@@ -108,7 +110,17 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
                       hint: 'Mật khẩu mới',
                       errorText: state.errorMessage,
                       status: inputStatus,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) {
+                        if (ref
+                                .read(passwordResetControllerProvider)
+                                .errorMessage !=
+                            null) {
+                          ref
+                              .read(passwordResetControllerProvider.notifier)
+                              .clearError();
+                        }
+                        setState(() {});
+                      },
                     ),
                     if (_isResetSuccess) ...[
                       const SizedBox(height: 20),
@@ -122,7 +134,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
               padding: const EdgeInsets.fromLTRB(37, 0, 37, 33),
               child: _isResetSuccess
                   ? _PasswordSavedButton(
-                      onTap: () => context.go('/login/email'),
+                      onTap: () => context.go('/home'),
                     )
                   : AppPrimaryButton(
                       label: 'Lưu mật khẩu',

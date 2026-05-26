@@ -4,7 +4,7 @@ import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:meep/features/auth/application/auth_controller.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/application/login_controller.dart';
 import 'package:meep/features/auth/data/firebase_auth_repository.dart';
 import 'package:meep/features/auth/data/firebase_user_repository.dart';
@@ -160,6 +160,21 @@ void main() {
       expect(state.isSuccess, false);
     });
 
+    test('user huỷ Google picker → silent (no error, no success)', () async {
+      final mockGoogle = MockGoogleSignIn();
+      when(() => mockGoogle.signIn()).thenAnswer((_) async => null);
+      final container = makeContainer(googleSignIn: mockGoogle);
+      addTearDown(container.dispose);
+      await container
+          .read(loginControllerProvider.notifier)
+          .continueWithGoogle();
+      final state = container.read(loginControllerProvider);
+      expect(state.errorMessage, isNull);
+      expect(state.isLoading, false);
+      expect(state.isSuccess, false);
+      expect(state.needsProfile, false);
+    });
+
     test('user cũ (có profile) → isSuccess=true', () async {
       final mockAuth = MockFirebaseAuth(
         mockUser: MockUser(uid: 'uid-existing', email: 'existing@gmail.com'),
@@ -186,20 +201,6 @@ void main() {
           .read(loginControllerProvider.notifier)
           .continueWithGoogle();
       expect(container.read(loginControllerProvider).isSuccess, true);
-    });
-  });
-
-  group('LoginController — sendPasswordReset', () {
-    test('gửi reset email thành công', () async {
-      final container = makeContainer();
-      addTearDown(container.dispose);
-      container
-          .read(loginControllerProvider.notifier)
-          .setEmail('anyone@example.com');
-      await expectLater(
-        container.read(loginControllerProvider.notifier).sendPasswordReset(),
-        completes,
-      );
     });
   });
 }
