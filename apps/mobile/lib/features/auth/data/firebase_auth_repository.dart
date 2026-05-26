@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:meep/core/config/app_config.dart';
@@ -61,7 +63,8 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<void> signInWithGoogle() async {
     final googleUser = await _googleSignIn.signIn();
     if (googleUser == null) {
-      throw const UnauthenticatedError(message: 'Google Sign-In đã bị huỷ');
+      // User dismissed the account picker — silent no-op upstream.
+      throw const OperationCancelledError();
     }
     final googleAuth = await googleUser.authentication;
     final credential = GoogleAuthProvider.credential(
@@ -73,11 +76,6 @@ class FirebaseAuthRepository implements AuthRepository {
     } on FirebaseAuthException catch (e) {
       throw _mapSignInError(e);
     }
-  }
-
-  @override
-  Future<void> signInWithApple() async {
-    throw UnimplementedError('signInWithApple — iOS deferred post-MVP');
   }
 
   @override
@@ -123,8 +121,15 @@ class FirebaseAuthRepository implements AuthRepository {
   @override
   Future<bool> isEmailAvailable(String email) async {
     try {
-      // fetchSignInMethodsForEmail bị deprecate về mặt bảo mật (email enumeration)
-      // nhưng vẫn hoạt động nếu "Email Enumeration Protection" tắt trong Firebase Console.
+      // `fetchSignInMethodsForEmail` đã bị Firebase deprecate vì lý do
+      // anti-enumeration. Pre-check chỉ chính xác khi Firebase Console >
+      // Authentication > Settings > **Email Enumeration Protection** đang TẮT.
+      //
+      // Khi protection BẬT: method này luôn trả `true` (Firebase trả về []),
+      // duplicate email sẽ được phát hiện ở `createUserWithEmailAndPassword`
+      // (step cuối flow signup) qua mã `email-already-in-use`.
+      //
+      // Auth spec hiện tại giả định protection TẮT để UX báo lỗi sớm.
       // ignore: deprecated_member_use
       final methods = await _auth.fetchSignInMethodsForEmail(email);
       return methods.isEmpty;
@@ -134,7 +139,38 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> signOut() => _auth.signOut();
+  Future<void> signOut() async {
+    try {
+      await _auth.signOut();
+    } on FirebaseAuthException catch (e) {
+      throw _mapGenericError(e);
+    }
+    // Best-effort: clear Google session để account picker hiện lại lần sau.
+    // Không fail signOut nếu Google plugin throw (test env, không có Play
+    // Services, hoặc chưa từng signIn qua Google).
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {/* swallow */}
+  }
+
+  @override
+  Future<void> revalidateSession() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    try {
+      await user.reload().timeout(const Duration(seconds: 5));
+    } on FirebaseAuthException catch (e) {
+      if (_isSessionPermanentlyInvalid(e.code)) {
+        await signOut();
+      }
+      // else: transient (network-request-failed, internal-error, ...) → giữ
+      // session, ops sau sẽ retry hoặc fail explicit.
+    } on TimeoutException {
+      // Mạng chậm → giữ session, offline-friendly.
+    } catch (_) {
+      // Unknown — conservative, không signOut.
+    }
+  }
 
   @override
   Future<void> deleteCurrentUser() async {
@@ -195,4 +231,10 @@ class FirebaseAuthRepository implements AuthRepository {
           const NetworkError(message: 'Không có kết nối mạng'),
         _ => UnexpectedError(message: e.message ?? e.code, cause: e),
       };
+
+  static bool _isSessionPermanentlyInvalid(String code) =>
+      code == 'user-not-found' ||
+      code == 'user-disabled' ||
+      code == 'user-token-expired' ||
+      code == 'invalid-user-token';
 }

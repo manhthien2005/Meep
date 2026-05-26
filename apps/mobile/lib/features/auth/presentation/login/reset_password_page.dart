@@ -33,7 +33,9 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
   void dispose() {
     _pwCtrl.dispose();
     _pwFocus.dispose();
-    ref.read(passwordResetControllerProvider.notifier).resetState();
+    // KHÔNG đụng `ref` trong dispose — router redirect có thể tear down element
+    // trước khi dispose chạy. Controller autoDispose sẽ tự reset state khi
+    // widget cuối cùng watch nó bị tháo.
     super.dispose();
   }
 
@@ -108,7 +110,17 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
                       hint: 'Mật khẩu mới',
                       errorText: state.errorMessage,
                       status: inputStatus,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) {
+                        if (ref
+                                .read(passwordResetControllerProvider)
+                                .errorMessage !=
+                            null) {
+                          ref
+                              .read(passwordResetControllerProvider.notifier)
+                              .clearError();
+                        }
+                        setState(() {});
+                      },
                     ),
                     if (_isResetSuccess) ...[
                       const SizedBox(height: 20),

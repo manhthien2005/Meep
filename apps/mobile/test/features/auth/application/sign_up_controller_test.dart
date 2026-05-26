@@ -148,6 +148,71 @@ void main() {
     });
   });
 
+  group('SignUpController — createAccount (Google flow)', () {
+    test('isGoogleSignIn=true → KHÔNG gọi signUpWithEmail, chỉ createProfile',
+        () async {
+      // Mock Google user đã sign-in qua Firebase Auth (currentUser set)
+      final mockAuth = MockFirebaseAuth(
+        mockUser: MockUser(
+          uid: 'uid-google-new',
+          email: 'newuser@gmail.com',
+          displayName: 'Google User',
+        ),
+        signedIn: true,
+      );
+      // Nếu createUserWithEmailAndPassword bị gọi → test fail
+      whenCalling(Invocation.method(#createUserWithEmailAndPassword, null))
+          .on(mockAuth)
+          .thenThrow(
+            Exception('signUpWithEmail không được gọi trong Google flow'),
+          );
+      final fakeFirestore = FakeFirebaseFirestore();
+      final container = makeContainer(auth: mockAuth, firestore: fakeFirestore);
+      addTearDown(container.dispose);
+
+      // Simulate prefillFromGoogle + setDisplayName + checkUsername
+      final ctrl = container.read(signUpControllerProvider.notifier);
+      ctrl.prefillFromGoogle('Google User');
+      ctrl.setDisplayName('Google User');
+      await ctrl.checkUsername('googleuser');
+      expect(
+        container.read(signUpControllerProvider).isUsernameAvailable,
+        true,
+      );
+
+      await ctrl.createAccount();
+      final state = container.read(signUpControllerProvider);
+      expect(state.errorMessage, isNull);
+      expect(state.isLoading, false);
+
+      // Verify Firestore profile created với email lấy từ Firebase Auth user
+      final userDoc = await fakeFirestore.doc('users/uid-google-new').get();
+      expect(userDoc.exists, isTrue);
+      expect(userDoc.data()?['email'], 'newuser@gmail.com');
+      expect(userDoc.data()?['displayName'], 'Google User');
+    });
+
+    test(
+        'isGoogleSignIn=false + email/password trống (state corrupted) → fail rõ ràng, không leak Pigeon error',
+        () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      final ctrl = container.read(signUpControllerProvider.notifier);
+      // Bypass step machine: simulate state.isGoogleSignIn=false nhưng creds trống
+      container.read(signUpControllerProvider.notifier).state =
+          container.read(signUpControllerProvider).copyWith(
+                username: 'someuser',
+                isUsernameAvailable: true,
+                isGoogleSignIn: false,
+                // email và password vẫn ''
+              );
+      await ctrl.createAccount();
+      final state = container.read(signUpControllerProvider);
+      expect(state.errorMessage, contains('Thiếu thông tin'));
+      expect(state.isLoading, false);
+    });
+  });
+
   group('SignUpController — checkEmailAvailable', () {
     test('email chưa đăng ký → trả true + step=password', () async {
       // MockFirebaseAuth.fetchSignInMethodsForEmail trả [] (chưa đăng ký)

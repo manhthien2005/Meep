@@ -79,7 +79,15 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                       inputType: AppTextInputType.email,
                       controller: _emailCtrl,
                       hint: 'Địa chỉ email',
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) {
+                        if (ref.read(loginControllerProvider).errorMessage !=
+                            null) {
+                          ref
+                              .read(loginControllerProvider.notifier)
+                              .clearError();
+                        }
+                        setState(() {});
+                      },
                     ),
                     const SizedBox(height: 24),
                     const OrDivider(),

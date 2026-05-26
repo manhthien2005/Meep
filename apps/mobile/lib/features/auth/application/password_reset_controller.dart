@@ -26,11 +26,8 @@ class PasswordResetController extends _$PasswordResetController {
             email: email,
           );
       state = state.copyWith(isLoading: false);
-    } on AppError catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
-    } catch (_) {
-      state =
-          state.copyWith(isLoading: false, errorMessage: 'Đã có lỗi xảy ra');
+    } catch (e) {
+      state = _afterFailure(e);
     }
   }
 
@@ -49,11 +46,16 @@ class PasswordResetController extends _$PasswordResetController {
       // Auto-sign-in — đổi mật khẩu = đã xác thực email ownership
       await auth.signInWithEmail(email: email, password: newPassword);
       state = state.copyWith(isLoading: false);
-    } on AppError catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
-    } catch (_) {
-      state =
-          state.copyWith(isLoading: false, errorMessage: 'Đã có lỗi xảy ra');
+    } catch (e) {
+      state = _afterFailure(e);
     }
+  }
+
+  PasswordResetState _afterFailure(Object e) {
+    final err = AppError.fromUnknown(e);
+    return state.copyWith(
+      isLoading: false,
+      errorMessage: err is OperationCancelledError ? null : err.message,
+    );
   }
 }

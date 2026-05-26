@@ -164,7 +164,8 @@ void main() {
   });
 
   group('signInWithGoogle', () {
-    test('user huỷ Google Sign-In → UnauthenticatedError', () async {
+    test('user huỷ Google Sign-In → OperationCancelledError (silent)',
+        () async {
       final mockGoogle = MockGoogleSignIn();
       when(() => mockGoogle.signIn()).thenAnswer((_) async => null);
       final repoWithGoogle = FirebaseAuthRepository(
@@ -173,7 +174,7 @@ void main() {
       );
       await expectLater(
         repoWithGoogle.signInWithGoogle(),
-        throwsA(isA<UnauthenticatedError>()),
+        throwsA(isA<OperationCancelledError>()),
       );
     });
   });
@@ -221,6 +222,79 @@ void main() {
         ),
         throwsA(isA<AppError>()),
       );
+    });
+  });
+
+  group('revalidateSession', () {
+    test('no user → no-op', () async {
+      await expectLater(repo.revalidateSession(), completes);
+      expect(repo.currentUid, isNull);
+    });
+
+    test('reload thành công → giữ session', () async {
+      final authWithUser = MockFirebaseAuth(
+        mockUser: MockUser(uid: 'uid-1'),
+        signedIn: true,
+      );
+      final repoWithUser = FirebaseAuthRepository(auth: authWithUser);
+      await repoWithUser.revalidateSession();
+      expect(repoWithUser.currentUid, 'uid-1');
+    });
+
+    test('reload throws user-not-found → signOut', () async {
+      final mockUser = MockUser(uid: 'uid-deleted');
+      final authWithUser = MockFirebaseAuth(
+        mockUser: mockUser,
+        signedIn: true,
+      );
+      whenCalling(Invocation.method(#reload, null))
+          .on(mockUser)
+          .thenThrow(FirebaseAuthException(code: 'user-not-found'));
+      final repoWithUser = FirebaseAuthRepository(auth: authWithUser);
+      await repoWithUser.revalidateSession();
+      expect(repoWithUser.currentUid, isNull);
+    });
+
+    test('reload throws user-disabled → signOut', () async {
+      final mockUser = MockUser(uid: 'uid-disabled');
+      final authWithUser = MockFirebaseAuth(
+        mockUser: mockUser,
+        signedIn: true,
+      );
+      whenCalling(Invocation.method(#reload, null))
+          .on(mockUser)
+          .thenThrow(FirebaseAuthException(code: 'user-disabled'));
+      final repoWithUser = FirebaseAuthRepository(auth: authWithUser);
+      await repoWithUser.revalidateSession();
+      expect(repoWithUser.currentUid, isNull);
+    });
+
+    test('reload throws user-token-expired → signOut', () async {
+      final mockUser = MockUser(uid: 'uid-expired');
+      final authWithUser = MockFirebaseAuth(
+        mockUser: mockUser,
+        signedIn: true,
+      );
+      whenCalling(Invocation.method(#reload, null))
+          .on(mockUser)
+          .thenThrow(FirebaseAuthException(code: 'user-token-expired'));
+      final repoWithUser = FirebaseAuthRepository(auth: authWithUser);
+      await repoWithUser.revalidateSession();
+      expect(repoWithUser.currentUid, isNull);
+    });
+
+    test('reload throws network-request-failed → giữ session', () async {
+      final mockUser = MockUser(uid: 'uid-offline');
+      final authWithUser = MockFirebaseAuth(
+        mockUser: mockUser,
+        signedIn: true,
+      );
+      whenCalling(Invocation.method(#reload, null))
+          .on(mockUser)
+          .thenThrow(FirebaseAuthException(code: 'network-request-failed'));
+      final repoWithUser = FirebaseAuthRepository(auth: authWithUser);
+      await repoWithUser.revalidateSession();
+      expect(repoWithUser.currentUid, 'uid-offline');
     });
   });
 

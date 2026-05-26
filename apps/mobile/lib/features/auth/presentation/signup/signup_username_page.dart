@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -9,9 +10,26 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/core/validators/auth_validators.dart';
 import 'package:meep/features/auth/application/sign_up_controller.dart';
+import 'package:meep/features/auth/application/sign_up_state.dart';
 import 'package:meep/shared/widgets/app_back_button.dart';
 import 'package:meep/shared/widgets/app_primary_button.dart';
 import 'package:meep/shared/widgets/app_text_input.dart';
+
+/// Forces input to lowercase letters. Validation of allowed characters happens
+/// in [AuthValidators.isUsernameFormatValid] so users can paste full strings
+/// and see a clear error rather than silently dropped characters.
+class _LowerCaseFormatter extends TextInputFormatter {
+  const _LowerCaseFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final lower = newValue.text.toLowerCase();
+    return lower == newValue.text ? newValue : newValue.copyWith(text: lower);
+  }
+}
 
 class SignUpUsernamePage extends ConsumerStatefulWidget {
   const SignUpUsernamePage({super.key});
@@ -21,10 +39,14 @@ class SignUpUsernamePage extends ConsumerStatefulWidget {
 }
 
 class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
+  static const _debounceDuration = Duration(milliseconds: 500);
+
   final _usernameCtrl = TextEditingController();
+  Timer? _debounce;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _usernameCtrl.dispose();
     super.dispose();
   }
@@ -32,14 +54,34 @@ class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
   bool get _hasEnoughInput =>
       _usernameCtrl.text.trim().length >= AuthValidators.usernameMinLength;
 
-  // Flow: ấn "Tiếp tục" → check → nếu available → createAccount → navigate
-  Future<void> _onContinue() async {
-    final username = _usernameCtrl.text.trim();
-    await ref.read(signUpControllerProvider.notifier).checkUsername(username);
-    if (!mounted) return;
+  void _onUsernameChanged(String value) {
+    // Clear stale error ngay để user thấy phản hồi tức thì
+    ref.read(signUpControllerProvider.notifier).clearError();
+    setState(() {});
 
-    final state = ref.read(signUpControllerProvider);
-    if (!state.isUsernameAvailable) return; // UI shows error từ state
+    _debounce?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.length < AuthValidators.usernameMinLength) return;
+
+    _debounce = Timer(_debounceDuration, () {
+      if (!mounted) return;
+      unawaited(
+        ref.read(signUpControllerProvider.notifier).checkUsername(trimmed),
+      );
+    });
+  }
+
+  Future<void> _onContinue() async {
+    _debounce?.cancel();
+    final username = _usernameCtrl.text.trim();
+
+    // Nếu chưa kịp check (user tap trước khi debounce fire) → check ngay.
+    if (!ref.read(signUpControllerProvider).isUsernameAvailable ||
+        ref.read(signUpControllerProvider).username != username) {
+      await ref.read(signUpControllerProvider.notifier).checkUsername(username);
+      if (!mounted) return;
+      if (!ref.read(signUpControllerProvider).isUsernameAvailable) return;
+    }
 
     await ref.read(signUpControllerProvider.notifier).createAccount();
     if (!mounted) return;
@@ -54,17 +96,7 @@ class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
   Widget build(BuildContext context) {
     final state = ref.watch(signUpControllerProvider);
     final isBusy = state.isCheckingUsername || state.isLoading;
-
-    // Trạng thái input: chỉ show sau khi đã check (username đã được set vào state)
-    final hasChecked = state.username.isNotEmpty;
-    AppTextInputStatus inputStatus = AppTextInputStatus.normal;
-    if (hasChecked && !state.isCheckingUsername) {
-      if (!state.isUsernameAvailable || state.errorMessage != null) {
-        inputStatus = AppTextInputStatus.error;
-      } else {
-        inputStatus = AppTextInputStatus.success;
-      }
-    }
+    final inputStatus = _inputStatusFor(state);
 
     return Scaffold(
       backgroundColor: AppColors.bw900,
@@ -85,8 +117,9 @@ class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
                   children: [
                     Text(
                       'Chọn tên người dùng của bạn',
-                      style:
-                          AppTextStyles.xlBold.copyWith(color: AppColors.bw100),
+                      style: AppTextStyles.xlBold.copyWith(
+                        color: AppColors.bw100,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 20),
@@ -95,27 +128,13 @@ class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
                       controller: _usernameCtrl,
                       hint: 'Tên người dùng',
                       status: inputStatus,
-                      errorText: (hasChecked &&
-                              !state.isCheckingUsername &&
-                              !state.isUsernameAvailable)
-                          ? (state.errorMessage ??
-                              'Tên người dùng này đã tồn tại. Vui lòng chọn tên khác.')
-                          : null,
-                      onChanged: (_) => setState(() {}),
+                      errorText: _errorTextFor(state),
+                      inputFormatters: const [_LowerCaseFormatter()],
+                      maxLength: AuthValidators.usernameMaxLength,
+                      onChanged: _onUsernameChanged,
                     ),
                     const SizedBox(height: 20),
-                    if (hasChecked && !state.isCheckingUsername)
-                      if (state.isUsernameAvailable &&
-                          state.errorMessage == null)
-                        Center(child: _AvailablePill())
-                      else if (state.errorMessage != null &&
-                          state.isUsernameAvailable)
-                        // createAccount() failed (e.g. email đã dùng, mạng lỗi)
-                        _ErrorPill(message: state.errorMessage!)
-                      else
-                        _HintPill()
-                    else
-                      _HintPill(),
+                    _StatusPill(state: state),
                   ],
                 ),
               ),
@@ -133,9 +152,52 @@ class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
       ),
     );
   }
+
+  AppTextInputStatus _inputStatusFor(SignUpState state) {
+    if (state.username.isEmpty || state.isCheckingUsername) {
+      return AppTextInputStatus.normal;
+    }
+    if (state.errorMessage != null || !state.isUsernameAvailable) {
+      return AppTextInputStatus.error;
+    }
+    return AppTextInputStatus.success;
+  }
+
+  /// Lỗi inline dưới input — chỉ hiện khi user đã gõ và check đã chạy xong
+  /// với kết quả không khả dụng hoặc lỗi format / mạng.
+  String? _errorTextFor(SignUpState state) {
+    if (state.username.isEmpty || state.isCheckingUsername) return null;
+    if (state.isUsernameAvailable && state.errorMessage == null) return null;
+    return state.errorMessage ??
+        'Tên người dùng này đã tồn tại. Vui lòng chọn tên khác.';
+  }
+}
+
+/// Pill hiển thị dưới input — 3 nhánh: hint mặc định, available, error.
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.state});
+
+  final SignUpState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasChecked = state.username.isNotEmpty;
+    if (!hasChecked || state.isCheckingUsername) return const _HintPill();
+
+    if (state.isUsernameAvailable && state.errorMessage == null) {
+      return const Center(child: _AvailablePill());
+    }
+    if (state.errorMessage != null && state.isUsernameAvailable) {
+      // createAccount() failed (vd email đã dùng, mạng lỗi) — khác với "taken"
+      return _ErrorPill(message: state.errorMessage!);
+    }
+    return const _HintPill();
+  }
 }
 
 class _HintPill extends StatelessWidget {
+  const _HintPill();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -176,6 +238,8 @@ class _ErrorPill extends StatelessWidget {
 }
 
 class _AvailablePill extends StatelessWidget {
+  const _AvailablePill();
+
   @override
   Widget build(BuildContext context) {
     return Container(

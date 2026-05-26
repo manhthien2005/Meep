@@ -51,11 +51,8 @@ class LoginController extends _$LoginController {
             password: state.password,
           );
       state = state.copyWith(isLoading: false, isSuccess: true);
-    } on AppError catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
-    } catch (_) {
-      state =
-          state.copyWith(isLoading: false, errorMessage: 'Đã có lỗi xảy ra');
+    } catch (e) {
+      state = _afterFailure(e);
     }
   }
 
@@ -64,6 +61,7 @@ class LoginController extends _$LoginController {
   /// - User mới (no /users/{uid}) → prefill SignUpController + `needsProfile = true`
   ///   → router redirect tự chuyển về /signup/name (không navigate thủ công)
   /// - User cũ → `isSuccess = true` → UI navigate /home
+  /// - User huỷ Google picker → silent no-op (state.isLoading = false, no error)
   Future<void> continueWithGoogle() async {
     state = state.copyWith(
       isLoading: true,
@@ -86,11 +84,17 @@ class LoginController extends _$LoginController {
       } else {
         state = state.copyWith(isLoading: false, isSuccess: true);
       }
-    } on AppError catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
-    } catch (_) {
-      state =
-          state.copyWith(isLoading: false, errorMessage: 'Đã có lỗi xảy ra');
+    } catch (e) {
+      state = _afterFailure(e);
     }
+  }
+
+  /// Reset isLoading + map error to message (null for [OperationCancelledError]).
+  LoginState _afterFailure(Object e) {
+    final err = AppError.fromUnknown(e);
+    return state.copyWith(
+      isLoading: false,
+      errorMessage: err is OperationCancelledError ? null : err.message,
+    );
   }
 }

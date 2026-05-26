@@ -90,7 +90,12 @@ class _SignUpNamePageState extends ConsumerState<SignUpNamePage> {
                       controller: _hoCtrl,
                       hint: 'Họ',
                       status: AppTextInputStatus.normal,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) {
+                        ref
+                            .read(signUpControllerProvider.notifier)
+                            .clearError();
+                        setState(() {});
+                      },
                     ),
                     const SizedBox(height: 16),
                     AppTextInput(
@@ -101,7 +106,12 @@ class _SignUpNamePageState extends ConsumerState<SignUpNamePage> {
                       status: state.errorMessage != null
                           ? AppTextInputStatus.error
                           : AppTextInputStatus.normal,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) {
+                        ref
+                            .read(signUpControllerProvider.notifier)
+                            .clearError();
+                        setState(() {});
+                      },
                     ),
                   ],
                 ),

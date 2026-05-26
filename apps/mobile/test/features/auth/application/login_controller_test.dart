@@ -160,6 +160,21 @@ void main() {
       expect(state.isSuccess, false);
     });
 
+    test('user huỷ Google picker → silent (no error, no success)', () async {
+      final mockGoogle = MockGoogleSignIn();
+      when(() => mockGoogle.signIn()).thenAnswer((_) async => null);
+      final container = makeContainer(googleSignIn: mockGoogle);
+      addTearDown(container.dispose);
+      await container
+          .read(loginControllerProvider.notifier)
+          .continueWithGoogle();
+      final state = container.read(loginControllerProvider);
+      expect(state.errorMessage, isNull);
+      expect(state.isLoading, false);
+      expect(state.isSuccess, false);
+      expect(state.needsProfile, false);
+    });
+
     test('user cũ (có profile) → isSuccess=true', () async {
       final mockAuth = MockFirebaseAuth(
         mockUser: MockUser(uid: 'uid-existing', email: 'existing@gmail.com'),

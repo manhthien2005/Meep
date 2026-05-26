@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_radii.dart';
@@ -18,6 +19,8 @@ class AppTextInput extends StatefulWidget {
     this.errorText,
     this.hint,
     this.status = AppTextInputStatus.normal,
+    this.inputFormatters,
+    this.maxLength,
   });
 
   final AppTextInputType inputType;
@@ -27,6 +30,15 @@ class AppTextInput extends StatefulWidget {
   final String? errorText;
   final String? hint;
   final AppTextInputStatus status;
+
+  /// Optional input formatters (e.g. lowercase, allowlist) forwarded to the
+  /// underlying [TextField]. Use sparingly — prefer parent-side validation
+  /// when feasible.
+  final List<TextInputFormatter>? inputFormatters;
+
+  /// Optional max-length cap forwarded to the underlying [TextField]. The
+  /// built-in Material counter is suppressed (`counterText: ''`).
+  final int? maxLength;
 
   @override
   State<AppTextInput> createState() => _AppTextInputState();
@@ -115,6 +127,8 @@ class _AppTextInputState extends State<AppTextInput> {
             onChanged: widget.onChanged,
             keyboardType: _keyboardType(),
             obscureText: _isPassword && _obscure,
+            inputFormatters: widget.inputFormatters,
+            maxLength: widget.maxLength,
             style: AppTextStyles.mdSemiBold.copyWith(
               color: _effectiveStatus == AppTextInputStatus.error
                   ? AppColors.error700
@@ -132,6 +146,7 @@ class _AppTextInputState extends State<AppTextInput> {
               ),
               border: InputBorder.none,
               suffixIcon: _suffix(),
+              counterText: '',
             ),
           ),
         ),

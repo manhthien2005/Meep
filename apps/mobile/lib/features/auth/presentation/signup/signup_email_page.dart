@@ -103,7 +103,20 @@ class _SignUpEmailPageState extends ConsumerState<SignUpEmailPage> {
                       status: errorText != null
                           ? AppTextInputStatus.error
                           : AppTextInputStatus.normal,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) {
+                        // Clear cả signup error (email đã đăng ký) lẫn Google
+                        // sign-in error pill bên dưới khi user gõ lại.
+                        ref
+                            .read(signUpControllerProvider.notifier)
+                            .clearError();
+                        if (ref.read(loginControllerProvider).errorMessage !=
+                            null) {
+                          ref
+                              .read(loginControllerProvider.notifier)
+                              .clearError();
+                        }
+                        setState(() {});
+                      },
                     ),
                     const SizedBox(height: 24),
                     const OrDivider(),
