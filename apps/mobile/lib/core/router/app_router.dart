@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:meep/dev/widget_catalog_page.dart';
 import 'package:meep/features/auth/application/auth_controller.dart';
 import 'package:meep/features/auth/application/login_controller.dart';
 import 'package:meep/features/auth/presentation/intro_page.dart';
@@ -245,11 +244,6 @@ GoRouter appRouter(Ref ref) {
           return '/intro';
         },
         builder: (_, __) => const SizedBox.shrink(),
-      ),
-      // DEV ONLY — xóa trước khi merge
-      GoRoute(
-        path: '/dev/widgets',
-        builder: (_, __) => const WidgetCatalogPage(),
       ),
       GoRoute(path: '/diary', builder: (_, __) => const DiaryListScreen()),
       GoRoute(
