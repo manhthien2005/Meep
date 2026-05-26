@@ -74,6 +74,9 @@ dev_dependencies:
 
   # Lints
   flutter_lints: ^5.0.0
+
+  # Launcher icon generation
+  flutter_launcher_icons: ^0.14.3
   # NOTE: riverpod_lint + custom_lint are intentionally not pinned here.
   # Their version graph clashes with freezed v2 as of 2026-04. Re-add later
   # together with the matching versions, e.g.:
@@ -92,3 +95,9 @@ flutter:
     - family: Nunito
       fonts:
         - asset: assets/fonts/Nunito.ttf
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icons/ic_launcher_source.png"
+  min_sdk_android: 21
