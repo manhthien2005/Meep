@@ -97,28 +97,4 @@ class LoginController extends _$LoginController {
       errorMessage: err is OperationCancelledError ? null : err.message,
     );
   }
-
-  Future<void> confirmPasswordReset({
-    required String oobCode,
-    required String newPassword,
-  }) async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
-    try {
-      final auth = ref.read(authRepositoryProvider);
-      // Lấy email từ oobCode để auto-sign-in sau reset
-      final email = await auth.verifyPasswordResetCode(oobCode: oobCode);
-      await auth.confirmPasswordReset(
-        oobCode: oobCode,
-        newPassword: newPassword,
-      );
-      // Auto-sign-in — đổi mật khẩu = đã xác thực email ownership
-      await auth.signInWithEmail(email: email, password: newPassword);
-      state = state.copyWith(isLoading: false, isSuccess: true);
-    } on AppError catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
-    } catch (_) {
-      state =
-          state.copyWith(isLoading: false, errorMessage: 'Đã có lỗi xảy ra');
-    }
-  }
 }
