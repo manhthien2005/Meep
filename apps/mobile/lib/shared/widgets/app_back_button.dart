@@ -11,12 +11,15 @@ class AppBackButton extends StatelessWidget {
     return Semantics(
       label: 'Quay lại',
       button: true,
-      child: GestureDetector(
-        onTap: onPressed ?? () => Navigator.of(context).maybePop(),
-        child: SvgPicture.asset(
-          'assets/icons/ic_back.svg',
-          width: 40,
-          height: 40,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: GestureDetector(
+          onTap: onPressed ?? () => Navigator.of(context).maybePop(),
+          child: SvgPicture.asset(
+            'assets/icons/ic_back.svg',
+            width: 40,
+            height: 40,
+          ),
         ),
       ),
     );

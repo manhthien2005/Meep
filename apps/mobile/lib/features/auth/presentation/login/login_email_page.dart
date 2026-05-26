@@ -6,9 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
-import 'package:meep/features/auth/application/auth_controller.dart';
 import 'package:meep/features/auth/application/login_controller.dart';
-import 'package:meep/features/auth/application/sign_up_controller.dart';
 import 'package:meep/shared/widgets/app_back_button.dart';
 import 'package:meep/shared/widgets/app_google_button.dart';
 import 'package:meep/shared/widgets/app_primary_button.dart';
@@ -30,7 +28,8 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
     super.dispose();
   }
 
-  bool get _canContinue => _emailCtrl.text.trim().contains('@');
+  bool get _canContinue =>
+      RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$').hasMatch(_emailCtrl.text.trim());
 
   void _onContinue() {
     ref.read(loginControllerProvider.notifier).setEmail(_emailCtrl.text);
@@ -43,11 +42,8 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
     final state = ref.read(loginControllerProvider);
     if (state.isSuccess) {
       context.go('/home');
-    } else if (state.needsProfile) {
-      final email = ref.read(authRepositoryProvider).currentEmail ?? '';
-      ref.read(signUpControllerProvider.notifier).prefillFromGoogle(email);
-      unawaited(context.push('/signup/name'));
     }
+    // needsProfile → router tự redirect đến /signup/name
   }
 
   @override
@@ -82,10 +78,6 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                       inputType: AppTextInputType.email,
                       controller: _emailCtrl,
                       hint: 'Địa chỉ email',
-                      errorText: state.errorMessage,
-                      status: state.errorMessage != null
-                          ? AppTextInputStatus.error
-                          : AppTextInputStatus.normal,
                       onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 24),

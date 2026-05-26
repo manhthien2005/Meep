@@ -18,14 +18,33 @@ class SignUpPasswordPage extends ConsumerStatefulWidget {
 
 class _SignUpPasswordPageState extends ConsumerState<SignUpPasswordPage> {
   final _pwCtrl = TextEditingController();
+  final _pwFocus = FocusNode();
+  bool _hasBlurred = false;
+
+  void _onFocusChange() {
+    if (!_pwFocus.hasFocus && mounted) {
+      setState(() => _hasBlurred = true);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _pwFocus.addListener(_onFocusChange);
+  }
 
   @override
   void dispose() {
+    _pwFocus.removeListener(_onFocusChange);
+    _pwFocus.dispose();
     _pwCtrl.dispose();
     super.dispose();
   }
 
   bool get _canContinue => _pwCtrl.text.length >= 8;
+
+  bool get _showError =>
+      _hasBlurred && _pwCtrl.text.isNotEmpty && !_canContinue;
 
   void _onContinue() {
     ref.read(signUpControllerProvider.notifier).setPassword(_pwCtrl.text);
@@ -63,8 +82,15 @@ class _SignUpPasswordPageState extends ConsumerState<SignUpPasswordPage> {
                     AppTextInput(
                       inputType: AppTextInputType.password,
                       controller: _pwCtrl,
+                      focusNode: _pwFocus,
                       hint: 'Mật khẩu',
-                      status: AppTextInputStatus.normal,
+                      errorText:
+                          _showError ? 'Mật khẩu tối thiểu 8 ký tự.' : null,
+                      status: _showError
+                          ? AppTextInputStatus.error
+                          : _canContinue
+                              ? AppTextInputStatus.success
+                              : AppTextInputStatus.normal,
                       onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 16),

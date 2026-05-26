@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
@@ -20,50 +21,45 @@ class SignUpUsernamePage extends ConsumerStatefulWidget {
 
 class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
   final _usernameCtrl = TextEditingController();
-  Timer? _debounce;
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _usernameCtrl.dispose();
     super.dispose();
   }
 
-  bool get _canContinue {
-    final state = ref.read(signUpControllerProvider);
-    return state.isUsernameAvailable && !state.isCheckingUsername;
-  }
+  bool get _hasEnoughInput => _usernameCtrl.text.trim().length >= 3;
 
-  void _onUsernameChanged(String value) {
-    _debounce?.cancel();
-    if (value.trim().length < 3) return;
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        ref.read(signUpControllerProvider.notifier).checkUsername(value.trim());
-      }
-    });
-  }
-
+  // Flow: ấn "Tiếp tục" → check → nếu available → createAccount → navigate
   Future<void> _onContinue() async {
+    final username = _usernameCtrl.text.trim();
+    await ref.read(signUpControllerProvider.notifier).checkUsername(username);
+    if (!mounted) return;
+
+    final state = ref.read(signUpControllerProvider);
+    if (!state.isUsernameAvailable) return; // UI shows error từ state
+
     await ref.read(signUpControllerProvider.notifier).createAccount();
     if (!mounted) return;
-    final state = ref.read(signUpControllerProvider);
-    if (state.errorMessage == null && !state.isLoading) {
-      context.go('/home');
+    if (ref.read(signUpControllerProvider).errorMessage == null) {
+      // Delay 800ms để user thấy "Hoàn tất" trước khi redirect
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      if (mounted) context.go('/home');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(signUpControllerProvider);
-    final isAvailable = state.isUsernameAvailable;
-    final isChecking = state.isCheckingUsername;
-    final hasInput = _usernameCtrl.text.trim().length >= 3;
+    final isBusy = state.isCheckingUsername || state.isLoading;
 
+    // Trạng thái input: chỉ show sau khi đã check (username đã được set vào state)
+    final hasChecked = state.username.isNotEmpty;
     AppTextInputStatus inputStatus = AppTextInputStatus.normal;
-    if (hasInput && !isChecking) {
-      inputStatus =
-          isAvailable ? AppTextInputStatus.success : AppTextInputStatus.error;
+    if (hasChecked && !state.isCheckingUsername) {
+      inputStatus = state.isUsernameAvailable
+          ? AppTextInputStatus.success
+          : AppTextInputStatus.error;
     }
 
     return Scaffold(
@@ -89,44 +85,37 @@ class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
                           AppTextStyles.xlBold.copyWith(color: AppColors.bw100),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     AppTextInput(
                       inputType: AppTextInputType.username,
                       controller: _usernameCtrl,
                       hint: 'Tên người dùng',
                       status: inputStatus,
-                      errorText: (hasInput && !isChecking && !isAvailable)
-                          ? 'Tên người dùng đã được sử dụng'
+                      errorText: (hasChecked &&
+                              !state.isCheckingUsername &&
+                              !state.isUsernameAvailable)
+                          ? (state.errorMessage ??
+                              'Tên người dùng này đã tồn tại. Vui lòng chọn tên khác.')
                           : null,
-                      onChanged: (v) {
-                        setState(() {});
-                        _onUsernameChanged(v);
-                      },
+                      onChanged: (_) => setState(() {}),
                     ),
-                    const SizedBox(height: 16),
-                    if (hasInput && !isChecking && isAvailable)
-                      _AvailablePill()
+                    const SizedBox(height: 20),
+                    if (hasChecked &&
+                        !state.isCheckingUsername &&
+                        state.isUsernameAvailable)
+                      Center(child: _AvailablePill())
                     else
                       _HintPill(),
-                    if (state.errorMessage != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        state.errorMessage!,
-                        style: AppTextStyles.smSemiBold
-                            .copyWith(color: AppColors.error700),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
                   ],
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(27, 0, 27, 33),
+              padding: const EdgeInsets.fromLTRB(37, 0, 37, 33),
               child: AppPrimaryButton(
-                label: 'Tiếp tục',
-                isLoading: state.isLoading || isChecking,
-                onPressed: _canContinue ? _onContinue : null,
+                label: state.isUsernameAvailable ? 'Hoàn tất' : 'Tiếp tục',
+                isLoading: isBusy,
+                onPressed: (_hasEnoughInput && !isBusy) ? _onContinue : null,
               ),
             ),
           ],
@@ -165,13 +154,20 @@ class _AvailablePill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          SvgPicture.asset(
+            'assets/icons/ic_circle_check_big.svg',
+            width: 20,
+            height: 20,
+            colorFilter: const ColorFilter.mode(
+              AppColors.bw100,
+              BlendMode.srcIn,
+            ),
+          ),
+          const SizedBox(width: 15),
           Text(
             'Tuyệt vời!',
-            style:
-                AppTextStyles.smSemiBold.copyWith(color: AppColors.success700),
+            style: AppTextStyles.smSemiBold.copyWith(color: AppColors.bw100),
           ),
-          const SizedBox(width: 4),
-          const Icon(Icons.check, size: 14, color: AppColors.success700),
         ],
       ),
     );

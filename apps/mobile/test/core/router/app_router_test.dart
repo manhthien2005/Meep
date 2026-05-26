@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:meep/core/router/app_router.dart';
 
 void main() {
-  group('authRedirect — 3-state guard', () {
+  group('authRedirect — 5-state guard', () {
     // ── loading ──────────────────────────────────────────────
     test('isLoading → null (any location)', () {
       expect(
@@ -10,6 +10,7 @@ void main() {
           isLoading: true,
           uid: null,
           profileExists: null,
+          needsProfile: false,
           location: '/home',
         ),
         isNull,
@@ -19,6 +20,7 @@ void main() {
           isLoading: true,
           uid: 'u1',
           profileExists: true,
+          needsProfile: false,
           location: '/intro',
         ),
         isNull,
@@ -32,6 +34,7 @@ void main() {
           isLoading: false,
           uid: null,
           profileExists: null,
+          needsProfile: false,
           location: '/intro',
         ),
         isNull,
@@ -44,6 +47,7 @@ void main() {
           isLoading: false,
           uid: null,
           profileExists: null,
+          needsProfile: false,
           location: '/login/email',
         ),
         isNull,
@@ -56,6 +60,7 @@ void main() {
           isLoading: false,
           uid: null,
           profileExists: null,
+          needsProfile: false,
           location: '/signup/email',
         ),
         isNull,
@@ -68,6 +73,7 @@ void main() {
           isLoading: false,
           uid: null,
           profileExists: null,
+          needsProfile: false,
           location: '/home',
         ),
         '/intro',
@@ -80,6 +86,7 @@ void main() {
           isLoading: false,
           uid: null,
           profileExists: null,
+          needsProfile: false,
           location: '/profile',
         ),
         '/intro',
@@ -93,6 +100,7 @@ void main() {
           isLoading: false,
           uid: 'u1',
           profileExists: null,
+          needsProfile: false,
           location: '/home',
         ),
         isNull,
@@ -102,58 +110,106 @@ void main() {
           isLoading: false,
           uid: 'u1',
           profileExists: null,
+          needsProfile: false,
           location: '/intro',
         ),
         isNull,
       );
     });
 
-    // ── uid != null, no profile (Google Sign-In incomplete) ──
-    test('uid + no profile + /signup/name → null (stay)', () {
+    // ── uid != null, no profile, needsProfile=true (Google signup active) ──
+    test('uid + no profile + needsProfile + /signup/name → null (stay)', () {
       expect(
         authRedirect(
           isLoading: false,
           uid: 'u1',
           profileExists: false,
+          needsProfile: true,
           location: '/signup/name',
         ),
         isNull,
       );
     });
 
-    test('uid + no profile + /signup/username → null (stay)', () {
+    test('uid + no profile + needsProfile + /signup/username → null (stay)',
+        () {
       expect(
         authRedirect(
           isLoading: false,
           uid: 'u1',
           profileExists: false,
+          needsProfile: true,
           location: '/signup/username',
         ),
         isNull,
       );
     });
 
-    test('uid + no profile + /home → /signup/name', () {
+    test('uid + no profile + needsProfile + /home → /signup/name', () {
       expect(
         authRedirect(
           isLoading: false,
           uid: 'u1',
           profileExists: false,
+          needsProfile: true,
           location: '/home',
         ),
         '/signup/name',
       );
     });
 
-    test('uid + no profile + /intro → /signup/name', () {
+    test('uid + no profile + needsProfile + /intro → /signup/name', () {
       expect(
         authRedirect(
           isLoading: false,
           uid: 'u1',
           profileExists: false,
-          location: '/intro',
+          needsProfile: true,
+          location: '/signup/email',
         ),
         '/signup/name',
+      );
+    });
+
+    // ── uid != null, no profile, needsProfile=false (orphaned auth) ──
+    test('uid + no profile + !needsProfile + /intro → /intro (orphaned)', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: false,
+          needsProfile: false,
+          location: '/intro',
+        ),
+        '/intro',
+      );
+    });
+
+    test('uid + no profile + !needsProfile + /home → /intro (orphaned)', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: false,
+          needsProfile: false,
+          location: '/home',
+        ),
+        '/intro',
+      );
+    });
+
+    test(
+        'uid + no profile + !needsProfile + /signup/email → null (email signup active)',
+        () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: false,
+          needsProfile: false,
+          location: '/signup/email',
+        ),
+        isNull,
       );
     });
 
@@ -164,6 +220,7 @@ void main() {
           isLoading: false,
           uid: 'u1',
           profileExists: true,
+          needsProfile: false,
           location: '/home',
         ),
         isNull,
@@ -176,6 +233,7 @@ void main() {
           isLoading: false,
           uid: 'u1',
           profileExists: true,
+          needsProfile: false,
           location: '/profile',
         ),
         isNull,
@@ -188,6 +246,7 @@ void main() {
           isLoading: false,
           uid: 'u1',
           profileExists: true,
+          needsProfile: false,
           location: '/intro',
         ),
         '/home',
@@ -200,6 +259,7 @@ void main() {
           isLoading: false,
           uid: 'u1',
           profileExists: true,
+          needsProfile: false,
           location: '/signup/email',
         ),
         '/home',
@@ -212,6 +272,7 @@ void main() {
           isLoading: false,
           uid: 'u1',
           profileExists: true,
+          needsProfile: false,
           location: '/login/email',
         ),
         '/home',
@@ -224,6 +285,7 @@ void main() {
           isLoading: false,
           uid: 'u1',
           profileExists: true,
+          needsProfile: false,
           location: '/dev/widgets',
         ),
         '/home',

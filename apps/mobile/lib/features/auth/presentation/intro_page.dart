@@ -70,13 +70,13 @@ class _IntroPageState extends State<IntroPage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bw900,
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           // Beam với breathing opacity
           AnimatedBuilder(
             animation: _beamCtrl,
             builder: (_, __) => _Beam(
-              // 0.85 → 1.0 breathing (±8% opacity, barely noticeable but alive)
               opacity: 0.85 + 0.15 * _beamCtrl.value,
             ),
           ),
@@ -91,9 +91,13 @@ class _IntroPageState extends State<IntroPage> with TickerProviderStateMixin {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       // Figma: logo tại y=414/917 ≈ 45.1%
-                      SizedBox(height: h * 0.451),
+                      // Dùng flexible spacer tránh overflow màn hình nhỏ
+                      const Flexible(
+                        flex: 451,
+                        child: SizedBox.expand(),
+                      ),
 
-                      // Logo: entry stagger [0.10-0.60] + rotation after entry
+                      // Logo: entry stagger [0.10-0.60]
                       _stagger(
                         start: 0.10,
                         end: 0.60,
@@ -163,6 +167,10 @@ class _IntroPageState extends State<IntroPage> with TickerProviderStateMixin {
                           route: '/login/email',
                           width: 198,
                         ),
+                      ),
+                      const Flexible(
+                        flex: 60,
+                        child: SizedBox.expand(),
                       ),
                     ],
                   ),

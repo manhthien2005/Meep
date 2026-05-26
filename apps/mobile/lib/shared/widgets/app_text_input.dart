@@ -39,6 +39,10 @@ class _AppTextInputState extends State<AppTextInput> {
 
   bool get _isPassword => widget.inputType == AppTextInputType.password;
 
+  // Figma: password hint/icon dùng white 50%, các input khác dùng bw400
+  Color get _hintColor =>
+      _isPassword ? const Color(0x80FFFFFF) : AppColors.bw400;
+
   FocusNode get _focusNode => widget.focusNode ?? _internalFocus!;
 
   // Active overrides normal when focused; error/success take precedence
@@ -120,7 +124,7 @@ class _AppTextInputState extends State<AppTextInput> {
             decoration: InputDecoration(
               hintText: widget.hint ?? _defaultHint(),
               hintStyle: AppTextStyles.mdSemiBold.copyWith(
-                color: AppColors.bw400,
+                color: _hintColor,
               ),
               contentPadding: const EdgeInsets.symmetric(
                 vertical: 19,
@@ -152,7 +156,7 @@ class _AppTextInputState extends State<AppTextInput> {
       return IconButton(
         icon: Icon(
           _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-          color: AppColors.bw400,
+          color: const Color(0x80FFFFFF),
           size: 20,
         ),
         onPressed: () => setState(() => _obscure = !_obscure),

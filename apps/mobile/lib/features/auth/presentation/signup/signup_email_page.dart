@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
-import 'package:meep/features/auth/application/auth_controller.dart';
 import 'package:meep/features/auth/application/login_controller.dart';
 import 'package:meep/features/auth/application/sign_up_controller.dart';
 import 'package:meep/features/auth/application/sign_up_state.dart';
@@ -26,12 +25,22 @@ class _SignUpEmailPageState extends ConsumerState<SignUpEmailPage> {
   final _emailCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Clear stale login error (từ login attempt trước) khi vào trang signup
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(loginControllerProvider.notifier).clearError();
+    });
+  }
+
+  @override
   void dispose() {
     _emailCtrl.dispose();
     super.dispose();
   }
 
-  bool get _canContinue => _emailCtrl.text.trim().contains('@');
+  bool get _canContinue =>
+      RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$').hasMatch(_emailCtrl.text.trim());
 
   void _onContinue() {
     ref.read(signUpControllerProvider.notifier).setEmail(_emailCtrl.text);
@@ -44,20 +53,19 @@ class _SignUpEmailPageState extends ConsumerState<SignUpEmailPage> {
     final loginState = ref.read(loginControllerProvider);
     if (loginState.isSuccess) {
       context.go('/home');
-    } else if (loginState.needsProfile) {
-      final googleEmail = ref.read(authRepositoryProvider).currentEmail ?? '';
-      ref
-          .read(signUpControllerProvider.notifier)
-          .prefillFromGoogle(googleEmail);
-      unawaited(context.push('/signup/name'));
     }
+    // needsProfile → router tự redirect đến /signup/name (không navigate thủ công)
+    // error → hiện trong UI qua loginState.errorMessage
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(signUpControllerProvider);
+    final signUpState = ref.watch(signUpControllerProvider);
+    final loginState = ref.watch(loginControllerProvider);
     final errorText =
-        state.step == SignUpStep.email ? state.errorMessage : null;
+        signUpState.step == SignUpStep.email ? signUpState.errorMessage : null;
+    final googleError = loginState.errorMessage;
+    final isBusy = signUpState.isLoading || loginState.isLoading;
 
     return Scaffold(
       backgroundColor: AppColors.bw900,
@@ -97,9 +105,17 @@ class _SignUpEmailPageState extends ConsumerState<SignUpEmailPage> {
                     _Divider(),
                     const SizedBox(height: 24),
                     AppGoogleButton(
-                      onPressed:
-                          state.isLoading ? null : () => unawaited(_onGoogle()),
+                      onPressed: isBusy ? null : () => unawaited(_onGoogle()),
                     ),
+                    if (googleError != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        googleError,
+                        style: AppTextStyles.smSemiBold
+                            .copyWith(color: AppColors.error700),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -108,7 +124,7 @@ class _SignUpEmailPageState extends ConsumerState<SignUpEmailPage> {
               padding: const EdgeInsets.fromLTRB(27, 0, 27, 33),
               child: AppPrimaryButton(
                 label: 'Tiếp tục',
-                isLoading: state.isLoading,
+                isLoading: signUpState.isLoading,
                 onPressed: _canContinue ? _onContinue : null,
               ),
             ),

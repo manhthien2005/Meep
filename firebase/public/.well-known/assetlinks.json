@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "dev.meep.meep",
+      "sha256_cert_fingerprints": [
+        "94:C5:93:D7:DA:43:F0:E1:C8:E9:D7:0C:5C:7C:A4:76:44:FB:DC:96:66:1E:E6:18:AF:B6:A2:BB:6B:4B:9D:FC"
+      ]
+    }
+  }
+]

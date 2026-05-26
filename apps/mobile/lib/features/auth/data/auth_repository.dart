@@ -12,6 +12,9 @@ abstract class AuthRepository {
   /// Returns the currently signed-in user's email, or null.
   String? get currentEmail;
 
+  /// Returns the currently signed-in user's display name, or null.
+  String? get currentDisplayName;
+
   /// Stream of auth state — emits new uid (or null) on every change.
   Stream<String?> watchUid();
 
@@ -35,6 +38,15 @@ abstract class AuthRepository {
 
   /// Send a password reset email.
   Future<void> sendPasswordResetEmail({required String email});
+
+  /// Lấy email từ oobCode trước khi reset — dùng để auto-sign-in sau reset.
+  Future<String> verifyPasswordResetCode({required String oobCode});
+
+  /// Xác nhận reset mật khẩu với oobCode từ deep link email.
+  Future<void> confirmPasswordReset({
+    required String oobCode,
+    required String newPassword,
+  });
 
   /// Sign out the current user.
   Future<void> signOut();
