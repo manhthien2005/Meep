@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meep Dev Guide</title>
+<style>
+:root {
+  --bg:#ffffff; --bg-subtle:#f6f8fa; --bg-muted:#eaeef2;
+  --border:#d0d7de; --text:#1f2328; --text-secondary:#57606a; --text-muted:#8c959f;
+  --blue:#0969da; --blue-bg:#ddf4ff; --blue-border:#54aeff;
+  --green:#1a7f37; --green-bg:#dafbe1; --green-border:#4ac26b;
+  --red:#cf222e; --red-bg:#ffebe9; --red-border:#ff8182;
+  --yellow:#9a6700; --yellow-bg:#fff8c5; --yellow-border:#e3b341;
+  --purple:#8250df; --purple-bg:#fbefff; --purple-border:#c297ff;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;}
+
+/* HEADER */
+.header{background:#1f2328;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;}
+.logo{width:34px;height:34px;background:linear-gradient(135deg,#58a6ff,#bc8cff);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#fff;margin-right:12px;flex-shrink:0;}
+.header-left{display:flex;align-items:center;}
+.header-title{font-size:15px;font-weight:700;color:#fff;}
+.header-sub{font-size:11px;color:#8b949e;margin-top:1px;}
+.header-badge{background:rgba(63,185,80,.2);color:#3fb950;border:1px solid rgba(63,185,80,.4);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+
+/* TABS */
+.tabs{background:var(--bg);border-bottom:1px solid var(--border);padding:0 28px;display:flex;overflow-x:auto;}
+.tab{padding:12px 18px;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;font-size:13px;font-weight:500;white-space:nowrap;transition:color .15s;margin-bottom:-1px;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600;}
+
+/* LAYOUT */
+.content{max-width:1060px;margin:0 auto;padding:28px 24px;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+.page-title{font-size:20px;font-weight:700;margin-bottom:4px;}
+.page-desc{color:var(--text-secondary);font-size:14px;margin-bottom:24px;}
+
+/* TOOLTIP */
+.tip{border-bottom:1.5px dashed var(--blue);cursor:help;color:inherit;position:relative;display:inline-block;}
+.tip:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1f2328;color:#e6edf3;padding:7px 12px;border-radius:7px;font-size:12px;line-height:1.5;white-space:normal;width:260px;z-index:999;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.2);}
+.tip:hover::before{content:'';position:absolute;bottom:calc(100% + 1px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#1f2328;z-index:999;pointer-events:none;}
+
+/* BADGES */
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;}
+.b-blue{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);}
+.b-green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);}
+.b-red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);}
+.b-yellow{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-border);}
+.b-purple{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-border);}
+.b-gray{background:var(--bg-subtle);color:var(--text-secondary);border:1px solid var(--border);}
+
+/* PIPELINE */
+.pipeline{display:flex;gap:0;margin-bottom:24px;overflow-x:auto;padding-bottom:4px;}
+.pipe-step{flex:1;min-width:140px;background:var(--bg-subtle);border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .2s;position:relative;}
+.pipe-step+.pipe-step{margin-left:30px;}
+.pipe-step+.pipe-step::before{content:'→';position:absolute;left:-22px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:16px;pointer-events:none;}
+.pipe-step:hover{border-color:var(--blue);background:var(--blue-bg);}
+.pipe-step.active{border-color:var(--blue);background:var(--blue-bg);box-shadow:0 0 0 3px rgba(9,105,218,.1);}
+.pipe-num{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;}
+.pipe-icon{font-size:18px;margin-bottom:3px;}
+.pipe-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.pipe-hint{font-size:11px;color:var(--text-secondary);}
+
+/* DETAIL PANEL */
+.detail-panel{background:var(--bg);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;}
+.detail-content{display:none;padding:24px 28px;}
+.detail-content.active{display:block;}
+.detail-head{display:flex;align-items:center;gap:14px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.detail-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.detail-title{font-size:18px;font-weight:700;}
+.detail-sub{font-size:12px;color:var(--text-secondary);margin-top:2px;}
+
+/* STEPS */
+.steps{list-style:none;}
+.step-item{display:flex;gap:14px;margin-bottom:20px;}
+.step-num{width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.step-num.red{background:var(--red);}
+.step-num.green{background:var(--green);}
+.step-label{font-size:14px;font-weight:600;margin-bottom:4px;}
+.step-body{color:var(--text-secondary);font-size:13px;}
+
+/* TASK CARD */
+.task-card{background:var(--bg-subtle);border:1.5px solid var(--border);border-radius:10px;padding:16px 18px;margin:14px 0;}
+.task-id{font-size:12px;color:var(--blue);font-weight:700;font-family:monospace;margin-bottom:4px;}
+.task-name{font-size:15px;font-weight:700;margin-bottom:10px;}
+.task-meta{display:flex;flex-wrap:wrap;gap:6px;}
+
+/* CODE */
+.code-block{background:#1f2328;border:1px solid #30363d;border-radius:8px;padding:13px 44px 13px 16px;margin:8px 0;font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;position:relative;overflow-x:auto;}
+.code-block pre{margin:0;white-space:pre;color:#e6edf3;}
+.code-comment{color:#8b949e;}
+.copy-btn{position:absolute;top:8px;right:8px;background:#30363d;border:1px solid #484f58;color:#8b949e;padding:3px 10px;border-radius:5px;font-size:11px;cursor:pointer;transition:all .15s;font-family:inherit;}
+.copy-btn:hover{color:#e6edf3;border-color:#8b949e;}
+
+/* ALERTS */
+.alert{border-radius:8px;padding:12px 16px;margin:12px 0;font-size:13px;line-height:1.6;display:flex;gap:10px;align-items:flex-start;}
+.alert-icon{font-size:15px;flex-shrink:0;margin-top:1px;}
+.alert-blue{background:var(--blue-bg);border:1.5px solid var(--blue-border);color:#0550ae;}
+.alert-green{background:var(--green-bg);border:1.5px solid var(--green-border);color:#116329;}
+.alert-red{background:var(--red-bg);border:1.5px solid var(--red-border);color:#a40e26;}
+.alert-yellow{background:var(--yellow-bg);border:1.5px solid var(--yellow-border);color:#7d4e00;}
+
+/* CHECKLIST */
+.checklist{list-style:none;}
+.checklist li{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--bg-muted);font-size:13px;color:var(--text-secondary);}
+.checklist li:last-child{border-bottom:none;}
+.checklist li input{margin-top:3px;flex-shrink:0;accent-color:var(--green);cursor:pointer;width:15px;height:15px;}
+.checklist li label{cursor:pointer;line-height:1.5;}
+.checklist li.done label{text-decoration:line-through;color:var(--text-muted);}
+
+/* BLOCKER */
+.blocker{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:7px;font-size:12px;font-weight:500;margin-bottom:5px;}
+.blocker-ok{background:var(--green-bg);border:1px solid var(--green-border);color:var(--green);}
+.blocker-fail{background:var(--red-bg);border:1px solid var(--red-border);color:var(--red);}
+
+/* DO/DON'T GRID */
+.dod-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0 20px;}
+.dod-card{border-radius:10px;overflow:hidden;border:1.5px solid;}
+.dod-card.do{border-color:var(--green-border);}
+.dod-card.dont{border-color:var(--red-border);}
+.dod-header{padding:10px 16px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:7px;}
+.do .dod-header{background:var(--green-bg);color:var(--green);}
+.dont .dod-header{background:var(--red-bg);color:var(--red);}
+.dod-body{padding:12px 16px;background:var(--bg-subtle);}
+.dod-item{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--text-secondary);padding:5px 0;border-bottom:1px solid var(--border);}
+.dod-item:last-child{border-bottom:none;}
+.dod-dot{flex-shrink:0;margin-top:6px;width:6px;height:6px;border-radius:50%;}
+.do .dod-dot{background:var(--green);}
+.dont .dod-dot{background:var(--red);}
+
+/* RULES ACCORDION */
+.rule-group{margin-bottom:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;}
+.rule-head{padding:14px 18px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:14px;background:var(--bg-subtle);transition:background .15s;user-select:none;}
+.rule-head:hover{background:var(--bg-muted);}
+.rule-body{border-top:1px solid var(--border);padding:20px;display:none;}
+.rule-body.open{display:block;}
+.chevron{transition:transform .2s;display:inline-block;color:var(--text-muted);}
+.chevron.open{transform:rotate(180deg);}
+
+/* RULE SECTIONS */
+.rule-section{margin-bottom:20px;}
+.rule-section:last-child{margin-bottom:0;}
+.rule-section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid;}
+.rst-green{color:var(--green);border-color:var(--green-border);}
+.rst-red{color:var(--red);border-color:var(--red-border);}
+.rst-blue{color:var(--blue);border-color:var(--blue-border);}
+.rule-item{display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;font-size:13px;}
+.rule-item:last-child{margin-bottom:0;}
+.ri{flex-shrink:0;font-size:15px;margin-top:1px;}
+
+/* DOD LIST */
+.dod-steps{counter-reset:dod;list-style:none;}
+.dod-steps li{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--bg-muted);font-size:13px;color:var(--text-secondary);counter-increment:dod;}
+.dod-steps li:last-child{border-bottom:none;}
+.dod-steps li::before{content:counter(dod);min-width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+
+/* COMMANDS */
+.cmd-section{margin-bottom:28px;}
+.cmd-section-title{font-size:13px;font-weight:700;margin-bottom:12px;padding:8px 14px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;}
+.cmd-label{font-size:12px;color:var(--text-secondary);margin-bottom:4px;font-weight:500;margin-top:10px;}
+
+/* FIGMA SECTION */
+.figma-section{background:var(--purple-bg);border:1.5px solid var(--purple-border);border-radius:12px;padding:20px 24px;margin:24px 0;}
+.figma-section-title{font-size:15px;font-weight:700;color:var(--purple);margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+.figma-section-sub{font-size:13px;color:var(--text-secondary);margin-bottom:16px;}
+.figma-steps{list-style:none;}
+.figma-step{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px;}
+.figma-dot{width:28px;height:28px;border-radius:50%;background:var(--purple);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.figma-label{font-size:13px;font-weight:600;margin-bottom:2px;}
+.figma-body{font-size:13px;color:var(--text-secondary);}
+.figma-note{background:var(--yellow-bg);border:1px solid var(--yellow-border);border-radius:7px;padding:10px 14px;font-size:12.5px;color:#7d4e00;margin-top:12px;}
+
+/* STUB EXAMPLE */
+.stub-example{background:var(--bg-subtle);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin:12px 0;}
+.stub-header{background:var(--bg-muted);padding:8px 16px;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);}
+.stub-body{padding:0;}
+
+/* DAILY CHECK-IN */
+.checkin-card{background:var(--blue-bg);border:1.5px solid var(--blue-border);border-radius:10px;padding:16px 20px;margin-top:12px;}
+.checkin-title{font-size:13px;font-weight:700;color:var(--blue);margin-bottom:10px;}
+.checkin-line{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;font-size:13px;}
+.checkin-label{font-weight:700;color:var(--text);min-width:80px;flex-shrink:0;}
+.checkin-val{color:var(--text-secondary);}
+
+/* COLLAPSIBLE */
+.collapsible-btn{display:flex;align-items:center;gap:8px;background:none;border:1.5px solid var(--border);border-radius:8px;padding:10px 16px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;color:var(--text);width:100%;text-align:left;margin-bottom:0;background:var(--bg-subtle);transition:background .15s;}
+.collapsible-btn:hover{background:var(--bg-muted);}
+.collapsible-content{display:none;padding-top:12px;}
+.collapsible-content.open{display:block;}
+
+/* KANBAN */
+.sim-wrap{background:var(--bg-subtle);border:1.5px solid var(--border);border-radius:12px;padding:20px 24px;margin-top:24px;}
+.sim-header{font-size:13px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;}
+.kanban{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;}
+.k-col{flex:1;min-width:148px;}
+.k-col-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;border-radius:6px;margin-bottom:10px;display:inline-block;}
+.k-backlog .k-col-title{background:var(--bg-muted);color:var(--text-secondary);}
+.k-progress .k-col-title{background:var(--blue-bg);color:var(--blue);}
+.k-review .k-col-title{background:var(--yellow-bg);color:var(--yellow);}
+.k-done .k-col-title{background:var(--green-bg);color:var(--green);}
+.k-card{background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;display:none;transition:border-color .3s,box-shadow .3s;}
+.k-card.visible{display:block;}
+.k-card.active{border-color:var(--blue);box-shadow:0 2px 8px rgba(9,105,218,.15);}
+.k-card.done-card{border-color:var(--green);box-shadow:0 2px 8px rgba(26,127,55,.15);}
+.kc-id{color:var(--blue);font-weight:700;font-family:monospace;margin-bottom:3px;}
+.kc-name{font-weight:600;color:var(--text);margin-bottom:7px;line-height:1.4;}
+.sim-actions{display:flex;gap:10px;margin-top:16px;align-items:center;flex-wrap:wrap;}
+.btn{padding:8px 18px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid;transition:all .15s;font-family:inherit;}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue);}
+.btn-primary:hover{background:#0860ca;}
+.btn-ghost{background:var(--bg);color:var(--text-secondary);border-color:var(--border);}
+.btn-ghost:hover{border-color:var(--blue);color:var(--blue);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.sim-status{font-size:12px;color:var(--text-secondary);font-style:italic;}
+
+code{background:var(--bg-muted);color:var(--text);padding:1px 6px;border-radius:4px;font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;border:1px solid var(--border);}
+.divider{border:none;border-top:1px solid var(--border);margin:20px 0;}
+
+@media(max-width:700px){
+  .dod-grid{grid-template-columns:1fr;}
+  .pipeline{flex-direction:column;}
+  .pipe-step+.pipe-step{margin-left:0;margin-top:24px;}
+  .pipe-step+.pipe-step::before{left:50%;top:-18px;transform:translateX(-50%) rotate(90deg);}
+  .content{padding:16px;}
+  .tip:hover::after{width:200px;left:0;transform:none;}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">M</div>
+    <div>
+      <div class="header-title">Meep Dev Guide</div>
+      <div class="header-sub">Hướng dẫn workflow · Solo-dev model</div>
+    </div>
+  </div>
+  <div class="header-badge">M2 → M3 · Demo 9/6</div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('workflow')">🗺️ Luồng làm việc</div>
+  <div class="tab" onclick="switchTab('rules')">📐 Quy tắc</div>
+  <div class="tab" onclick="switchTab('commands')">⚡ Lệnh nhanh</div>
+</div>
+
+<div class="content">
+
+<!-- ══════════════════════════════════════
+     TAB 1: WORKFLOW
+══════════════════════════════════════ -->
+<div class="tab-panel active" id="tab-workflow">
+
+  <div class="page-title">Hành trình của một task</div>
+  <div class="page-desc">Nhấn vào từng bước để xem hướng dẫn chi tiết. Làm đúng thứ tự, không bỏ bước.</div>
+
+  <!-- PIPELINE -->
+  <div class="pipeline">
+    <div class="pipe-step active" onclick="selectStep(0)">
+      <div class="pipe-num">Bước 1</div><div class="pipe-icon">📋</div>
+      <div class="pipe-name">Nhận task</div><div class="pipe-hint">Đọc GitHub issue</div>
+    </div>
+    <div class="pipe-step" onclick="selectStep(1)">
+      <div class="pipe-num">Bước 2</div><div class="pipe-icon">⚡</div>
+      <div class="pipe-name">/start</div><div class="pipe-hint">Kick-off + tạo branch</div>
+    </div>
+    <div class="pipe-step" onclick="selectStep(2)">
+      <div class="pipe-num">Bước 3</div><div class="pipe-icon">⌨️</div>
+      <div class="pipe-name">Viết code</div><div class="pipe-hint">FE trước, BE sau</div>
+    </div>
+    <div class="pipe-step" onclick="selectStep(3)">
+      <div class="pipe-num">Bước 4</div><div class="pipe-icon">🔍</div>
+      <div class="pipe-name">/review + PR</div><div class="pipe-hint">Self-review → nộp</div>
+    </div>
+    <div class="pipe-step" onclick="selectStep(4)">
+      <div class="pipe-num">Bước 5</div><div class="pipe-icon">✅</div>
+      <div class="pipe-name">Done</div><div class="pipe-hint">Merged vào develop</div>
+    </div>
+  </div>
+
+  <!-- DETAIL PANEL -->
+  <div class="detail-panel">
+
+    <!-- STEP 0: NHẬN TASK -->
+    <div class="detail-content active" id="detail-0">
+      <div class="detail-head">
+        <div class="detail-icon" style="background:var(--bg-muted)">📋</div>
+        <div>
+          <div class="detail-title">Nhận task từ GitHub</div>
+          <div class="detail-sub">Trạng thái: <span class="badge b-gray">Backlog</span> — task chưa ai làm</div>
+        </div>
+      </div>
+
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px;">Ví dụ task được giao</div>
+      <div class="task-card">
+        <div class="task-id">#111</div>
+        <div class="task-name">[Profile] T3+4 — ProfileScreen + PhotoGrid + PhotoDetailScreen</div>
+        <div class="task-meta">
+          <span class="badge b-purple">profile</span>
+          <span class="badge b-blue">M · ~1 ngày</span>
+          <span class="badge b-gray">HanDHG</span>
+          <span class="badge b-yellow">M2</span>
+        </div>
+      </div>
+
+      <div style="font-weight:700;font-size:13px;margin:16px 0 10px;">Trước khi bắt đầu, đọc và kiểm tra:</div>
+      <ul class="checklist">
+        <li><input type="checkbox" id="c0a" onchange="chk(this)"><label for="c0a"><strong>Acceptance criteria</strong> — "done là gì" phải đo được, không mơ hồ</label></li>
+        <li><input type="checkbox" id="c0b" onchange="chk(this)"><label for="c0b">Issue có ghi <strong>"blocked by #X"</strong> không? Nếu có → kiểm tra task đó đã xong chưa</label></li>
+        <li><input type="checkbox" id="c0c" onchange="chk(this)"><label for="c0c">Task được assign cho mình, đúng module mình phụ trách</label></li>
+      </ul>
+
+      <div class="alert alert-blue" style="margin-top:16px;">
+        <span class="alert-icon">💡</span>
+        <span>Đã hiểu rõ task → mở Claude Code → gõ <strong>/start 111</strong> để bắt đầu.</span>
+      </div>
+    </div>
+
+    <!-- STEP 1: /START -->
+    <div class="detail-content" id="detail-1">
+      <div class="detail-head">
+        <div class="detail-icon" style="background:var(--blue-bg)">⚡</div>
+        <div>
+          <div class="detail-title">Chạy /start — Claude Code làm giúp</div>
+          <div class="detail-sub">Trạng thái chuyển sang <span class="badge b-blue">In Progress</span></div>
+        </div>
+      </div>
+
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">
+        Gõ <code>/start 111</code> trong Claude Code. Claude tự động kiểm tra và chuẩn bị:
+      </p>
+
+      <ul class="steps">
+        <li class="step-item">
+          <div class="step-num">1</div>
+          <div>
+            <div class="step-label">Đọc reference architecture</div>
+            <div class="step-body">Nếu đây là module đầu tiên → Claude đọc chuẩn auth module làm baseline pattern.</div>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-num">2</div>
+          <div>
+            <div class="step-label">Fetch thông tin issue, đọc <span class="tip" data-tip="Contract = tập hợp freezed models + abstract interfaces + stub providers mà leader đã tạo sẵn. Dev chỉ implement, không đổi contract.">contract</span></div>
+            <div class="step-body">Đọc acceptance criteria, files được phép chạm, <span class="tip" data-tip="Freezed model = class Dart được tự động tạo code (copyWith, toJson, equality). Không sửa tay — sửa file .dart gốc rồi chạy build_runner.">freezed model</span>, <span class="tip" data-tip="Stub provider = placeholder tạm thời ném lỗi UnimplementedError. Dev BE sẽ thay bằng implementation thật sau.">stub provider</span>.</div>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-num">3</div>
+          <div>
+            <div class="step-label">Kiểm tra blockers</div>
+            <div class="step-body" style="margin-bottom:8px;">Nếu task chặn còn mở → Claude báo dừng ngay.</div>
+            <div class="blocker blocker-ok">✅ #109 FirebaseProfileRepository — Đã xong</div>
+            <div class="blocker blocker-ok">✅ #110 ProfileController — Đã xong</div>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-num">4</div>
+          <div>
+            <div class="step-label">Tạo <span class="tip" data-tip="Branch = nhánh code riêng của bạn. Làm trên branch → không ảnh hưởng code người khác cho đến khi merge.">branch</span> từ develop</div>
+            <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>git checkout -b feature/HanDHG/profile-screen origin/develop</pre></div>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-num green">5</div>
+          <div>
+            <div class="step-label">Cập nhật GitHub Project → In Progress</div>
+            <div class="step-body">/start in summary xanh hết → gõ <strong>/build</strong> để bắt đầu code.</div>
+          </div>
+        </li>
+      </ul>
+
+      <div class="alert alert-red">
+        <span class="alert-icon">🚫</span>
+        <span><strong>Nếu /start báo blocker còn mở → DỪNG.</strong> Ping leader trên issue, chờ. Không tự code vượt blocker.</span>
+      </div>
+    </div>
+
+    <!-- STEP 2: CODE -->
+    <div class="detail-content" id="detail-2">
+      <div class="detail-head">
+        <div class="detail-icon" style="background:var(--blue-bg)">⌨️</div>
+        <div>
+          <div class="detail-title">Viết code — FE trước, BE sau</div>
+          <div class="detail-sub">Trạng thái: <span class="badge b-blue">In Progress</span></div>
+        </div>
+      </div>
+
+      <div class="dod-grid">
+        <div class="dod-card do">
+          <div class="dod-header">✅ Được làm</div>
+          <div class="dod-body">
+            <div class="dod-item"><span class="dod-dot"></span><span>Sửa file trong <code>presentation/</code> của module mình</span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Dùng <span class="tip" data-tip="Stub provider trả mock data đúng type để UI chạy được khi BE chưa xong. Xem ví dụ bên dưới.">stub provider</span> có sẵn (trả mock data typed)</span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Tạo file <code>presentation/</code> mới nếu chưa có stub</span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Dùng <span class="tip" data-tip="Freezed model = class Dart đã được generate. Không sửa trực tiếp — mọi field đã được leader định nghĩa sẵn.">freezed model</span> có sẵn để hiển thị UI</span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Commit thường xuyên theo tiến độ</span></div>
+          </div>
+        </div>
+        <div class="dod-card dont">
+          <div class="dod-header">🚫 Không được làm</div>
+          <div class="dod-body">
+            <div class="dod-item"><span class="dod-dot"></span><span>Sửa <span class="tip" data-tip="Freezed model là hợp đồng chung. Sửa sai → break code người khác ngay lập tức.">freezed model</span> hoặc <span class="tip" data-tip="Abstract interface = file định nghĩa tên method mà repository phải implement. VD: Future<UserProfile> getProfile(String uid). Signature này không được đổi.">abstract interface</span></span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Dùng <code>Map&lt;String,dynamic&gt;</code> làm mock data</span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Chạm vào file trong module người khác</span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Tự thêm package vào <code>pubspec.yaml</code></span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Sửa code trong <code>core/</code>, <code>shared/</code></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STUB EXAMPLE -->
+      <button class="collapsible-btn" onclick="toggleCollapse(this)" style="margin-bottom:12px;">
+        <span>💡 Stub provider trông như thế nào? (click xem ví dụ)</span>
+        <span class="chevron" style="margin-left:auto;">▼</span>
+      </button>
+      <div class="collapsible-content">
+        <div class="stub-example">
+          <div class="stub-header">❌ Sai — hardcode Map không có type</div>
+          <div class="stub-body">
+            <div class="code-block" style="margin:0;border-radius:0;border:none;border-bottom:1px solid #30363d;"><pre><span class="code-comment">// Không biết field nào tồn tại, type là gì</span>
+final user = {'name': 'Thien', 'avatar': 'url'};</pre></div>
+          </div>
+        </div>
+        <div class="stub-example" style="margin-top:10px;">
+          <div class="stub-header">✅ Đúng — dùng FakeRepository implement đúng interface</div>
+          <div class="stub-body">
+            <div class="code-block" style="margin:0;border-radius:0;border:none;"><button class="copy-btn" onclick="cp(this)">Copy</button><pre><span class="code-comment">// Tạo class fake implement đúng interface</span>
+class FakeProfileRepository implements ProfileRepository {
+  @override
+  Future&lt;UserProfile&gt; getProfile(String uid) async =&gt; UserProfile(
+    uid: 'mock-uid',
+    displayName: 'Thien PDM',
+    avatarUrl: null,       <span class="code-comment">// nullable → UI phải handle</span>
+    createdAt: DateTime.now(),
+  );
+}
+
+<span class="code-comment">// Override provider trong main.dart (dev mode)</span>
+ProviderScope(
+  overrides: [
+    profileRepositoryProvider.overrideWithValue(FakeProfileRepository()),
+  ],
+)</pre></div>
+          </div>
+        </div>
+        <div class="alert alert-blue" style="margin-top:8px;margin-bottom:0;">
+          <span class="alert-icon">ℹ️</span>
+          <span>Khi BE xong, chỉ cần bỏ override → provider tự dùng <code>FirebaseProfileRepository</code> thật. UI không cần sửa gì.</span>
+        </div>
+      </div>
+
+      <!-- MISSING FIELD -->
+      <div style="font-weight:700;font-size:13px;margin:20px 0 10px;">Khi Figma cần field chưa có trong model:</div>
+      <ul class="steps">
+        <li class="step-item">
+          <div class="step-num red">!</div>
+          <div>
+            <div class="step-label">DỪNG — không tự thêm vào model</div>
+            <div class="step-body">Thêm comment và dùng placeholder đúng type tạm:</div>
+            <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre><span class="code-comment">// TODO(P/T3/HanDHG): cần field `coverPhotoUrl` trong UserProfile</span>
+final coverPhoto = ''; <span class="code-comment">// placeholder — chờ leader update model</span></pre></div>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-num">2</div>
+          <div>
+            <div class="step-label">Comment vào GitHub issue, ping leader</div>
+            <div class="step-body">Ghi rõ: tên field, kiểu dữ liệu, model nào cần thêm. Trong lúc chờ → làm tiếp phần UI khác.</div>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-num green">3</div>
+          <div>
+            <div class="step-label">Leader merge contract mới → pull về → wire tiếp</div>
+          </div>
+        </li>
+      </ul>
+
+      <div class="alert alert-yellow">
+        <span class="alert-icon">⚠️</span>
+        <span>Commit message phải tiếng Việt: <code>feat(profile): implement ProfileScreen layout theo Figma</code></span>
+      </div>
+    </div>
+
+    <!-- STEP 3: REVIEW + PR -->
+    <div class="detail-content" id="detail-3">
+      <div class="detail-head">
+        <div class="detail-icon" style="background:var(--yellow-bg)">🔍</div>
+        <div>
+          <div class="detail-title">Self-review + Tạo PR</div>
+          <div class="detail-sub">Trạng thái chuyển sang <span class="badge b-yellow">Review</span></div>
+        </div>
+      </div>
+
+      <div class="alert alert-red" style="margin-bottom:20px;">
+        <span class="alert-icon">🚫</span>
+        <span><strong>Thứ tự bắt buộc:</strong> code → <code>/review</code> → fix → <span class="tip" data-tip="PR (Pull Request) = yêu cầu merge code của mình vào develop, qua review của leader. Tạo trên GitHub.">PR</span>. Không tạo PR trước khi /review sạch.</span>
+      </div>
+
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px;">Chạy theo thứ tự này:</div>
+      <ul class="checklist">
+        <li><input type="checkbox" id="c3a" onchange="chk(this)"><label for="c3a">Chạy <code>flutter analyze</code> — phải <strong>0 errors</strong></label></li>
+        <li><input type="checkbox" id="c3b" onchange="chk(this)"><label for="c3b">Chạy <code>flutter test</code> — phải <strong>0 failures</strong></label></li>
+        <li><input type="checkbox" id="c3c" onchange="chk(this)"><label for="c3c">Chạy <code>dart format .</code> — clean</label></li>
+        <li><input type="checkbox" id="c3d" onchange="chk(this)"><label for="c3d">Chạy <code>/review</code> trong Claude Code → fix hết ghi chú</label></li>
+        <li><input type="checkbox" id="c3e" onchange="chk(this)"><label for="c3e">Không có màu hardcode — dùng <code>AppColors</code> / theme token</label></li>
+        <li><input type="checkbox" id="c3f" onchange="chk(this)"><label for="c3f">Không có <code>Map&lt;String,dynamic&gt;</code> mock data còn sót</label></li>
+        <li><input type="checkbox" id="c3g" onchange="chk(this)"><label for="c3g">Có ít nhất 1 <span class="tip" data-tip="Widget test = test kiểm tra UI render đúng không, không cần chạy app thật. Nhanh hơn và ổn định hơn chạy tay.">widget test</span> cho màn hình chính</label></li>
+      </ul>
+
+      <div style="font-weight:700;font-size:13px;margin:18px 0 8px;">Tạo PR:</div>
+      <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>gh pr create --base develop</pre></div>
+      <p style="font-size:13px;color:var(--text-secondary);margin-top:8px;">Trong phần mô tả PR, ghi <code>Closes #111</code> để issue tự đóng khi merge.</p>
+    </div>
+
+    <!-- STEP 4: DONE -->
+    <div class="detail-content" id="detail-4">
+      <div class="detail-head">
+        <div class="detail-icon" style="background:var(--green-bg)">✅</div>
+        <div>
+          <div class="detail-title">Done — Task hoàn thành!</div>
+          <div class="detail-sub">Trạng thái: <span class="badge b-green">Done</span> · Merged vào <span class="tip" data-tip="develop = branch tích hợp chung. Tất cả feature branches merge vào đây qua PR. Không code trực tiếp trên develop.">develop</span></div>
+        </div>
+      </div>
+
+      <ul class="steps">
+        <li class="step-item">
+          <div class="step-num green">✓</div>
+          <div>
+            <div class="step-label">Leader review trong ≤ 24 giờ</div>
+            <div class="step-body">Nếu có comment → fix → push lại branch (PR tự cập nhật, không tạo lại).</div>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-num green">✓</div>
+          <div>
+            <div class="step-label"><span class="tip" data-tip="CI (GitHub Actions) = hệ thống tự động chạy test + lint + format check khi có PR. Nếu đỏ thì không được merge.">CI</span> tự chạy: analyze + test + format + branch name check</div>
+            <div class="step-body">Phải toàn xanh. Nếu đỏ → xem log CI trên GitHub → fix → push lại.</div>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-num green">✓</div>
+          <div>
+            <div class="step-label">Merge → Issue tự đóng → Card về Done</div>
+            <div class="step-body">GitHub tự xóa branch. Code đã trên develop, mọi người pull về được.</div>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-num" style="background:var(--purple)">→</div>
+          <div>
+            <div class="step-label">Kéo task tiếp theo từ backlog</div>
+            <div class="step-body">Tối đa <strong>2 task In Progress</strong> cùng lúc. Quay lại Bước 1.</div>
+          </div>
+        </li>
+      </ul>
+      <div class="alert alert-green">
+        <span class="alert-icon">🎉</span>
+        <span>Báo leader qua daily check-in. Kéo task tiếp theo.</span>
+      </div>
+    </div>
+
+  </div><!-- /detail-panel -->
+
+  <!-- FIGMA → FLUTTER -->
+  <div class="figma-section">
+    <div class="figma-section-title">🎨 Figma → Flutter — FE-first workflow</div>
+    <div class="figma-section-sub">Bước cụ thể để chuyển thiết kế Figma thành Flutter widget trong module của mình.</div>
+
+    <ul class="figma-steps">
+      <li class="figma-step">
+        <div class="figma-dot">1</div>
+        <div>
+          <div class="figma-label">Mở Figma, tìm frame cần implement</div>
+          <div class="figma-body">Xem comment trong stub file để biết frame nào — ví dụ: <code>// TODO(P/T6/TBD): implement ProfileScreen per Figma — 572:4183</code> → số <strong>572:4183</strong> là ID frame trên Figma.</div>
+        </div>
+      </li>
+      <li class="figma-step">
+        <div class="figma-dot">2</div>
+        <div>
+          <div class="figma-label">Chạy <code>/figma-to-flutter</code> trong Claude Code</div>
+          <div class="figma-body">Claude đọc frame từ Figma (qua MCP đã setup), tạo Flutter widget vào đúng file <code>presentation/</code> của module.</div>
+        </div>
+      </li>
+      <li class="figma-step">
+        <div class="figma-dot">3</div>
+        <div>
+          <div class="figma-label">Review output — thay thế hardcode bằng token</div>
+          <div class="figma-body">Claude có thể tạo ra màu/font hardcode. Phải đổi sang theme token:
+            <div class="code-block" style="margin-top:8px;"><button class="copy-btn" onclick="cp(this)">Copy</button><pre><span class="code-comment">// ❌ Hardcode → CI sẽ reject</span>
+color: Color(0xFF1f2328),
+style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+
+<span class="code-comment">// ✅ Dùng token</span>
+color: AppColors.textPrimary,
+style: AppTextStyles.bodyMedium,</pre></div>
+          </div>
+        </div>
+      </li>
+      <li class="figma-step">
+        <div class="figma-dot">4</div>
+        <div>
+          <div class="figma-label">Wire vào stub provider để thấy data thật</div>
+          <div class="figma-body">Dùng <code>FakeRepository</code> với typed data để kiểm tra UI trông đúng không. Không dùng text cứng như "Thien PDM".</div>
+        </div>
+      </li>
+      <li class="figma-step">
+        <div class="figma-dot">5</div>
+        <div>
+          <div class="figma-label">Chạy <code>flutter analyze</code> — phải sạch trước khi commit</div>
+          <div class="figma-body">Nếu còn lỗi → fix hết rồi mới commit. Đừng để lỗi tích lũy.</div>
+        </div>
+      </li>
+    </ul>
+
+    <div class="figma-note">
+      ⚠️ <strong>Nếu Figma dùng màu/font chưa có trong AppColors / AppTextStyles</strong> → không tự thêm vào theme. Ping leader, chờ designer approve token mới.
+    </div>
+  </div>
+
+  <!-- KANBAN SIMULATOR -->
+  <div class="sim-wrap">
+    <div class="sim-header">Mô phỏng — Nhấn nút để xem task di chuyển qua các trạng thái</div>
+    <div class="kanban">
+      <div class="k-col k-backlog">
+        <div class="k-col-title">Backlog</div>
+        <div class="k-card visible" id="sim-card">
+          <div class="kc-id">#111</div>
+          <div class="kc-name">ProfileScreen + PhotoGrid</div>
+          <span class="badge b-gray" id="sim-badge">Backlog</span>
+        </div>
+      </div>
+      <div class="k-col k-progress"><div class="k-col-title">In Progress</div></div>
+      <div class="k-col k-review"><div class="k-col-title">Review</div></div>
+      <div class="k-col k-done"><div class="k-col-title">Done</div></div>
+    </div>
+    <div class="sim-actions">
+      <button class="btn btn-ghost" onclick="simReset()">↺ Reset</button>
+      <button class="btn btn-primary" onclick="simNext()" id="sim-btn">Chạy /start →</button>
+      <span class="sim-status" id="sim-status"></span>
+    </div>
+  </div>
+
+</div><!-- /tab-workflow -->
+
+
+<!-- ══════════════════════════════════════
+     TAB 2: RULES
+══════════════════════════════════════ -->
+<div class="tab-panel" id="tab-rules">
+
+  <div class="page-title">Quy tắc làm việc</div>
+  <div class="page-desc">Nhấn vào từng nhóm để mở. Đọc kỹ một lần trước khi code lần đầu.</div>
+
+  <!-- CONTRACT -->
+  <div class="rule-group">
+    <div class="rule-head" onclick="toggleRule(this)">
+      <span>🔒 Contract — Model và Interface</span>
+      <i class="chevron open">▼</i>
+    </div>
+    <div class="rule-body open">
+      <div class="dod-grid">
+        <div class="dod-card do">
+          <div class="dod-header">✅ Được làm</div>
+          <div class="dod-body">
+            <div class="dod-item"><span class="dod-dot"></span><span>Dùng <span class="tip" data-tip="Freezed model = class Dart được generate tự động với copyWith, toJson, equality. Leader đã tạo sẵn, dev chỉ dùng.">freezed model</span> đã có để build UI</span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Cần thêm field → comment <code>TODO</code> + ping leader trên issue</span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Dùng <span class="tip" data-tip="Stub provider = Riverpod provider tạm, ném UnimplementedError. Dev FE override bằng FakeRepository trả mock data typed.">stub provider</span> với FakeRepository trả typed data</span></div>
+          </div>
+        </div>
+        <div class="dod-card dont">
+          <div class="dod-header">🚫 Không được làm</div>
+          <div class="dod-body">
+            <div class="dod-item"><span class="dod-dot"></span><span>Tự thêm/sửa/xóa field trong <span class="tip" data-tip="Freezed model dùng chung cho cả app. Sửa sai → break code người khác ngay.">freezed model</span></span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Đổi signature của <span class="tip" data-tip="Abstract interface = file định nghĩa TÊN method + input/output mà repository phải tuân theo. VD: Future<UserProfile> getProfile(String uid).">abstract interface</span></span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Dùng <code>Map&lt;String,dynamic&gt;</code> thay typed model</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="alert alert-yellow" style="margin:0">
+        <span class="alert-icon">⚠️</span>
+        <span><span class="tip" data-tip="Contract = freezed models + abstract interfaces + stub providers. Leader define, dev implement. Đổi contract → phải qua leader.">Contract</span> là hợp đồng chung của cả app. Sửa sai có thể break code của người khác ngay lập tức.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCOPE -->
+  <div class="rule-group">
+    <div class="rule-head" onclick="toggleRule(this)">
+      <span>📁 Scope — Chỉ chạm file của mình</span>
+      <i class="chevron">▼</i>
+    </div>
+    <div class="rule-body">
+      <div class="dod-grid">
+        <div class="dod-card do">
+          <div class="dod-header">✅ Được làm</div>
+          <div class="dod-body">
+            <div class="dod-item"><span class="dod-dot"></span><span>Sửa file trong <code>features/&lt;module_của_mình&gt;/</code></span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Tạo file mới trong <code>presentation/</code> của module mình</span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Phát hiện bug module khác → tạo issue, tag owner</span></div>
+          </div>
+        </div>
+        <div class="dod-card dont">
+          <div class="dod-header">🚫 Không được làm</div>
+          <div class="dod-body">
+            <div class="dod-item"><span class="dod-dot"></span><span>Sửa file trong module của người khác</span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Sửa <code>core/</code>, <code>shared/widgets/</code>, <code>core/theme/</code></span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Tự thêm package vào <code>pubspec.yaml</code></span></div>
+          </div>
+        </div>
+      </div>
+      <hr class="divider">
+      <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">Ai phụ trách module nào</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;">
+        <span class="badge b-purple">HanDHG → profile, diary</span>
+        <span class="badge b-blue">NganTNK → settings, reaction, chat</span>
+        <span class="badge b-green">KhoaLND → friend, feed, notification</span>
+        <span class="badge b-yellow">ThienPDM → auth, space, widget</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- GIT -->
+  <div class="rule-group">
+    <div class="rule-head" onclick="toggleRule(this)">
+      <span>🌿 Git — Branch và Commit</span>
+      <i class="chevron">▼</i>
+    </div>
+    <div class="rule-body">
+      <div class="dod-grid">
+        <div class="dod-card do">
+          <div class="dod-header">✅ Được làm</div>
+          <div class="dod-body">
+            <div class="dod-item"><span class="dod-dot"></span><span>Branch: <code>feature/HanDHG/ten-task</code></span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Commit tiếng Việt: <code>feat(profile): implement layout</code></span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>PR có <code>Closes #N</code> để issue tự đóng</span></div>
+          </div>
+        </div>
+        <div class="dod-card dont">
+          <div class="dod-header">🚫 Không được làm</div>
+          <div class="dod-body">
+            <div class="dod-item"><span class="dod-dot"></span><span>Commit thẳng vào <code>develop</code></span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Commit message tiếng Anh</span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Tạo <span class="tip" data-tip="PR (Pull Request) = yêu cầu gộp code vào develop, qua review leader.">PR</span> trước khi chạy <code>/review</code></span></div>
+          </div>
+        </div>
+      </div>
+      <hr class="divider">
+      <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Format branch name</div>
+      <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>feature/HanDHG/profile-screen   <span class="code-comment"># tính năng mới</span>
+fix/NganTNK/reaction-crash       <span class="code-comment"># fix bug</span>
+chore/KhoaLND/update-deps        <span class="code-comment"># việc vặt, không phải feature</span></pre></div>
+    </div>
+  </div>
+
+  <!-- UI -->
+  <div class="rule-group">
+    <div class="rule-head" onclick="toggleRule(this)">
+      <span>🎨 UI — Thiết kế giao diện</span>
+      <i class="chevron">▼</i>
+    </div>
+    <div class="rule-body">
+      <div class="dod-grid">
+        <div class="dod-card do">
+          <div class="dod-header">✅ Được làm</div>
+          <div class="dod-body">
+            <div class="dod-item"><span class="dod-dot"></span><span>Dùng <code>AppColors.xxx</code>, <code>AppTextStyles.xxx</code></span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Build UI với <span class="tip" data-tip="Stub provider trả FakeRepository → UI có data để render. Khi BE xong chỉ cần bỏ override.">stub provider</span> trước khi BE xong</span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Viết <span class="tip" data-tip="Widget test = test kiểm tra UI render đúng mà không cần chạy app thật. Nhanh, ổn định.">widget test</span>: happy path, empty state, error</span></div>
+          </div>
+        </div>
+        <div class="dod-card dont">
+          <div class="dod-header">🚫 Không được làm</div>
+          <div class="dod-body">
+            <div class="dod-item"><span class="dod-dot"></span><span>Hardcode màu: <code>Color(0xFF...)</code>, <code>Colors.blue</code></span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Hardcode font: <code>fontSize: 16</code> (dùng text style)</span></div>
+            <div class="dod-item"><span class="dod-dot"></span><span>Để lại <code>print()</code> debug trong code</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEFINITION OF DONE -->
+  <div class="rule-group">
+    <div class="rule-head" onclick="toggleRule(this)">
+      <span>✅ Definition of Done — Xong là xong thật</span>
+      <i class="chevron">▼</i>
+    </div>
+    <div class="rule-body">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">Task chỉ được mark <strong>Done</strong> khi đủ <strong>7 điều kiện</strong>. Thiếu 1 → chưa xong.</p>
+      <ol class="dod-steps">
+        <li>Code commit đúng Conventional Commits + mô tả tiếng Việt</li>
+        <li>Có test — unit test cho logic, <span class="tip" data-tip="Widget test kiểm tra UI render đúng không, không cần chạy app thật.">widget test</span> cho UI quan trọng</li>
+        <li><code>flutter analyze</code> + <code>dart format</code> clean, 0 errors</li>
+        <li><span class="tip" data-tip="PR (Pull Request) = yêu cầu gộp code vào develop qua review.">PR</span> mở đúng template, có <code>Closes #N</code></li>
+        <li>≥ 1 leader (manhthien2005) approve trên GitHub</li>
+        <li><span class="tip" data-tip="CI (GitHub Actions) tự chạy test + lint khi có PR. Phải xanh hết mới được merge.">CI</span> pass hoàn toàn — tất cả jobs xanh</li>
+        <li>Merged vào <span class="tip" data-tip="develop = branch tích hợp chung. Tất cả feature branches merge vào đây.">develop</span></li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- DAILY CHECK-IN -->
+  <div class="rule-group">
+    <div class="rule-head" onclick="toggleRule(this)">
+      <span>📅 Daily check-in — Báo cáo hàng ngày</span>
+      <i class="chevron">▼</i>
+    </div>
+    <div class="rule-body">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
+        Không có meeting hàng ngày. Thay vào đó, mỗi sáng post <strong>3 dòng</strong> vào Discord/Zalo của team:
+      </p>
+      <div class="checkin-card">
+        <div class="checkin-title">📝 Format check-in</div>
+        <div class="checkin-line">
+          <div class="checkin-label">Hôm qua:</div>
+          <div class="checkin-val">Link PR hoặc commit đã làm — ví dụ "Xong ProfileScreen layout, tạo PR #112"</div>
+        </div>
+        <div class="checkin-line">
+          <div class="checkin-label">Hôm nay:</div>
+          <div class="checkin-val">Issue ID đang làm — ví dụ "#112 EditProfileScreen"</div>
+        </div>
+        <div class="checkin-line" style="margin-bottom:0">
+          <div class="checkin-label">Block:</div>
+          <div class="checkin-val">Ghi rõ nếu bị chặn — ví dụ "Chờ leader thêm field coverPhotoUrl vào UserProfile". Nếu không có: <em>"Không có block"</em></div>
+        </div>
+      </div>
+      <div class="alert alert-blue" style="margin-top:12px;margin-bottom:0;">
+        <span class="alert-icon">ℹ️</span>
+        <span>Check-in quan trọng để leader biết ai đang stuck — không check-in = leader không biết cần unblock ai.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUG -->
+  <div class="rule-group">
+    <div class="rule-head" onclick="toggleRule(this)">
+      <span>🐛 Khi gặp bug hoặc bị blocked</span>
+      <i class="chevron">▼</i>
+    </div>
+    <div class="rule-body">
+      <div class="rule-section">
+        <div class="rule-section-title rst-red">Khi gặp bug</div>
+        <div class="rule-item"><span class="ri">1️⃣</span><div><strong>Bug trong module mình</strong> → chạy <code>/debug</code> trong Claude Code, tìm nguyên nhân gốc rễ, fix, viết thêm test để bug không tái phát.</div></div>
+        <div class="rule-item"><span class="ri">2️⃣</span><div><strong>Bug trong module người khác</strong> → tạo issue mô tả bug, tag module owner. Không tự sửa dù chỉ 1 dòng.</div></div>
+      </div>
+      <div class="rule-section">
+        <div class="rule-section-title rst-blue">Khi bị blocked</div>
+        <div class="rule-item"><span class="ri">1️⃣</span><div><strong>Chờ leader update contract</strong> → comment trên issue, tiếp tục phần UI khác không phụ thuộc vào field đó.</div></div>
+        <div class="rule-item"><span class="ri">2️⃣</span><div><strong>Không hiểu spec</strong> → hỏi leader trên issue. Không tự đoán rồi code sai.</div></div>
+        <div class="rule-item"><span class="ri">3️⃣</span><div><strong>WIP limit</strong> → tối đa 2 task In Progress cùng lúc. Xong task hiện tại trước khi kéo task mới.</div></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /tab-rules -->
+
+
+<!-- ══════════════════════════════════════
+     TAB 3: COMMANDS
+══════════════════════════════════════ -->
+<div class="tab-panel" id="tab-commands">
+
+  <div class="page-title">Lệnh thường dùng</div>
+  <div class="page-desc">Thay <code>DevName</code> bằng tên của bạn: <strong>HanDHG</strong>, <strong>NganTNK</strong>, <strong>KhoaLND</strong>.</div>
+
+  <div class="cmd-section">
+    <div class="cmd-section-title">⚡ Claude Code — Bắt đầu và kết thúc task</div>
+    <div class="cmd-label">Kick-off task từ GitHub issue</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>/start 111</pre></div>
+    <div class="cmd-label">Implement theo TDD (chạy sau /start)</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>/build</pre></div>
+    <div class="cmd-label">Self-review trước khi tạo PR</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>/review</pre></div>
+    <div class="cmd-label">Convert Figma frame → Flutter widget</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>/figma-to-flutter</pre></div>
+    <div class="cmd-label">Debug có hệ thống khi gặp bug</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>/debug</pre></div>
+  </div>
+
+  <div class="cmd-section">
+    <div class="cmd-section-title">🌿 Git — Branch</div>
+    <div class="cmd-label">Tạo branch mới từ develop</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>git checkout -b feature/DevName/ten-task origin/develop</pre></div>
+    <div class="cmd-label">Update develop về mới nhất</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>git checkout develop && git pull --ff-only</pre></div>
+    <div class="cmd-label">Sync branch với develop mới (khi bị outdated)</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>git fetch origin develop
+git rebase origin/develop
+<span class="code-comment"># Nếu conflict → sửa file → git add → git rebase --continue</span>
+git push --force-with-lease</pre></div>
+  </div>
+
+  <div class="cmd-section">
+    <div class="cmd-section-title">🔬 Flutter — Kiểm tra & Test</div>
+    <div class="cmd-label">Kiểm tra lỗi code</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>flutter analyze</pre></div>
+    <div class="cmd-label">Format code</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>dart format .</pre></div>
+    <div class="cmd-label">Chạy toàn bộ test</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>flutter test</pre></div>
+    <div class="cmd-label">Chạy test của module cụ thể</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>flutter test test/features/profile/</pre></div>
+    <div class="cmd-label">Generate code sau khi sửa <span class="tip" data-tip="@freezed và @riverpod là annotations — build_runner đọc chúng và tạo file .freezed.dart / .g.dart tự động.">freezed / riverpod</span> annotations</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>dart run build_runner build --delete-conflicting-outputs</pre></div>
+  </div>
+
+  <div class="cmd-section">
+    <div class="cmd-section-title">📬 PR — Nộp bài</div>
+    <div class="cmd-label">Push branch lên GitHub</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>git push -u origin feature/DevName/ten-task</pre></div>
+    <div class="cmd-label">Tạo PR vào develop</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>gh pr create --base develop</pre></div>
+    <div class="cmd-label">Xem trạng thái CI</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>gh pr checks</pre></div>
+  </div>
+
+  <div class="cmd-section">
+    <div class="cmd-section-title">✍️ Commit message — Mẫu nhanh</div>
+    <div class="cmd-label">Feature mới</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>feat(profile): implement ProfileScreen layout theo Figma</pre></div>
+    <div class="cmd-label">Fix bug</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>fix(reaction): sửa crash khi danh sách reaction rỗng</pre></div>
+    <div class="cmd-label">Viết test</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>test(profile): thêm widget test cho ProfileScreen empty state</pre></div>
+    <div class="cmd-label">Cập nhật docs</div>
+    <div class="code-block"><button class="copy-btn" onclick="cp(this)">Copy</button><pre>docs(diary): cập nhật spec DiaryEntry model</pre></div>
+  </div>
+
+</div><!-- /tab-commands -->
+
+</div><!-- /content -->
+
+<script>
+function switchTab(n){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector(`.tab[onclick="switchTab('${n}')"]`).classList.add('active');
+  document.getElementById('tab-'+n).classList.add('active');
+}
+function selectStep(i){
+  document.querySelectorAll('.pipe-step').forEach((s,j)=>s.classList.toggle('active',i===j));
+  document.querySelectorAll('.detail-content').forEach((d,j)=>d.classList.toggle('active',i===j));
+}
+function toggleRule(h){
+  const b=h.nextElementSibling,c=h.querySelector('.chevron');
+  b.classList.toggle('open');c.classList.toggle('open');
+}
+function toggleCollapse(btn){
+  const c=btn.nextElementSibling,ch=btn.querySelector('.chevron');
+  c.classList.toggle('open');ch.classList.toggle('open');
+}
+function cp(btn){
+  navigator.clipboard.writeText(btn.nextElementSibling.textContent.trim()).then(()=>{
+    const o=btn.textContent;btn.textContent='Copied!';btn.style.color='#3fb950';
+    setTimeout(()=>{btn.textContent=o;btn.style.color='';},1500);
+  });
+}
+function chk(cb){cb.closest('li').classList.toggle('done',cb.checked);}
+
+// SIMULATOR
+const cols=['k-backlog','k-progress','k-review','k-done'];
+const badges=[['b-gray','Backlog'],['b-blue','In Progress'],['b-yellow','Review'],['b-green','Done']];
+const btns=['Chạy /start →','Code + commit →','Chạy /review + PR →','Leader approve → Merge →'];
+const msgs=['Task đang trong backlog, chưa ai làm.','Dev tạo branch, bắt đầu implement FE.','Code xong, chạy /review, tạo PR.','Leader approve, CI xanh, đã merge!'];
+let s=0;
+const card=document.getElementById('sim-card');
+const badge=document.getElementById('sim-badge');
+const sbtn=document.getElementById('sim-btn');
+const sstatus=document.getElementById('sim-status');
+
+function simNext(){
+  if(s>=cols.length)return;
+  card.classList.add('visible');
+  document.querySelector('.'+cols[s]).appendChild(card);
+  badge.className='badge '+badges[s][0];badge.textContent=badges[s][1];
+  card.classList.toggle('active',s>0&&s<cols.length-1);
+  card.classList.toggle('done-card',s===cols.length-1);
+  sstatus.textContent=msgs[s];
+  s++;
+  if(s>=cols.length){sbtn.disabled=true;sbtn.textContent='✅ Task xong!';selectStep(4);}
+  else{sbtn.textContent=btns[s];selectStep(s-1);}
+}
+function simReset(){
+  s=0;card.className='k-card visible';
+  badge.className='badge b-gray';badge.textContent='Backlog';
+  document.querySelector('.k-backlog').appendChild(card);
+  sbtn.disabled=false;sbtn.textContent=btns[0];sstatus.textContent='';selectStep(0);
+}
+</script>
+</body>
+</html>
