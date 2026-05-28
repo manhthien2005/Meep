@@ -31,6 +31,8 @@ class SpaceController extends _$SpaceController {
     required String name,
     required String iconEmoji,
     required String colorHex,
+    // friendUids: list of friend uids to invite (max 9 — creator is auto-added, total ≤ 10)
+    required List<String> friendUids,
   }) async {
     // TODO(SP/T2/TBD): call createSpace CF
     throw UnimplementedError('createSpace — TODO: SP/T2/TBD');
