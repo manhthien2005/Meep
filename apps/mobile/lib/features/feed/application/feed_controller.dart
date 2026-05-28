@@ -42,7 +42,10 @@ class FeedController extends _$FeedController {
   @override
   Future<List<Post>> build({
     FeedFilter filter = FeedFilter.all,
+    // filterUid: used with FeedFilter.person — filter by friend's uid
     String? filterUid,
+    // filterSpaceId: used with FeedFilter.space — query feed WHERE spaceId == filterSpaceId
+    String? filterSpaceId,
   }) async {
     // TODO(FE/T3/KhoaLND): implement watchFeed stream
     throw UnimplementedError('FeedController.build — TODO: FE/T3/KhoaLND');
