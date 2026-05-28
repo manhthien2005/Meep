@@ -119,6 +119,21 @@ export const blockUser = onCall((request) => {
 });
 
 /**
+ * Unblock a user: delete /blocks doc + delete /friendships/{pairId} if exists.
+ * Atomic via Admin SDK batch — client cannot write /blocks directly.
+ *
+ * TODO(SE/impl):
+ *   - verify caller != target
+ *   - delete /blocks/{blockerUid}_{targetUid} if exists
+ *   - delete /friendships/{pairId} if exists
+ */
+export const unblockUser = onCall((request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
+  // TODO(SE/impl): see comment above.
+  return { ok: true };
+});
+
+/**
  * Delete account: re-authenticate, then cascade-delete all user data.
  *
  * TODO(SE/impl):

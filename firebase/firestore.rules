@@ -166,7 +166,7 @@ service cloud.firestore {
         request.auth.uid == resource.data.blockerUid ||
         request.auth.uid == resource.data.blockedUid
       );
-      allow create, update, delete: if false; // CF blockUser only
+      allow create, update, delete: if false; // CF blockUser / unblockUser (Admin SDK) only
     }
 
     // ===== /spaces/{spaceId} =====

@@ -25,6 +25,10 @@ class UserProfile with _$UserProfile {
     @Default(0) int postCount,
     @Default(0) int friendCount,
     @Default(0) int spaceCount,
+
+    /// Allow other users to find this account by username search.
+    /// Default true. Toggled in Settings > Quyền riêng tư và dữ liệu.
+    @Default(true) bool isSearchable,
     @TimestampConverter() required DateTime createdAt,
     @TimestampConverter() required DateTime updatedAt,
   }) = _UserProfile;
