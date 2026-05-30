@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meep/core/theme/app_colors.dart';
-import 'package:meep/core/theme/app_spacing.dart';
+import 'package:meep/core/theme/app_radii.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
@@ -50,44 +50,80 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
     final repo = ref.watch(friendRepositoryProvider);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Column(
         children: [
+          const SizedBox(height: 16),
+          // Title
           Text(
             'Thêm Space mới',
             style: AppTextStyles.xlBold.copyWith(color: AppColors.bw100),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 8),
+          // Subtitle
           Text(
             'Tạo một không gian kết nối với bạn bè',
-            style: AppTextStyles.mdBold.copyWith(color: AppColors.bw500),
+            style: AppTextStyles.baseBold.copyWith(color: AppColors.bw500),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: 20),
           // Search bar
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Tìm kiếm bạn bè',
-              hintStyle: AppTextStyles.mdRegular.copyWith(
-                color: AppColors.bw500,
-              ),
-              filled: true,
-              fillColor: AppColors.bw700,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF363636),
+              borderRadius: BorderRadius.circular(20),
             ),
-            style: AppTextStyles.mdRegular.copyWith(color: AppColors.bw100),
-            onChanged: (value) {
-              setState(() => _searchQuery = value);
-            },
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.search,
+                  size: 20,
+                  color: Color(0xFFD5D5D5),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Tìm kiếm bạn bè',
+                      hintStyle: AppTextStyles.baseBold.copyWith(
+                        color: const Color(0xFFDDDDDD),
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    style: AppTextStyles.baseBold.copyWith(
+                      color: AppColors.bw100,
+                    ),
+                    onChanged: (value) {
+                      setState(() => _searchQuery = value);
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: 20),
+          // Section header
+          Row(
+            children: [
+              const Icon(
+                Icons.people_outline,
+                size: 20,
+                color: Color(0xFFD5D5D5),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Chọn bạn bè để thêm vào Space',
+                style: AppTextStyles.baseBold.copyWith(
+                  color: const Color(0xFFDDDDDD),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
           // Friend list
           Expanded(
             child: StreamBuilder<List<UserProfile>>(
@@ -118,8 +154,9 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
                     ),
                   );
                 }
-                return ListView.builder(
+                return ListView.separated(
                   itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 20),
                   itemBuilder: (context, index) {
                     final friend = filtered[index];
                     final isSelected =
@@ -127,74 +164,175 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
                     final canSelect =
                         isSelected || widget.selectedFriendUids.length < 9;
 
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage: friend.avatarUrl != null
-                            ? NetworkImage(friend.avatarUrl!)
-                            : null,
-                        child: friend.avatarUrl == null
-                            ? Text(
-                                friend.displayName[0].toUpperCase(),
-                                style: AppTextStyles.mdBold,
-                              )
-                            : null,
-                      ),
-                      title: Text(
-                        friend.displayName,
-                        style: AppTextStyles.mdSemiBold.copyWith(
-                          color: AppColors.bw100,
-                        ),
-                      ),
-                      trailing: Checkbox(
-                        value: isSelected,
-                        onChanged: canSelect
-                            ? (value) {
-                                setState(() {
-                                  if (value == true) {
-                                    widget.selectedFriendUids.add(friend.uid);
-                                  } else {
-                                    widget.selectedFriendUids
-                                        .remove(friend.uid);
-                                  }
-                                });
-                              }
-                            : null,
-                        activeColor: AppColors.turquoise500,
-                        checkColor: Colors.white,
-                      ),
+                    return _FriendListItem(
+                      friend: friend,
+                      isSelected: isSelected,
+                      canSelect: canSelect,
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            widget.selectedFriendUids.remove(friend.uid);
+                          } else if (canSelect) {
+                            widget.selectedFriendUids.add(friend.uid);
+                          }
+                        });
+                      },
                     );
                   },
                 );
               },
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: 20),
           // Continue button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed:
-                  widget.selectedFriendUids.isEmpty ? null : widget.onContinue,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0x66394041),
-                disabledBackgroundColor: const Color(0x66394041),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          _ContinueButton(
+            enabled: widget.selectedFriendUids.isNotEmpty,
+            onPressed: widget.onContinue,
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+}
+
+class _FriendListItem extends StatelessWidget {
+  const _FriendListItem({
+    required this.friend,
+    required this.isSelected,
+    required this.canSelect,
+    required this.onTap,
+  });
+
+  final UserProfile friend;
+  final bool isSelected;
+  final bool canSelect;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: canSelect || isSelected ? onTap : null,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        height: 50,
+        child: Row(
+          children: [
+            // Avatar
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: AppColors.bw600,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.bw600,
+                  width: 4,
                 ),
               ),
-              child: Text(
-                'Tiếp tục →',
-                style: AppTextStyles.mdBold.copyWith(
-                  color: widget.selectedFriendUids.isEmpty
-                      ? AppColors.bw600
-                      : AppColors.bw100,
+              child: Center(
+                child: Text(
+                  friend.displayName[0].toUpperCase(),
+                  style: AppTextStyles.mdBold.copyWith(
+                    color: AppColors.bw100,
+                  ),
                 ),
               ),
             ),
+            const SizedBox(width: 16),
+            // Name
+            Expanded(
+              child: Text(
+                friend.displayName,
+                style: AppTextStyles.mdBold.copyWith(color: AppColors.bw100),
+              ),
+            ),
+            // Checkbox
+            _CustomCheckbox(
+              isChecked: isSelected,
+              enabled: canSelect || isSelected,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomCheckbox extends StatelessWidget {
+  const _CustomCheckbox({
+    required this.isChecked,
+    required this.enabled,
+  });
+
+  final bool isChecked;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 18,
+      height: 18,
+      decoration: BoxDecoration(
+        color: isChecked ? AppColors.turquoise500 : AppColors.bw400,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isChecked ? AppColors.turquoise500 : AppColors.bw600,
+          width: 2,
+        ),
+      ),
+      child: isChecked
+          ? const Icon(
+              Icons.check,
+              size: 12,
+              color: AppColors.bw900,
+            )
+          : null,
+    );
+  }
+}
+
+class _ContinueButton extends StatelessWidget {
+  const _ContinueButton({
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: TextButton(
+        onPressed: enabled ? onPressed : null,
+        style: TextButton.styleFrom(
+          backgroundColor: const Color(0x66394041),
+          disabledBackgroundColor: const Color(0x66394041),
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.pill),
           ),
-          const SizedBox(height: AppSpacing.md),
-        ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Tiếp tục',
+              style: AppTextStyles.mdBold.copyWith(
+                color: enabled ? Colors.white : AppColors.bw600,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.arrow_forward,
+              size: 20,
+              color: enabled ? Colors.white : AppColors.bw600,
+            ),
+          ],
+        ),
       ),
     );
   }
