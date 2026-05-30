@@ -38,9 +38,9 @@
 
 | | |
 |---|---|
-| Assignee | TBD |
+| Assignee | KhoaLND |
 | Estimate | M (~8h) |
-| Branch | `feat/TBD/feed-data-layer` |
+| Branch | `feat/KhoaLND/feed-data-layer` |
 | Blocked by | contracts Part 1 |
 
 Files:
@@ -63,9 +63,9 @@ Cross-module imports: None
 
 | | |
 |---|---|
-| Assignee | TBD |
+| Assignee | KhoaLND |
 | Estimate | M (~8h) |
-| Branch | `feat/TBD/feed-caption-service` |
+| Branch | `feat/KhoaLND/feed-caption-service` |
 | Blocked by | contracts Part 1 |
 
 Files:
@@ -80,6 +80,7 @@ Acceptance criteria:
 - [ ] `CaptionType.time`: `DateTime.now()` local timezone → `DateFormat('HH:mm').format(now)`
 - [ ] GPS `permission-denied` → tự động fallback sang `CaptionType.text`, không crash
 - [ ] Nominatim/Open-Meteo timeout >5s → hiện fallback text `"📍 ..."` / `"🌤️ ..."`, không block
+- [ ] Cache kết quả Nominatim geocode trong session: nếu lat/lng chênh lệch < 100m so với lần trước → dùng lại kết quả cũ, không gọi API lại (tránh rate limit 1 req/s của Nominatim)
 
 Cross-module imports: None
 
@@ -88,21 +89,23 @@ Cross-module imports: None
 
 | | |
 |---|---|
-| Assignee | TBD |
+| Assignee | KhoaLND |
 | Estimate | L (2 ngày) |
-| Branch | `feat/TBD/feed-camera-section` |
+| Branch | `feat/KhoaLND/feed-camera-section` |
 | Blocked by | contracts Part 1 |
 
 Files:
 - `lib/features/feed/application/app_camera_controller.dart` — full impl: initialize, capture, flip, flash, zoom, dispose
-- `lib/features/feed/presentation/widgets/camera_section.dart` — viewfinder 400×400 + controls (Figma `440:1767`)
+- `lib/features/feed/presentation/widgets/camera_section.dart` — viewfinder 400×400 + controls (Figma `440:1767`), bao gồm FriendsButton camera + album picker button
 - `lib/features/feed/presentation/home_screen.dart` — `CustomScrollView`: `SliverToBoxAdapter` (CameraSection) + `SliverList` (FeedSection)
-- `test/features/feed/app_camera_controller_test.dart` — test: double-tap capture → disabled until navigate, GPS fallback
+- `test/features/feed/app_camera_controller_test.dart` — test: double-tap capture → disabled until navigate, album pick → PreviewScreen
 
 Acceptance criteria:
 - [ ] `AppCameraController` (không phải `CameraController` — tránh conflict với `camera` package)
 - [ ] Tap capture → disable button ngay lập tức cho đến khi navigate xong (tránh double submission)
-- [ ] Swipe TRÁI trên viewfinder → Dual Camera mode
+- [ ] **Album picker:** tap icon Album (trái capture button) → `ImagePicker().pickImage(source: ImageSource.gallery)` → navigate thẳng đến `CapturePreviewScreen` với file đã chọn (`image_picker` đã có trong pubspec)
+- [ ] **CameraSection FriendsButton:** render "15 người bạn ▾" ở top của CameraSection — đây là audience pre-selector cho post sắp gửi (khác với FriendsButton feed filter ở T7). State lưu trong `PostController` / `PostDraft`. M2: tap → không làm gì (audience chọn tại PreviewScreen T4), render UI only.
+- [ ] Swipe TRÁI trên viewfinder → Dual Camera mode (Figma `269:1402`) — **xem Open Question OQ-3**
 - [ ] Camera stop preview khi scroll xuống feed (`ScrollController` listener)
 - [ ] Camera không khởi động được (quyền) → `CameraPermissionScreen`, không crash
 - [ ] Tap "Lịch sử" → `scrollController.animateTo(cameraHeight)` xuống feed
@@ -114,9 +117,9 @@ Cross-module imports: None (camera section không import từ Friend module tr�
 
 | | |
 |---|---|
-| Assignee | TBD |
+| Assignee | KhoaLND |
 | Estimate | L (2 ngày) |
-| Branch | `feat/TBD/feed-capture-preview` |
+| Branch | `feat/KhoaLND/feed-capture-preview` |
 | Blocked by | T2, T3 |
 
 Files:
@@ -139,9 +142,9 @@ Cross-module imports: `FriendRepository.getFriendUids()` từ **friend** (hiển
 
 | | |
 |---|---|
-| Assignee | TBD |
+| Assignee | KhoaLND |
 | Estimate | M (~8h) |
-| Branch | `feat/TBD/feed-post-controller` |
+| Branch | `feat/KhoaLND/feed-post-controller` |
 | Blocked by | T1, T4 |
 
 Files:
@@ -162,9 +165,9 @@ Cross-module imports: None
 
 | | |
 |---|---|
-| Assignee | TBD |
+| Assignee | KhoaLND |
 | Estimate | M (~8h) |
-| Branch | `feat/TBD/feed-controller` |
+| Branch | `feat/KhoaLND/feed-controller` |
 | Blocked by | T1 |
 
 Files:
@@ -185,9 +188,9 @@ Cross-module imports: `BlockRepository` từ **settings** (filter blocked user p
 
 | | |
 |---|---|
-| Assignee | TBD |
+| Assignee | KhoaLND |
 | Estimate | M (~8h) |
-| Branch | `feat/TBD/feed-section-ui` |
+| Branch | `feat/KhoaLND/feed-section-ui` |
 | Blocked by | T6 |
 
 Files:
@@ -200,9 +203,10 @@ Files:
 Acceptance criteria:
 - [ ] `FriendPostCard`: ảnh 400×400, `Note` overlay, label `"[Tên bạn] [time ago]"`, ActText bar disabled
 - [ ] `OwnPostCard`: ảnh 400×400, `"Bạn [ngày]"`, pill "✨ Chưa có hoạt động nào!" (M2)
+- [ ] **Feed empty state:** khi `posts.isEmpty && !isLoading` → hiện widget "Chưa có ảnh nào" (icon + text), không để màn hình trắng
 - [ ] Tap post của người unfriend → Firestore `permission-denied` → ẩn card, không crash
 - [ ] `ActTextBar` M2: render UI nhưng mọi interaction là no-op (disabled)
-- [ ] `FriendsButton` dropdown kết hợp với `FeedController.setFilter()` → title đổi
+- [ ] `FriendsButton` (feed filter) dropdown kết hợp với `FeedController.setFilter()` → title đổi — khác với CameraSection FriendsButton (audience selector, T3)
 
 Cross-module imports: None
 
@@ -211,9 +215,9 @@ Cross-module imports: None
 
 | | |
 |---|---|
-| Assignee | TBD |
+| Assignee | KhoaLND |
 | Estimate | S (~4h) |
-| Branch | `feat/TBD/feed-grid-share` |
+| Branch | `feat/KhoaLND/feed-grid-share` |
 | Blocked by | T7 |
 
 Files:
@@ -236,9 +240,9 @@ Cross-module imports: `BlockConfirmDialog` từ **settings**
 
 | | |
 |---|---|
-| Assignee | TBD |
+| Assignee | KhoaLND |
 | Estimate | L (2 ngày) |
-| Branch | `feat/TBD/feed-cf-post-created` |
+| Branch | `feat/KhoaLND/feed-cf-post-created` |
 | Blocked by | contracts Part 1 |
 
 Files:
@@ -261,9 +265,9 @@ Cross-module imports: None (Admin SDK, nhưng đọc `/users/{uid}/fcmTokens` sc
 
 | | |
 |---|---|
-| Assignee | TBD |
+| Assignee | KhoaLND |
 | Estimate | S (~4h) |
-| Branch | `feat/TBD/feed-cf-post-deleted` |
+| Branch | `feat/KhoaLND/feed-cf-post-deleted` |
 | Blocked by | T9 |
 
 Files:
@@ -283,7 +287,7 @@ Cross-module imports: None
 
 | | |
 |---|---|
-| Assignee | TBD |
+| Assignee | KhoaLND |
 | Estimate | S (~4h) |
 | Branch | `test/TBD/feed-rules` |
 | Blocked by | T1, T9 |
@@ -320,7 +324,43 @@ T9, T10 (Cloud Functions) có thể chạy song song với T1-T8 (Flutter).
 
 ## PART 4 — Open questions
 
-Tất cả đã resolved trong spec. 
-
 > **Note cross-module:** `onFriendshipDeleted` CF (cross-feed cleanup) được implement tại **Friend module T6** — Feed module KHÔNG tạo CF riêng.
 > **Note Space:** Khi Space module bắt đầu, cần leader gate thêm `spaceId` param vào `FeedScreen` và `FeedFilter.space(spaceId)` — xem Space spec §Cross-module contract.
+
+---
+
+### Câu hỏi cần ThienPDM xác nhận trước khi implement
+
+| ID | Task liên quan | Câu hỏi | Default nếu không confirm |
+|---|---|---|---|
+| OQ-1 | T3, T4 | **SettingsSheet trigger:** File thuộc **Settings module**. KhoaLND chỉ navigate đến route Settings khi user tap avatar góc phải — không tự implement shell. | ✅ **RESOLVED:** navigate to Settings route |
+| OQ-2 | T3 | **CameraSection FriendsButton state:** CameraSection FriendsButton chỉ hiển thị danh sách bạn bè (thuộc Friend module) — render UI only, không chọn audience. PreviewScreen là nơi duy nhất user chọn audience. Implement chi tiết khi Friend module done. | ✅ **RESOLVED:** render stub UI only ở T3, audience selection chỉ ở PreviewScreen (T4) |
+| OQ-3 | T3 | **Dual Camera mode:** Option B — switch sang front camera + layout khác (không phải PiP). `CameraController(lens: CameraLensDirection.front)`. | ✅ **RESOLVED:** Option B — switch front camera |
+| OQ-4 | T6 | **BlockRepository dependency:** Settings module chưa expose interface. | ✅ **RESOLVED:** bỏ qua block filter M2 — `FeedController` không import `BlockRepository` |
+| OQ-5 | T9 | **`postCount` field:** CF implement tạm với `FieldValue.increment(1)` — Firestore tự tạo field nếu chưa có. **Note tồn đọng:** khi Profile module implement PhotoGrid, leader cần add `int postCount = 0` vào `UserProfile` freezed model. | ✅ **RESOLVED:** implement CF bình thường, note lại cho leader |
+| OQ-6 | T1, T7 | **Offline Firestore cache:** Firestore Flutter SDK enable offline persistence mặc định — không cần config thêm. `cached_network_image` handle image file caching riêng. | ✅ **RESOLVED:** dùng default, không cần config |
+
+---
+
+## PART 5 — Library recommendations
+
+### Packages cần thêm vào pubspec (chưa có — cần leader approve)
+
+| Package | Dùng cho | Free? | Khuyến nghị | Lý do |
+|---|---|---|---|---|
+| `camera` | Camera viewfinder, capture, flash, zoom, flip | ✅ | **Dùng** | Official Flutter team, không có alternative khả thi cho low-level camera control |
+| `geolocator` | GPS lat/lng cho Caption Vị trí + Thời tiết | ✅ | **Dùng** | Phổ biến nhất, có `checkPermission()` + `requestPermission()` built-in — cần thiết cho graceful fallback GPS denied |
+| `gal` | Lưu ảnh vào gallery thiết bị (tap download) | ✅ | **Dùng** | Duy nhất handle Android 10+ scoped storage đúng cách. Alternatives (`gallery_saver`, `image_gallery_saver`) không maintain từ 2021+ |
+| `http` | Gọi Nominatim + Open-Meteo REST API | ✅ | **Dùng `http`, không dùng `dio`** | Chỉ 2 GET request đơn giản, không cần interceptors/retry của `dio`. Spec đã define fallback text thay vì retry logic → `http` đủ dùng và nhẹ hơn |
+
+### Packages đã có trong pubspec — plan cũ đánh nhầm là thiếu
+
+| Package | Đã có từ | Dùng cho |
+|---|---|---|
+| `cached_network_image` | pubspec hiện tại | Cache ảnh feed — T7 dùng |
+| `flutter_image_compress` | pubspec hiện tại | Compress ảnh trước upload — T5 dùng |
+| `intl` | pubspec hiện tại | Format `HH:mm` timezone — T2 dùng |
+| `image_picker` | pubspec hiện tại | **Album picker** (T3) — plan cũ không mention nhưng package đã sẵn |
+| `share_plus` | pubspec hiện tại | Native OS share sheet trong ShareModal (T8) |
+
+> **Tổng packages cần xin leader approve thêm: 4** (`camera`, `geolocator`, `gal`, `http`)

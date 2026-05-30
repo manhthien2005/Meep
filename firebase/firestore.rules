@@ -100,17 +100,26 @@ service cloud.firestore {
 
     // ===== /posts/{postId} — combined: Feed + Space + Reaction =====
     match /posts/{postId} {
-      // Fan-out approach: check feed subcollection (covers All-friends + Space posts)
+      // Direct-read approach: own posts + friend posts (no fan-out dependency).
+      // NOTE: This bypasses the fan-out architecture (CF onPostCreated writes
+      // /users/{uid}/feed/ but feed no longer reads from it). Simpler for dev/demo.
       allow read: if isAuthed() && (
         resource.data.authorId == request.auth.uid ||
+        isFriend(resource.data.authorId) ||
         exists(/databases/$(database)/documents/users/$(request.auth.uid)/feed/$(postId))
       );
 
       allow create: if isOwner(request.resource.data.authorId)
         && request.resource.data.keys().hasAll(
-          ['authorId', 'authorName', 'imageUrl', 'audienceType', 'createdAt']
+          ['authorId', 'authorName', 'audienceType', 'createdAt']
         )
-        && request.resource.data.imageUrl is string
+        && (
+          // Single camera: imageUrl is the photo.
+          request.resource.data.imageUrl is string ||
+          // Dual camera: both lenses present, imageUrl absent.
+          (request.resource.data.backImageUrl is string &&
+           request.resource.data.frontImageUrl is string)
+        )
         && (
           !('caption' in request.resource.data) ||
           (request.resource.data.caption is string &&
