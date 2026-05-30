@@ -83,36 +83,47 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
               borderRadius: BorderRadius.circular(20),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                const Icon(
-                  Icons.search,
-                  size: 20,
-                  color: Color(0xFFD5D5D5),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    textAlign: TextAlign.left,
-                    decoration: InputDecoration(
-                      hintText: 'Tìm kiếm bạn bè',
-                      hintStyle: AppTextStyles.baseBold.copyWith(
-                        color: const Color(0xFFDDDDDD),
-                      ),
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    style: AppTextStyles.baseBold.copyWith(
-                      color: AppColors.bw100,
-                    ),
-                    onChanged: (value) {
-                      setState(() => _searchQuery = value);
-                    },
+                // Input thật — text căn giữa
+                TextField(
+                  controller: _searchController,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
                   ),
+                  style: AppTextStyles.baseBold.copyWith(
+                    color: AppColors.bw100,
+                  ),
+                  onChanged: (value) {
+                    setState(() => _searchQuery = value);
+                  },
                 ),
+                // Placeholder (icon + text) căn giữa, ẩn khi gõ
+                if (_searchQuery.isEmpty)
+                  IgnorePointer(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.search,
+                          size: 20,
+                          color: Color(0xFFD5D5D5),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Tìm kiếm bạn bè',
+                          style: AppTextStyles.baseBold.copyWith(
+                            color: const Color(0xFFDDDDDD),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
@@ -238,7 +249,7 @@ class _FriendListItem extends StatelessWidget {
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: AppColors.bw600,
-                  width: 1.5,
+                  width: 2,
                 ),
               ),
               padding: const EdgeInsets.all(3),
