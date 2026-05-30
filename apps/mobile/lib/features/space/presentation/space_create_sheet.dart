@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:meep/core/theme/app_colors.dart';
-import 'package:meep/core/theme/app_spacing.dart';
-import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/space/presentation/widgets/friend_select_step.dart';
+import 'package:meep/features/space/presentation/widgets/icon_builder_step.dart';
 import 'package:meep/features/space/presentation/widgets/space_config_step.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
 
@@ -62,7 +60,7 @@ class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
             onCustomIconTap: () => _goToStep(2),
             onComplete: _createSpace,
           ),
-          _IconBuilderStep(
+          IconBuilderStep(
             initialEmoji: _iconEmoji,
             initialColor: _colorHex,
             onDone: (emoji, color) {
@@ -72,7 +70,6 @@ class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
               });
               _goToStep(1);
             },
-            onBack: () => _goToStep(1),
           ),
         ],
       ),
@@ -82,42 +79,5 @@ class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
   Future<void> _createSpace() async {
     // TODO(SP/T3.5): wire SpaceController.createSpace()
     Navigator.of(context).pop();
-  }
-}
-
-// Step 3 stub
-class _IconBuilderStep extends StatelessWidget {
-  const _IconBuilderStep({
-    required this.initialEmoji,
-    required this.initialColor,
-    required this.onDone,
-    required this.onBack,
-  });
-
-  final String initialEmoji;
-  final String initialColor;
-  final void Function(String emoji, String color) onDone;
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          Text(
-            'Tạo theme cho Space',
-            style: AppTextStyles.xlBold.copyWith(color: AppColors.bw100),
-          ),
-          const Spacer(),
-          // TODO(SP/T3.4): preview + emoji picker + color overlay
-          ElevatedButton(
-            onPressed: () => onDone(initialEmoji, initialColor),
-            child: const Text('Xong'),
-          ),
-          const SizedBox(height: AppSpacing.md),
-        ],
-      ),
-    );
   }
 }
