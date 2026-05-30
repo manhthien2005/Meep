@@ -10,6 +10,11 @@ abstract class FriendRequestRepository {
     required String receiverUid,
   });
 
+  /// Accept a friend request via Cloud Function.
+  /// Creates friendship + conversation + increments friendCount.
+  /// Throws if sender or receiver already has 20 friends.
+  Future<void> acceptFriendRequest(String requestId);
+
   /// Cancel a sent friend request.
   Future<void> cancelFriendRequest(String requestId);
 

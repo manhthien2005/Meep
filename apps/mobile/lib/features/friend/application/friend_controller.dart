@@ -1,9 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/friend/application/friend_state.dart';
 import 'package:meep/features/friend/data/friend_repository.dart';
-import 'package:meep/features/friend/data/friend_request.dart';
 import 'package:meep/features/friend/data/friend_request_repository.dart';
 
 part 'friend_controller.g.dart';
@@ -11,51 +10,58 @@ part 'friend_controller.g.dart';
 @Riverpod(keepAlive: true)
 FriendRepository friendRepository(Ref ref) => throw UnimplementedError(
       'friendRepositoryProvider must be overridden — '
-      'wire FirestoreFriendRepository in main.dart (TODO: F/T1/KhoaLND)',
+      'wire FirestoreFriendRepository in main.dart (TODO: F/T1/ThienPDM)',
     );
 
 @Riverpod(keepAlive: true)
 FriendRequestRepository friendRequestRepository(Ref ref) =>
     throw UnimplementedError(
       'friendRequestRepositoryProvider must be overridden — '
-      'wire FirestoreFriendRequestRepository in main.dart (TODO: F/T1/KhoaLND)',
+      'wire FirestoreFriendRequestRepository in main.dart (TODO: F/T1/ThienPDM)',
     );
 
 @riverpod
 class FriendController extends _$FriendController {
   @override
-  Future<List<UserProfile>> build(String uid) async {
-    // TODO(F/T2/KhoaLND): implement watchFriends stream
-    throw UnimplementedError('FriendController.build — TODO: F/T2/KhoaLND');
+  FriendState build(String uid) {
+    // TODO(F/T2/ThienPDM): implement watchFriends stream + watchPendingRequests
+    // Listen to both streams and merge into FriendState
+    return const FriendState();
   }
 
-  Future<void> searchUsers(String query) async {
-    // TODO(F/T3/KhoaLND): implement user search
-    throw UnimplementedError('searchUsers — TODO: F/T3/KhoaLND');
+  Future<void> searchUser(String query) async {
+    // TODO(F/T2/ThienPDM): implement user search with 500ms debounce
+    // Call friendRepository.searchUser(query.toLowerCase())
+    // Update state.searchResult + state.searchQuery
+    throw UnimplementedError('searchUser — TODO: F/T2/ThienPDM');
   }
 
-  Future<void> sendRequest(String receiverUid) async {
-    // TODO(F/T4/KhoaLND): implement sendFriendRequest
-    throw UnimplementedError('sendRequest — TODO: F/T4/KhoaLND');
+  Future<void> sendFriendRequest(String receiverUid) async {
+    // TODO(F/T2/ThienPDM): implement sendFriendRequest
+    // Call friendRequestRepository.sendFriendRequest
+    throw UnimplementedError('sendFriendRequest — TODO: F/T2/ThienPDM');
   }
 
-  Future<void> cancelRequest(String requestId) async {
-    // TODO(F/T5/KhoaLND): implement cancelFriendRequest
-    throw UnimplementedError('cancelRequest — TODO: F/T5/KhoaLND');
+  Future<void> acceptFriendRequest(String requestId) async {
+    // TODO(F/T2/ThienPDM): implement acceptFriendRequest
+    // Call friendRequestRepository.acceptFriendRequest (calls CF)
+    // Handle error "max 20 friends" → set state.errorMessage
+    throw UnimplementedError('acceptFriendRequest — TODO: F/T2/ThienPDM');
   }
 
-  Future<void> declineRequest(String requestId) async {
-    // TODO(F/T6/KhoaLND): implement declineFriendRequest
-    throw UnimplementedError('declineRequest — TODO: F/T6/KhoaLND');
+  Future<void> cancelFriendRequest(String requestId) async {
+    // TODO(F/T2/ThienPDM): implement cancelFriendRequest
+    throw UnimplementedError('cancelFriendRequest — TODO: F/T2/ThienPDM');
   }
 
-  Future<void> unfriend(String friendUid) async {
-    // TODO(F/T7/KhoaLND): implement unfriend
-    throw UnimplementedError('unfriend — TODO: F/T7/KhoaLND');
+  Future<void> declineFriendRequest(String requestId) async {
+    // TODO(F/T2/ThienPDM): implement declineFriendRequest
+    throw UnimplementedError('declineFriendRequest — TODO: F/T2/ThienPDM');
   }
 
-  Future<List<FriendRequest>> watchPendingRequests() async {
-    // TODO(F/T8/KhoaLND): implement watchPendingRequests
-    throw UnimplementedError('watchPendingRequests — TODO: F/T8/KhoaLND');
+  Future<void> unfriend(String pairId) async {
+    // TODO(F/T2/ThienPDM): implement unfriend with optimistic update
+    // Remove friend from state.friends immediately, then call repo
+    throw UnimplementedError('unfriend — TODO: F/T2/ThienPDM');
   }
 }
