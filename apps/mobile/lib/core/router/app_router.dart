@@ -15,6 +15,7 @@ import 'package:meep/features/auth/presentation/signup/signup_name_page.dart';
 import 'package:meep/features/auth/presentation/signup/signup_password_page.dart';
 import 'package:meep/features/auth/presentation/signup/signup_username_page.dart';
 import 'package:meep/features/chat/presentation/chat_screen.dart';
+import 'package:meep/features/chat/presentation/group_chat_screen.dart';
 import 'package:meep/features/chat/presentation/inbox_screen.dart';
 import 'package:meep/dev/widget_catalog_page.dart';
 import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
@@ -57,6 +58,15 @@ String? authRedirect({
 
   // Password reset deep link: bypass toàn bộ auth guard
   if (location == '/login/reset-password' || location.startsWith('/__/auth/')) {
+    return null;
+  }
+
+  // DEV(C/#142): cho phép test luồng Chat FE không cần login (bypass cả 2 chiều
+  // — uid null không bị đá về /intro, uid có không bị đá về /home). Bỏ khi auth
+  // wire xong + có home-shell điều hướng Inbox sau đăng nhập.
+  if (location.startsWith('/inbox') ||
+      location.startsWith('/chat') ||
+      location.startsWith('/group-chat')) {
     return null;
   }
 
@@ -305,6 +315,12 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/chat/:conversationId',
         builder: (_, state) => ChatScreen(
+          conversationId: state.pathParameters['conversationId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/group-chat/:conversationId',
+        builder: (_, state) => GroupChatScreen(
           conversationId: state.pathParameters['conversationId'] ?? '',
         ),
       ),

@@ -37,6 +37,14 @@ abstract final class AppTextStyles {
     height: 18 / 14,
   );
 
+  // text-base — 18px
+  static const baseBold = TextStyle(
+    fontFamily: _family,
+    fontSize: 18,
+    fontWeight: FontWeight.w700,
+    height: 24 / 18,
+  );
+
   // text-md — 16px
   static const mdRegular = TextStyle(
     fontFamily: _family,

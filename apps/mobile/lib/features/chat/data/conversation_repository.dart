@@ -21,6 +21,14 @@ abstract class ConversationRepository {
     required String text,
   });
 
-  /// Stream of messages for [conversationId], chronological ASC.
-  Stream<List<Message>> watchMessages(String conversationId);
+  /// Stream of the most recent [limit] messages for [conversationId],
+  /// ordered chronological ASC (oldest first) for display.
+  ///
+  /// Impl: query `orderBy('createdAt', descending: true).limit(limit)` to take
+  /// the newest [limit] messages, then reverse client-side to ASC.
+  /// To load older messages, re-subscribe with a larger [limit] (50 → 100 → …).
+  Stream<List<Message>> watchMessages(
+    String conversationId, {
+    int limit = 50,
+  });
 }
