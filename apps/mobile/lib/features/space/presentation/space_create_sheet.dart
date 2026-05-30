@@ -23,6 +23,9 @@ class _SpaceCreateSheetState extends ConsumerState<SpaceCreateSheet> {
   String _colorHex = '#bfd5ff';
   bool _isCreating = false;
 
+  // Preset tuỳ chỉnh user tạo ở Step 3 — lưu lại để chọn + đặt tên ở Step 2.
+  final List<SpacePreset> _customPresets = [];
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -54,6 +57,7 @@ class _SpaceCreateSheetState extends ConsumerState<SpaceCreateSheet> {
             iconEmoji: _iconEmoji,
             colorHex: _colorHex,
             isLoading: _isCreating,
+            customPresets: _customPresets,
             onNameChanged: (name) => setState(() => _spaceName = name),
             onPresetSelected: (emoji, color) {
               setState(() {
@@ -67,17 +71,34 @@ class _SpaceCreateSheetState extends ConsumerState<SpaceCreateSheet> {
           IconBuilderStep(
             initialEmoji: _iconEmoji,
             initialColor: _colorHex,
-            onDone: (emoji, color) {
-              setState(() {
-                _iconEmoji = emoji;
-                _colorHex = color;
-              });
-              _goToStep(1);
-            },
+            onDone: _onCustomIconDone,
           ),
         ],
       ),
     );
+  }
+
+  /// Step 3 "Xong": lưu custom preset vào grid (nếu chưa có) + auto-select +
+  /// về Step 2. Dedup theo (emoji, colorHex) — không thêm trùng.
+  void _onCustomIconDone(String emoji, String color) {
+    setState(() {
+      _iconEmoji = emoji;
+      _colorHex = color;
+      final exists = _customPresets.any(
+            (p) =>
+                p.emoji == emoji &&
+                p.colorHex.toUpperCase() == color.toUpperCase(),
+          ) ||
+          kSpacePresets.any(
+            (p) =>
+                p.emoji == emoji &&
+                p.colorHex.toUpperCase() == color.toUpperCase(),
+          );
+      if (!exists) {
+        _customPresets.add(SpacePreset(emoji, color));
+      }
+    });
+    _goToStep(1);
   }
 
   Future<void> _createSpace() async {

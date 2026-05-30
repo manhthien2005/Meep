@@ -117,7 +117,11 @@ class _IconBuilderStepState extends State<IconBuilderStep> {
               const SizedBox(width: 13),
               _TabButton(
                 onTap: _openColorOverlay,
-                child: const _ColorWheelIcon(size: 24),
+                child: Image.asset(
+                  'assets/icons/ic_color_wheel.png',
+                  width: 24,
+                  height: 24,
+                ),
               ),
             ],
           ),
@@ -212,49 +216,6 @@ class _TabButton extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Color wheel icon (hue ring) — vẽ bằng CustomPainter thay vì SVG (Figma
-/// export ra PNG nhúng, không scale tốt). Match graphic cầu vồng 269:1334.
-class _ColorWheelIcon extends StatelessWidget {
-  const _ColorWheelIcon({required this.size});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(painter: _ColorWheelPainter()),
-    );
-  }
-}
-
-class _ColorWheelPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-    const sweep = 360;
-    for (var i = 0; i < sweep; i++) {
-      final paint = Paint()
-        ..color = HSVColor.fromAHSV(1, i.toDouble(), 1, 1).toColor()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2;
-      final startAngle = (i - 90) * 3.1415926 / 180;
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius - 1),
-        startAngle,
-        (2 * 3.1415926 / sweep) + 0.02,
-        false,
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _SuggestionCircle extends StatelessWidget {

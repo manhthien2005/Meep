@@ -31,6 +31,7 @@ class SpaceConfigStep extends StatelessWidget {
     required this.onPresetSelected,
     required this.onCustomIconTap,
     required this.onComplete,
+    this.customPresets = const [],
     this.isLoading = false,
   });
 
@@ -41,6 +42,9 @@ class SpaceConfigStep extends StatelessWidget {
   final void Function(String emoji, String color) onPresetSelected;
   final VoidCallback onCustomIconTap;
   final VoidCallback onComplete;
+
+  /// Preset tuỳ chỉnh user tạo ở Step 3 — hiện sau 8 preset gốc, trước ô "+".
+  final List<SpacePreset> customPresets;
   final bool isLoading;
 
   @override
@@ -77,18 +81,18 @@ class SpaceConfigStep extends StatelessWidget {
             label: 'Space theme',
           ),
           const SizedBox(height: 16),
-          // Preset grid 3 cột (8 preset + ô "+")
+          // Preset grid 3 cột (8 preset gốc + N custom + ô "+")
           Expanded(
             child: GridView.count(
               crossAxisCount: 3,
               mainAxisSpacing: 20,
               crossAxisSpacing: 25,
               children: [
-                for (final preset in kSpacePresets)
+                for (final preset in [...kSpacePresets, ...customPresets])
                   _PresetCircle(
                     preset: preset,
                     isSelected: iconEmoji == preset.emoji &&
-                        colorHex.toUpperCase() == preset.colorHex,
+                        colorHex.toUpperCase() == preset.colorHex.toUpperCase(),
                     onTap: () =>
                         onPresetSelected(preset.emoji, preset.colorHex),
                   ),

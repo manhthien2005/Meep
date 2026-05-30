@@ -8,6 +8,7 @@ void main() {
       String spaceName = '',
       String iconEmoji = '👥',
       String colorHex = '#BFD5FF',
+      List<SpacePreset> customPresets = const [],
       ValueChanged<String>? onNameChanged,
       void Function(String, String)? onPresetSelected,
       VoidCallback? onCustomIconTap,
@@ -19,6 +20,7 @@ void main() {
             spaceName: spaceName,
             iconEmoji: iconEmoji,
             colorHex: colorHex,
+            customPresets: customPresets,
             onNameChanged: onNameChanged ?? (_) {},
             onPresetSelected: onPresetSelected ?? (_, __) {},
             onCustomIconTap: onCustomIconTap ?? () {},
@@ -107,6 +109,23 @@ void main() {
       await tester.pumpAndSettle();
 
       // Badge checkmark hiện cho preset đang chọn
+      expect(find.byIcon(Icons.check), findsOneWidget);
+    });
+
+    testWidgets('custom preset hiện trong grid + selected', (tester) async {
+      setTallSurface(tester);
+      await tester.pumpWidget(
+        buildStep(
+          iconEmoji: '🦄',
+          colorHex: '#ABCDEF',
+          customPresets: const [SpacePreset('🦄', '#ABCDEF')],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Custom emoji hiện trong grid (sau 8 preset gốc)
+      expect(find.text('🦄'), findsOneWidget);
+      // Đang được chọn → badge checkmark
       expect(find.byIcon(Icons.check), findsOneWidget);
     });
   });
