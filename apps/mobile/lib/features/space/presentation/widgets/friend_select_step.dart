@@ -75,6 +75,8 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
             ),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(
                   Icons.search,
@@ -82,9 +84,10 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
                   color: Color(0xFFD5D5D5),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
+                Flexible(
                   child: TextField(
                     controller: _searchController,
+                    textAlign: TextAlign.center,
                     decoration: InputDecoration(
                       hintText: 'Tìm kiếm bạn bè',
                       hintStyle: AppTextStyles.baseBold.copyWith(
@@ -219,25 +222,36 @@ class _FriendListItem extends StatelessWidget {
         height: 50,
         child: Row(
           children: [
-            // Avatar
+            // Avatar — inner circle + outer ring xám
             Container(
               width: 50,
               height: 50,
-              decoration: BoxDecoration(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
                 color: AppColors.bw600,
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.bw600,
-                  width: 1,
-                ),
               ),
-              child: Center(
-                child: Text(
-                  friend.displayName[0].toUpperCase(),
-                  style: AppTextStyles.mdBold.copyWith(
-                    color: AppColors.bw100,
-                  ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.bw700,
+                  shape: BoxShape.circle,
+                  image: friend.avatarUrl != null
+                      ? DecorationImage(
+                          image: NetworkImage(friend.avatarUrl!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
                 ),
+                child: friend.avatarUrl == null
+                    ? Center(
+                        child: Text(
+                          friend.displayName[0].toUpperCase(),
+                          style: AppTextStyles.mdBold.copyWith(
+                            color: AppColors.bw100,
+                          ),
+                        ),
+                      )
+                    : null,
               ),
             ),
             const SizedBox(width: 16),

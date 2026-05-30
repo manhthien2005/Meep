@@ -3,6 +3,7 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/space/presentation/widgets/friend_select_step.dart';
+import 'package:meep/shared/widgets/app_bottom_sheet.dart';
 
 class SpaceCreateSheet extends StatefulWidget {
   const SpaceCreateSheet({super.key});
@@ -36,66 +37,42 @@ class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.bw800,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
+    return AppBottomSheet(
+      child: PageView(
+        controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
         children: [
-          // Handle bar
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Container(
-              width: 55,
-              height: 8,
-              decoration: BoxDecoration(
-                color: AppColors.bw700,
-                borderRadius: BorderRadius.circular(6.5),
-              ),
-            ),
+          FriendSelectStep(
+            selectedFriendUids: _selectedFriendUids,
+            onContinue: () => _goToStep(1),
+            onClose: () => Navigator.of(context).pop(),
           ),
-          const SizedBox(height: AppSpacing.md),
-          // PageView
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                FriendSelectStep(
-                  selectedFriendUids: _selectedFriendUids,
-                  onContinue: () => _goToStep(1),
-                  onClose: () => Navigator.of(context).pop(),
-                ),
-                _SpaceConfigStep(
-                  spaceName: _spaceName,
-                  iconEmoji: _iconEmoji,
-                  colorHex: _colorHex,
-                  onNameChanged: (name) => setState(() => _spaceName = name),
-                  onPresetSelected: (emoji, color) {
-                    setState(() {
-                      _iconEmoji = emoji;
-                      _colorHex = color;
-                    });
-                  },
-                  onCustomIconTap: () => _goToStep(2),
-                  onBack: () => _goToStep(0),
-                  onComplete: _createSpace,
-                ),
-                _IconBuilderStep(
-                  initialEmoji: _iconEmoji,
-                  initialColor: _colorHex,
-                  onDone: (emoji, color) {
-                    setState(() {
-                      _iconEmoji = emoji;
-                      _colorHex = color;
-                    });
-                    _goToStep(1);
-                  },
-                  onBack: () => _goToStep(1),
-                ),
-              ],
-            ),
+          _SpaceConfigStep(
+            spaceName: _spaceName,
+            iconEmoji: _iconEmoji,
+            colorHex: _colorHex,
+            onNameChanged: (name) => setState(() => _spaceName = name),
+            onPresetSelected: (emoji, color) {
+              setState(() {
+                _iconEmoji = emoji;
+                _colorHex = color;
+              });
+            },
+            onCustomIconTap: () => _goToStep(2),
+            onBack: () => _goToStep(0),
+            onComplete: _createSpace,
+          ),
+          _IconBuilderStep(
+            initialEmoji: _iconEmoji,
+            initialColor: _colorHex,
+            onDone: (emoji, color) {
+              setState(() {
+                _iconEmoji = emoji;
+                _colorHex = color;
+              });
+              _goToStep(1);
+            },
+            onBack: () => _goToStep(1),
           ),
         ],
       ),
