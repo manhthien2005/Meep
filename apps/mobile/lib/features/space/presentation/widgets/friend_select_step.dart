@@ -26,6 +26,18 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
+  // Cache stream 1 lần để setState (tap chọn friend) không re-subscribe
+  // → không reload toàn bộ list.
+  late final Stream<List<UserProfile>> _friendsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    // TODO(SP/T3.2): get current user uid from auth
+    _friendsStream =
+        ref.read(friendRepositoryProvider).watchFriends('current-uid-mock');
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -46,9 +58,6 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
 
   @override
   Widget build(BuildContext context) {
-    // TODO(SP/T3.2): get current user uid from auth
-    final repo = ref.watch(friendRepositoryProvider);
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Column(
@@ -76,7 +85,6 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(
                   Icons.search,
@@ -84,10 +92,10 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
                   color: Color(0xFFD5D5D5),
                 ),
                 const SizedBox(width: 12),
-                Flexible(
+                Expanded(
                   child: TextField(
                     controller: _searchController,
-                    textAlign: TextAlign.center,
+                    textAlign: TextAlign.left,
                     decoration: InputDecoration(
                       hintText: 'Tìm kiếm bạn bè',
                       hintStyle: AppTextStyles.baseBold.copyWith(
@@ -130,7 +138,7 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
           // Friend list
           Expanded(
             child: StreamBuilder<List<UserProfile>>(
-              stream: repo.watchFriends('current-uid-mock'),
+              stream: _friendsStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -222,15 +230,18 @@ class _FriendListItem extends StatelessWidget {
         height: 50,
         child: Row(
           children: [
-            // Avatar — inner circle + outer ring xám
+            // Avatar — inner circle + outer ring xám mỏng (tách khỏi avatar)
             Container(
               width: 50,
               height: 50,
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: AppColors.bw600,
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.bw600,
+                  width: 1.5,
+                ),
               ),
+              padding: const EdgeInsets.all(3),
               child: Container(
                 decoration: BoxDecoration(
                   color: AppColors.bw700,
