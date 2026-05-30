@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/presentation/widgets/friend_select_step.dart';
 import 'package:meep/features/space/presentation/widgets/icon_builder_step.dart';
 import 'package:meep/features/space/presentation/widgets/space_config_step.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
 
-class SpaceCreateSheet extends StatefulWidget {
+class SpaceCreateSheet extends ConsumerStatefulWidget {
   const SpaceCreateSheet({super.key});
 
   @override
-  State<SpaceCreateSheet> createState() => _SpaceCreateSheetState();
+  ConsumerState<SpaceCreateSheet> createState() => _SpaceCreateSheetState();
 }
 
-class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
+class _SpaceCreateSheetState extends ConsumerState<SpaceCreateSheet> {
   final _pageController = PageController();
 
   // State shared across steps
@@ -19,6 +21,7 @@ class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
   String _spaceName = '';
   String _iconEmoji = '👥';
   String _colorHex = '#bfd5ff';
+  bool _isCreating = false;
 
   @override
   void dispose() {
@@ -50,6 +53,7 @@ class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
             spaceName: _spaceName,
             iconEmoji: _iconEmoji,
             colorHex: _colorHex,
+            isLoading: _isCreating,
             onNameChanged: (name) => setState(() => _spaceName = name),
             onPresetSelected: (emoji, color) {
               setState(() {
@@ -77,7 +81,23 @@ class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
   }
 
   Future<void> _createSpace() async {
-    // TODO(SP/T3.5): wire SpaceController.createSpace()
-    Navigator.of(context).pop();
+    if (_isCreating) return;
+    setState(() => _isCreating = true);
+    try {
+      await ref.read(spaceControllerProvider.notifier).createSpace(
+            name: _spaceName.trim(),
+            iconEmoji: _iconEmoji,
+            colorHex: _colorHex,
+            friendUids: _selectedFriendUids.toList(),
+          );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isCreating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không tạo được Space: $e')),
+      );
+    }
   }
 }

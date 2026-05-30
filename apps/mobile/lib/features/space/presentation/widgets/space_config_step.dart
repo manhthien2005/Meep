@@ -31,6 +31,7 @@ class SpaceConfigStep extends StatelessWidget {
     required this.onPresetSelected,
     required this.onCustomIconTap,
     required this.onComplete,
+    this.isLoading = false,
   });
 
   final String spaceName;
@@ -40,6 +41,7 @@ class SpaceConfigStep extends StatelessWidget {
   final void Function(String emoji, String color) onPresetSelected;
   final VoidCallback onCustomIconTap;
   final VoidCallback onComplete;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -98,6 +100,7 @@ class SpaceConfigStep extends StatelessWidget {
           AppPrimaryButton(
             label: 'Hoàn tất',
             showTrailingIcon: false,
+            isLoading: isLoading,
             onPressed: spaceName.trim().isEmpty ? null : onComplete,
           ),
           const SizedBox(height: 16),
