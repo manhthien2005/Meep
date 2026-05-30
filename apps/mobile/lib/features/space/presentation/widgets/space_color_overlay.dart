@@ -37,7 +37,8 @@ class SpaceColorOverlay extends StatefulWidget {
 
 class _SpaceColorOverlayState extends State<SpaceColorOverlay> {
   late Color _base = _hexToColor(widget.initialColor);
-  double _lightness = 0.5;
+  // Slider khởi tạo đúng sắc độ của màu preset đang chọn (không cứng 0.5).
+  late double _lightness = HSLColor.fromColor(_base).lightness;
 
   Color get _result {
     final hsl = HSLColor.fromColor(_base);
