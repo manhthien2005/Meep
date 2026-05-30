@@ -16,6 +16,7 @@ import 'package:meep/features/auth/presentation/signup/signup_password_page.dart
 import 'package:meep/features/auth/presentation/signup/signup_username_page.dart';
 import 'package:meep/features/chat/presentation/chat_screen.dart';
 import 'package:meep/features/chat/presentation/inbox_screen.dart';
+import 'package:meep/dev/widget_catalog_page.dart';
 import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
 import 'package:meep/features/diary/presentation/diary_create_screen.dart';
 import 'package:meep/features/diary/presentation/diary_list_screen.dart';
@@ -113,7 +114,7 @@ class _RouterNotifier extends ChangeNotifier {
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
   // ── Cold start: process deep link TRƯỚC khi tạo GoRouter ─────────────────
-  String initialLocation = '/intro';
+  String initialLocation = '/dev/widgets'; // DEV: khởi động vào widget catalog
   try {
     final rawRoute =
         WidgetsBinding.instance.platformDispatcher.defaultRouteName;
@@ -323,6 +324,10 @@ GoRouter appRouter(Ref ref) {
         builder: (_, state) => StreakPhotoDetailScreen(
           postId: state.pathParameters['postId'] ?? '',
         ),
+      ),
+      GoRoute(
+        path: '/dev/widgets',
+        builder: (_, __) => const WidgetCatalogPage(),
       ),
     ],
   );
