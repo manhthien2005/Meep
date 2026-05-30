@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/space/presentation/widgets/friend_select_step.dart';
 
 class SpaceCreateSheet extends StatefulWidget {
   const SpaceCreateSheet({super.key});
@@ -61,7 +62,7 @@ class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
               controller: _pageController,
               physics: const NeverScrollableScrollPhysics(),
               children: [
-                _FriendSelectStep(
+                FriendSelectStep(
                   selectedFriendUids: _selectedFriendUids,
                   onContinue: () => _goToStep(1),
                   onClose: () => Navigator.of(context).pop(),
@@ -104,46 +105,6 @@ class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
   Future<void> _createSpace() async {
     // TODO(SP/T3.5): wire SpaceController.createSpace()
     Navigator.of(context).pop();
-  }
-}
-
-// Step 1 stub
-class _FriendSelectStep extends StatelessWidget {
-  const _FriendSelectStep({
-    required this.selectedFriendUids,
-    required this.onContinue,
-    required this.onClose,
-  });
-
-  final Set<String> selectedFriendUids;
-  final VoidCallback onContinue;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          Text(
-            'Thêm Space mới',
-            style: AppTextStyles.xlBold.copyWith(color: AppColors.bw100),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Tạo một không gian kết nối với bạn bè',
-            style: AppTextStyles.mdBold.copyWith(color: AppColors.bw500),
-          ),
-          const Spacer(),
-          // TODO(SP/T3.2): friend list + search + checkbox
-          ElevatedButton(
-            onPressed: selectedFriendUids.isEmpty ? null : onContinue,
-            child: const Text('Tiếp tục →'),
-          ),
-          const SizedBox(height: AppSpacing.md),
-        ],
-      ),
-    );
   }
 }
 
