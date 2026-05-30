@@ -23,6 +23,15 @@ abstract final class AppColors {
   static const bw800 = Color(0xFF252627);
   static const bw900 = Color(0xFF050F10);
 
+  // Glass / overlay — taskbar kính (gradient border)
+  static const glassBorder = Color(0xFFB9E5EE);
+
+  // Taskbar side buttons (grid/upload) — màu sáng nổi trên nền tối
+  static const taskbarSideButton = Color(0xFFD9D9D9);
+
+  // Taskbar chat badge — chữ số trên nền turquoise (Figma Active=Chat)
+  static const taskbarBadgeText = Color(0xFF596466);
+
   // Success
   static const success200 = Color(0xFFE7FAF0);
   static const success300 = Color(0xFFC4F3D9);

@@ -6,16 +6,24 @@ import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/shared/widgets/app_back_button.dart';
 import 'package:meep/shared/widgets/app_google_button.dart';
 import 'package:meep/shared/widgets/app_primary_button.dart';
+import 'package:meep/shared/widgets/app_taskbar.dart';
 import 'package:meep/shared/widgets/app_text_input.dart';
 
 /// DEV ONLY — xóa route /dev/widgets trước khi merge vào develop.
-class WidgetCatalogPage extends StatelessWidget {
+class WidgetCatalogPage extends StatefulWidget {
   const WidgetCatalogPage({super.key});
+
+  @override
+  State<WidgetCatalogPage> createState() => _WidgetCatalogPageState();
+}
+
+class _WidgetCatalogPageState extends State<WidgetCatalogPage> {
+  TaskbarTab _activeTab = TaskbarTab.home;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bw900,
+      backgroundColor: const Color(0xFF1E1F21),
       appBar: AppBar(
         backgroundColor: AppColors.bw800,
         title: Text(
@@ -79,6 +87,81 @@ class WidgetCatalogPage extends StatelessWidget {
           ]),
           _section('AppTextInput — Password', [
             const AppTextInput(inputType: AppTextInputType.password),
+          ]),
+          _section('AppTaskbar — Floating (nổi)', [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // Placeholder để thấy blur xuyên qua
+                Container(
+                  height: 100,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.turquoise600,
+                        AppColors.turquoise800,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.all(Radius.circular(16)),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Nội dung phía sau taskbar',
+                      style: AppTextStyles.mdBold.copyWith(
+                        color: AppColors.bw100,
+                      ),
+                    ),
+                  ),
+                ),
+                AppTaskbar(
+                  activeTab: _activeTab,
+                  variant: TaskbarVariant.floating,
+                  chatBadgeCount: 2,
+                  onTabSelected: (tab) => setState(() => _activeTab = tab),
+                ),
+              ],
+            ),
+          ]),
+          _section('AppTaskbar — Embedded (chìm)', [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // Placeholder để thấy blur xuyên qua
+                Container(
+                  height: 100,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.error600,
+                        AppColors.error800,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.all(Radius.circular(16)),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Nội dung phía sau taskbar',
+                      style: AppTextStyles.mdBold.copyWith(
+                        color: AppColors.bw100,
+                      ),
+                    ),
+                  ),
+                ),
+                AppTaskbar(
+                  activeTab: _activeTab,
+                  variant: TaskbarVariant.embedded,
+                  onTabSelected: (tab) => setState(() => _activeTab = tab),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Embedded — vẽ bằng Flutter (AppTaskbar)',
+              style: AppTextStyles.xsSemiBold.copyWith(
+                color: AppColors.bw600,
+                fontFamily: 'monospace',
+              ),
+            ),
           ]),
         ],
       ),
