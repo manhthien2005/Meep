@@ -109,7 +109,15 @@ class FriendController extends _$FriendController {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      final currentUid = ref.read(currentUidProvider).requireValue!;
+      final currentUid = ref.read(currentUidProvider).valueOrNull;
+      if (currentUid == null) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Chưa đăng nhập',
+        );
+        return;
+      }
+
       await ref.read(friendRequestRepositoryProvider).sendFriendRequest(
             senderUid: currentUid,
             receiverUid: receiverUid,
@@ -197,7 +205,12 @@ class FriendController extends _$FriendController {
   }
 
   Future<void> unfriend(String friendUid) async {
-    final currentUid = ref.read(currentUidProvider).requireValue!;
+    final currentUid = ref.read(currentUidProvider).valueOrNull;
+    if (currentUid == null) {
+      state = state.copyWith(errorMessage: 'Chưa đăng nhập');
+      return;
+    }
+
     final pairId = pairIdOf(currentUid, friendUid);
 
     // Optimistic update: remove friend immediately
