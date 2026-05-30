@@ -3,6 +3,7 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/space/presentation/widgets/friend_select_step.dart';
+import 'package:meep/features/space/presentation/widgets/space_config_step.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
 
 class SpaceCreateSheet extends StatefulWidget {
@@ -47,7 +48,7 @@ class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
             onContinue: () => _goToStep(1),
             onClose: () => Navigator.of(context).pop(),
           ),
-          _SpaceConfigStep(
+          SpaceConfigStep(
             spaceName: _spaceName,
             iconEmoji: _iconEmoji,
             colorHex: _colorHex,
@@ -59,7 +60,6 @@ class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
               });
             },
             onCustomIconTap: () => _goToStep(2),
-            onBack: () => _goToStep(0),
             onComplete: _createSpace,
           ),
           _IconBuilderStep(
@@ -82,51 +82,6 @@ class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
   Future<void> _createSpace() async {
     // TODO(SP/T3.5): wire SpaceController.createSpace()
     Navigator.of(context).pop();
-  }
-}
-
-// Step 2 stub
-class _SpaceConfigStep extends StatelessWidget {
-  const _SpaceConfigStep({
-    required this.spaceName,
-    required this.iconEmoji,
-    required this.colorHex,
-    required this.onNameChanged,
-    required this.onPresetSelected,
-    required this.onCustomIconTap,
-    required this.onBack,
-    required this.onComplete,
-  });
-
-  final String spaceName;
-  final String iconEmoji;
-  final String colorHex;
-  final ValueChanged<String> onNameChanged;
-  final void Function(String emoji, String color) onPresetSelected;
-  final VoidCallback onCustomIconTap;
-  final VoidCallback onBack;
-  final VoidCallback onComplete;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          Text(
-            'Cấu hình Space',
-            style: AppTextStyles.xlBold.copyWith(color: AppColors.bw100),
-          ),
-          const Spacer(),
-          // TODO(SP/T3.3): TextField + preset list
-          ElevatedButton(
-            onPressed: spaceName.isEmpty ? null : onComplete,
-            child: const Text('Hoàn tất'),
-          ),
-          const SizedBox(height: AppSpacing.md),
-        ],
-      ),
-    );
   }
 }
 
