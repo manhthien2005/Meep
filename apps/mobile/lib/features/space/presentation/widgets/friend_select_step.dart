@@ -267,7 +267,9 @@ class _FriendListItem extends StatelessWidget {
                 child: friend.avatarUrl == null
                     ? Center(
                         child: Text(
-                          friend.displayName[0].toUpperCase(),
+                          friend.displayName.isEmpty
+                              ? '?'
+                              : friend.displayName[0].toUpperCase(),
                           style: AppTextStyles.mdBold.copyWith(
                             color: AppColors.bw100,
                           ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/core/theme/hex_color.dart';
 import 'package:meep/features/space/presentation/widgets/space_color_overlay.dart';
 import 'package:meep/shared/widgets/app_primary_button.dart';
 
@@ -249,9 +250,4 @@ class _SuggestionCircle extends StatelessWidget {
       ),
     );
   }
-}
-
-Color hexToColor(String hex) {
-  final cleaned = hex.replaceFirst('#', '');
-  return Color(int.parse('FF$cleaned', radix: 16));
 }

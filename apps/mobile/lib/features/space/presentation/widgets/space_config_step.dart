@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/core/theme/hex_color.dart';
 import 'package:meep/shared/widgets/app_primary_button.dart';
 
 /// Preset icon = (emoji, background color) paired — Figma 269:1257 source of truth.
@@ -190,7 +191,7 @@ class _PresetCircle extends StatelessWidget {
         children: [
           Container(
             decoration: BoxDecoration(
-              color: _hexToColor(preset.colorHex),
+              color: hexToColor(preset.colorHex),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
@@ -255,9 +256,4 @@ class _CustomIconCircle extends StatelessWidget {
       ),
     );
   }
-}
-
-Color _hexToColor(String hex) {
-  final cleaned = hex.replaceFirst('#', '');
-  return Color(int.parse('FF$cleaned', radix: 16));
 }

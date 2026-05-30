@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/core/theme/hex_color.dart';
 
 /// 12 màu cơ bản cho overlay "Màu nền" — Figma 600:3498 source of truth.
 const kColorPalette = <String>[
@@ -36,7 +37,7 @@ class SpaceColorOverlay extends StatefulWidget {
 }
 
 class _SpaceColorOverlayState extends State<SpaceColorOverlay> {
-  late Color _base = _hexToColor(widget.initialColor);
+  late Color _base = hexToColor(widget.initialColor);
   // Slider khởi tạo đúng sắc độ của màu preset đang chọn (không cứng 0.5).
   late double _lightness = HSLColor.fromColor(_base).lightness;
 
@@ -55,7 +56,7 @@ class _SpaceColorOverlayState extends State<SpaceColorOverlay> {
 
   void _selectColor(String hex) {
     setState(() {
-      _base = _hexToColor(hex);
+      _base = hexToColor(hex);
       _lightness = HSLColor.fromColor(_base).lightness;
     });
     _notify();
@@ -108,7 +109,7 @@ class _SpaceColorOverlayState extends State<SpaceColorOverlay> {
                 for (final hex in kColorPalette)
                   _ColorDot(
                     hex: hex,
-                    isSelected: _hexToColor(hex).toARGB32() == _base.toARGB32(),
+                    isSelected: hexToColor(hex).toARGB32() == _base.toARGB32(),
                     onTap: () => _selectColor(hex),
                   ),
               ],
@@ -168,7 +169,7 @@ class _ColorDot extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: _hexToColor(hex),
+          color: hexToColor(hex),
           border: isSelected ? Border.all(color: Colors.white, width: 4) : null,
         ),
       ),
@@ -247,9 +248,4 @@ class _GradientTrackShape extends RoundedRectSliderTrackShape {
       ..shader = LinearGradient(colors: colors).createShader(rect);
     context.canvas.drawRRect(rrect, paint);
   }
-}
-
-Color _hexToColor(String hex) {
-  final cleaned = hex.replaceFirst('#', '');
-  return Color(int.parse('FF$cleaned', radix: 16));
 }
