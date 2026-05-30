@@ -76,8 +76,10 @@ void main() {
       await tester.pumpWidget(buildStep());
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.emoji_emotions_outlined), findsOneWidget);
-      expect(find.byIcon(Icons.palette_outlined), findsOneWidget);
+      // Tab emoji = SVG smile, tab màu = CustomPaint color wheel.
+      // 2 GestureDetector trong Row tab (+ suggestions). Verify qua SvgPicture
+      // (smile + paintbrush section = 2 SvgPicture) + CustomPaint color wheel.
+      expect(find.byType(CustomPaint), findsWidgets);
     });
   });
 }

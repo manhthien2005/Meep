@@ -1,5 +1,6 @@
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/space/presentation/widgets/space_color_overlay.dart';
@@ -62,15 +63,20 @@ class _IconBuilderStepState extends State<IconBuilderStep> {
   }
 
   Future<void> _openColorOverlay() async {
-    final picked = await showModalBottomSheet<String>(
+    // Lưu màu gốc để revert nếu user đóng mà không xác nhận (hiện không có
+    // nút huỷ — đóng = giữ màu đã chỉnh). Live sync: mỗi lần overlay đổi màu,
+    // preview + suggestions cập nhật ngay qua onColorChanged.
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
+      // Không tối nền — để preview phía sau vẫn thấy rõ khi chỉnh màu.
+      barrierColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => SpaceColorOverlay(initialColor: _color),
+      builder: (_) => SpaceColorOverlay(
+        initialColor: _color,
+        onColorChanged: (hex) => setState(() => _color = hex),
+      ),
     );
-    if (picked != null) {
-      setState(() => _color = picked);
-    }
   }
 
   @override
@@ -101,13 +107,17 @@ class _IconBuilderStepState extends State<IconBuilderStep> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _TabButton(
-                icon: Icons.emoji_emotions_outlined,
                 onTap: _openEmojiPicker,
+                child: SvgPicture.asset(
+                  'assets/icons/ic_smile.svg',
+                  width: 24,
+                  height: 24,
+                ),
               ),
               const SizedBox(width: 13),
               _TabButton(
-                icon: Icons.palette_outlined,
                 onTap: _openColorOverlay,
+                child: const _ColorWheelIcon(size: 24),
               ),
             ],
           ),
@@ -115,10 +125,10 @@ class _IconBuilderStepState extends State<IconBuilderStep> {
           // Section "Gợi ý"
           Row(
             children: [
-              const Icon(
-                Icons.brush_outlined,
-                size: 20,
-                color: Color(0xFFD5D5D5),
+              SvgPicture.asset(
+                'assets/icons/ic_paintbrush_vertical.svg',
+                width: 20,
+                height: 20,
               ),
               const SizedBox(width: 8),
               Text(
@@ -182,9 +192,9 @@ class _PreviewCircle extends StatelessWidget {
 }
 
 class _TabButton extends StatelessWidget {
-  const _TabButton({required this.icon, required this.onTap});
+  const _TabButton({required this.child, required this.onTap});
 
-  final IconData icon;
+  final Widget child;
   final VoidCallback onTap;
 
   @override
@@ -198,10 +208,53 @@ class _TabButton extends StatelessWidget {
           color: const Color(0x66394041),
           borderRadius: BorderRadius.circular(40),
         ),
-        child: Icon(icon, size: 24, color: AppColors.bw100),
+        child: child,
       ),
     );
   }
+}
+
+/// Color wheel icon (hue ring) — vẽ bằng CustomPainter thay vì SVG (Figma
+/// export ra PNG nhúng, không scale tốt). Match graphic cầu vồng 269:1334.
+class _ColorWheelIcon extends StatelessWidget {
+  const _ColorWheelIcon({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _ColorWheelPainter()),
+    );
+  }
+}
+
+class _ColorWheelPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    const sweep = 360;
+    for (var i = 0; i < sweep; i++) {
+      final paint = Paint()
+        ..color = HSVColor.fromAHSV(1, i.toDouble(), 1, 1).toColor()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2;
+      final startAngle = (i - 90) * 3.1415926 / 180;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius - 1),
+        startAngle,
+        (2 * 3.1415926 / sweep) + 0.02,
+        false,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _SuggestionCircle extends StatelessWidget {

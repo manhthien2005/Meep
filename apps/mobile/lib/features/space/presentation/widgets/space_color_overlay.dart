@@ -19,11 +19,17 @@ const kColorPalette = <String>[
 ];
 
 /// Overlay chọn màu nền cho icon Space. Tap màu → chọn, kéo slider → chỉnh
-/// sắc độ (lightness). Bấm X → trả về hex đã chọn (shade-adjusted).
+/// sắc độ (lightness). Mỗi thay đổi fire [onColorChanged] để preview phía sau
+/// sync trực tiếp (live). Bấm X → đóng (màu đã sync, không cần trả về).
 class SpaceColorOverlay extends StatefulWidget {
-  const SpaceColorOverlay({super.key, required this.initialColor});
+  const SpaceColorOverlay({
+    super.key,
+    required this.initialColor,
+    required this.onColorChanged,
+  });
 
   final String initialColor;
+  final ValueChanged<String> onColorChanged;
 
   @override
   State<SpaceColorOverlay> createState() => _SpaceColorOverlayState();
@@ -44,11 +50,19 @@ class _SpaceColorOverlayState extends State<SpaceColorOverlay> {
     return '#${rgb.toUpperCase()}';
   }
 
+  void _notify() => widget.onColorChanged(_resultHex);
+
   void _selectColor(String hex) {
     setState(() {
       _base = _hexToColor(hex);
       _lightness = HSLColor.fromColor(_base).lightness;
     });
+    _notify();
+  }
+
+  void _onLightnessChanged(double v) {
+    setState(() => _lightness = v);
+    _notify();
   }
 
   @override
@@ -76,7 +90,7 @@ class _SpaceColorOverlayState extends State<SpaceColorOverlay> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: _CloseButton(
-                    onTap: () => Navigator.of(context).pop(_resultHex),
+                    onTap: () => Navigator.of(context).pop(),
                   ),
                 ),
               ],
@@ -103,7 +117,7 @@ class _SpaceColorOverlayState extends State<SpaceColorOverlay> {
             _ShadeSlider(
               base: _base,
               lightness: _lightness,
-              onChanged: (v) => setState(() => _lightness = v),
+              onChanged: _onLightnessChanged,
             ),
           ],
         ),
