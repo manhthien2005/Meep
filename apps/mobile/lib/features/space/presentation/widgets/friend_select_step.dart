@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meep/core/theme/app_colors.dart';
-import 'package:meep/core/theme/app_radii.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
+import 'package:meep/shared/widgets/app_primary_button.dart';
 
 class FriendSelectStep extends ConsumerStatefulWidget {
   const FriendSelectStep({
@@ -185,9 +185,10 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
           ),
           const SizedBox(height: 20),
           // Continue button
-          _ContinueButton(
-            enabled: widget.selectedFriendUids.isNotEmpty,
-            onPressed: widget.onContinue,
+          AppPrimaryButton(
+            label: 'Tiếp tục',
+            onPressed:
+                widget.selectedFriendUids.isNotEmpty ? widget.onContinue : null,
           ),
           const SizedBox(height: 16),
         ],
@@ -227,7 +228,7 @@ class _FriendListItem extends StatelessWidget {
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: AppColors.bw600,
-                  width: 4,
+                  width: 1,
                 ),
               ),
               child: Center(
@@ -288,52 +289,6 @@ class _CustomCheckbox extends StatelessWidget {
               color: AppColors.bw900,
             )
           : null,
-    );
-  }
-}
-
-class _ContinueButton extends StatelessWidget {
-  const _ContinueButton({
-    required this.enabled,
-    required this.onPressed,
-  });
-
-  final bool enabled;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: TextButton(
-        onPressed: enabled ? onPressed : null,
-        style: TextButton.styleFrom(
-          backgroundColor: const Color(0x66394041),
-          disabledBackgroundColor: const Color(0x66394041),
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.pill),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Tiếp tục',
-              style: AppTextStyles.mdBold.copyWith(
-                color: enabled ? Colors.white : AppColors.bw600,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.arrow_forward,
-              size: 20,
-              color: enabled ? Colors.white : AppColors.bw600,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

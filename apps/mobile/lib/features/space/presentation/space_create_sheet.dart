@@ -39,7 +39,7 @@ class _SpaceCreateSheetState extends State<SpaceCreateSheet> {
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.bw800,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [
