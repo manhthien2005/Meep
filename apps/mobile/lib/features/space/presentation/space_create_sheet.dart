@@ -19,8 +19,9 @@ class _SpaceCreateSheetState extends ConsumerState<SpaceCreateSheet> {
   // State shared across steps
   final Set<String> _selectedFriendUids = {};
   String _spaceName = '';
-  String _iconEmoji = '👥';
-  String _colorHex = '#bfd5ff';
+  // Default icon = mặt cười 😄 + nền warning300 (Figma Step 3 default).
+  String _iconEmoji = '😄';
+  String _colorHex = '#FEEBCA';
   bool _isCreating = false;
 
   // Preset tuỳ chỉnh user tạo ở Step 3 — lưu lại để chọn + đặt tên ở Step 2.
