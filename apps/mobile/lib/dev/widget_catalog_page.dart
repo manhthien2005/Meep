@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
@@ -19,6 +20,15 @@ class WidgetCatalogPage extends StatefulWidget {
 
 class _WidgetCatalogPageState extends State<WidgetCatalogPage> {
   TaskbarTab _activeTab = TaskbarTab.home;
+
+  /// DEV: tab Tin nhắn mở Inbox để test luồng Chat. Các tab khác chỉ đổi active.
+  void _onTab(TaskbarTab tab) {
+    if (tab == TaskbarTab.chat) {
+      context.push('/inbox');
+      return;
+    }
+    setState(() => _activeTab = tab);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +127,7 @@ class _WidgetCatalogPageState extends State<WidgetCatalogPage> {
                   activeTab: _activeTab,
                   variant: TaskbarVariant.floating,
                   chatBadgeCount: 2,
-                  onTabSelected: (tab) => setState(() => _activeTab = tab),
+                  onTabSelected: _onTab,
                 ),
               ],
             ),
@@ -150,7 +160,7 @@ class _WidgetCatalogPageState extends State<WidgetCatalogPage> {
                 AppTaskbar(
                   activeTab: _activeTab,
                   variant: TaskbarVariant.embedded,
-                  onTabSelected: (tab) => setState(() => _activeTab = tab),
+                  onTabSelected: _onTab,
                 ),
               ],
             ),

@@ -291,5 +291,45 @@ void main() {
         '/home',
       );
     });
+
+    // ── DEV(C/#142): chat routes bypass auth both ways ───────
+    test('uid null + /inbox → null (stay, dev bypass)', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: null,
+          profileExists: null,
+          needsProfile: false,
+          location: '/inbox',
+        ),
+        isNull,
+      );
+    });
+
+    test('uid + profile + /chat/:id → null (stay, not /home)', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: true,
+          needsProfile: false,
+          location: '/chat/conv-1',
+        ),
+        isNull,
+      );
+    });
+
+    test('uid null + /group-chat/:id → null (stay, dev bypass)', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: null,
+          profileExists: null,
+          needsProfile: false,
+          location: '/group-chat/conv-1',
+        ),
+        isNull,
+      );
+    });
   });
 }
