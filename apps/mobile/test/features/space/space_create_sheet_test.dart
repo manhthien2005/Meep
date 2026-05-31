@@ -15,17 +15,15 @@ class _FakeFriendRepository implements FriendRepository {
   Stream<List<UserProfile>> watchFriends(String uid) => Stream.value(_friends);
 
   @override
-  Future<List<UserProfile>> searchUser(String query) async => _friends;
+  Future<UserProfile?> searchUser(String username) async =>
+      _friends.where((f) => f.username == username).firstOrNull;
 
   @override
   Future<List<String>> getFriendUids(String uid) async =>
       _friends.map((f) => f.uid).toList();
 
   @override
-  Future<void> unfriend({
-    required String uid,
-    required String friendUid,
-  }) async {}
+  Future<void> unfriend(String pairId) async {}
 }
 
 void main() {

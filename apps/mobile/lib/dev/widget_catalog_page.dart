@@ -36,14 +36,10 @@ class _MockFriendRepository implements FriendRepository {
   }
 
   @override
-  Future<List<UserProfile>> searchUser(String query) async {
+  Future<UserProfile?> searchUser(String username) async {
     return _mockFriends
-        .where(
-          (f) =>
-              f.displayName.toLowerCase().contains(query.toLowerCase()) ||
-              f.username.toLowerCase().contains(query.toLowerCase()),
-        )
-        .toList();
+        .where((f) => f.username.toLowerCase() == username.toLowerCase())
+        .firstOrNull;
   }
 
   @override
@@ -52,10 +48,7 @@ class _MockFriendRepository implements FriendRepository {
   }
 
   @override
-  Future<void> unfriend({
-    required String uid,
-    required String friendUid,
-  }) async {}
+  Future<void> unfriend(String pairId) async {}
 }
 
 /// DEV ONLY — xóa route /dev/widgets trước khi merge vào develop.
