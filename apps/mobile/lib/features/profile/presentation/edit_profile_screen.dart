@@ -30,6 +30,7 @@ const _iCake = 'assets/icons/ic_cake.svg';
 const _iPhone = 'assets/icons/ic_phone.svg';
 const _iMail = 'assets/icons/ic_mail.svg';
 const _iPerson = 'assets/icons/ic_person.svg';
+const _iPencilLine = 'assets/icons/ic_pencil_line.svg';
 const _iBell = 'assets/icons/ic_bell.svg';
 const _iChevronLeft = 'assets/icons/ic_chevron_left.svg';
 const _iInfo = 'assets/icons/ic_info.svg';
@@ -317,7 +318,7 @@ class _SettingsSectionState extends State<_SettingsSection> {
         ),
         // Figma: Tiểu sử row — info icon 719:4035 toggles tooltip (frame 719:4240)
         _SettingsRow(
-          iconPath: _iMail,
+          iconPath: _iPencilLine,
           label: 'Tiểu sử',
           value: _kBio,
           onInfoTap: () => setState(() => _showBioTooltip = !_showBioTooltip),
