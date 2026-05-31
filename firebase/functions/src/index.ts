@@ -4,6 +4,10 @@ import { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } from 'firebas
 import { initializeApp } from 'firebase-admin/app';
 import { z } from 'zod';
 
+// Feed module
+export { onPostCreated } from './feed/onPostCreated.js';
+export { onPostDeleted } from './feed/onPostDeleted.js';
+
 initializeApp();
 
 setGlobalOptions({
@@ -51,24 +55,7 @@ export const sendFriendRequest = onCall((request) => {
 
 // ===== Firestore triggers =====
 
-/**
- * Fan out a notification to all friends of the post author.
- *
- * TODO(impl):
- *   - read the post doc
- *   - look up friend uids in /friendships
- *   - load FCM tokens from /users/{uid}/private/fcm
- *   - call messaging.sendEachForMulticast(...)
- */
-export const onPostCreated = onDocumentCreated(
-  { document: 'posts/{postId}', region: 'asia-southeast1' },
-  (event) => {
-    const post = event.data?.data();
-    if (!post) return;
-    // TODO(impl): see comment above.
-    console.warn(`onPostCreated fired for ${event.params.postId} — TODO: fan out`);
-  },
-);
+// onPostCreated — implemented in ./feed/onPostCreated.ts
 
 // ===== Friend module =====
 
@@ -122,21 +109,7 @@ export const deleteAccount = onCall((request) => {
   return { ok: true };
 });
 
-// ===== Feed module stubs =====
-
-/**
- * Clean up Storage assets when a post is deleted.
- *
- * TODO(FE/impl):
- *   - delete posts/{uid}/{postId}/photo.jpg from Storage
- *   - remove fan-out feed entries in /users/{uid}/feed/{postId}
- */
-export const onPostDeleted = onDocumentDeleted(
-  { document: 'posts/{postId}', region: 'asia-southeast1' },
-  (_event) => {
-    // TODO(FE/impl): see comment above.
-  },
-);
+// onPostCreated + onPostDeleted implemented in ./feed/ — exported above
 
 // ===== Notification module stubs =====
 
