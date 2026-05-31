@@ -45,8 +45,10 @@ class FirebasePostRepository implements PostRepository {
             .orderBy('createdAt', descending: true)
             .limit(10)
             .snapshots()
-            .map((snap) =>
-                snap.docs.map((doc) => Post.fromJson(doc.data())).toList(),);
+            .map(
+              (snap) =>
+                  snap.docs.map((doc) => Post.fromJson(doc.data())).toList(),
+            );
       }).toList();
 
       // Merge all streams, flatten, sort by createdAt desc, take top 10.
