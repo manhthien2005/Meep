@@ -14,10 +14,10 @@ class PhotoGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (photos.isEmpty) {
-      return Center(
+      return const Center(
         child: Text(
           'Chưa có ảnh nào',
-          style: const TextStyle(color: AppColors.bw500),
+          style: TextStyle(color: AppColors.bw500),
         ),
       );
     }
@@ -55,8 +55,7 @@ class _PhotoItem extends StatelessWidget {
           child: Image.network(
             url,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) =>
-                Container(color: AppColors.bw700),
+            errorBuilder: (_, __, ___) => Container(color: AppColors.bw700),
             loadingBuilder: (_, child, progress) =>
                 progress == null ? child : Container(color: AppColors.bw800),
           ),

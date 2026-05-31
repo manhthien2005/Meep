@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -19,9 +20,21 @@ import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/data/fake_conversation_repository.dart';
 import 'package:meep/firebase_options.dart';
 
+// Pass --dart-define=USE_EMULATOR=true khi dev local để trỏ vào Firebase Emulator Suite.
+const _useEmulator =
+    bool.fromEnvironment('USE_EMULATOR', defaultValue: false);
+// Android emulator truy cập host machine qua 10.0.2.2 (không phải 127.0.0.1)
+const _emulatorHost = '10.0.2.2';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  if (_useEmulator) {
+    await FirebaseAuth.instance.useAuthEmulator(_emulatorHost, 9099);
+    FirebaseFirestore.instance.useFirestoreEmulator(_emulatorHost, 9999);
+    await FirebaseStorage.instance.useStorageEmulator(_emulatorHost, 9199);
+  }
 
   final authRepo = FirebaseAuthRepository(
     auth: FirebaseAuth.instance,

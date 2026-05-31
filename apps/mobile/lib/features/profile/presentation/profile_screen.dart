@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/profile/presentation/widgets/diary_tab_content.dart';
 import 'package:meep/features/profile/presentation/widgets/photo_grid.dart';
 import 'package:meep/features/profile/presentation/widgets/profile_tab_bar.dart';
+import 'package:meep/shared/widgets/app_taskbar.dart';
+import 'package:meep/shared/widgets/share_profile_sheet.dart';
 
 // ─── MOCK DATA — xoá khi wire ProfileController ──────────────────────────────
 const _kUsername = 'janakimmm';
@@ -22,7 +26,7 @@ final _kMockPhotos = List.generate(
 // #D9D9D9 → avatarRingIdle
 // AppTextStyles.lgSemiBold  — 20px w600 h:28/20  (username)
 // AppTextStyles.baseSemiBold — 18px w600 h:24/18 (stats number)
-const _cBg = Color(0xFF0D0804);
+const _cBg = Color(0xFF050F10); // Black & White/900
 const _cButtonFill = Color(0xFF363636);
 const _cButtonText = Color(0xFFDDDDDD);
 const _cAvatarRing = Color(0xFFD9D9D9);
@@ -44,88 +48,116 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: _cBg,
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 30, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 30, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const _ProfileAvatar(username: _kUsername),
-                      const SizedBox(width: 25),
-                      _StatsRow(
-                        postCount: _kPostCount,
-                        friendCount: _kFriendCount,
-                        spaceCount: _kSpaceCount,
-                        onFriendTap: () {
-                          // TODO(T3): open FriendSheet
-                        },
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const _ProfileAvatar(username: _kUsername),
+                          const SizedBox(width: 25),
+                          _StatsRow(
+                            postCount: _kPostCount,
+                            friendCount: _kFriendCount,
+                            spaceCount: _kSpaceCount,
+                            onFriendTap: () {
+                              // TODO(T3): open FriendSheet
+                            },
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    _kUsername,
-                    style: TextStyle(
-                      fontFamily: 'Nunito',
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600, // TODO: AppTextStyles.lgSemiBold
-                      height: 28 / 20,
-                      color: AppColors.bw100,
-                    ),
-                  ),
-                  if (_kBio.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      _kBio,
-                      style: AppTextStyles.smRegular.copyWith(
-                        color: AppColors.bw100,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ProfileActionButton(
-                          label: 'Chỉnh sửa',
-                          onTap: () {
-                            // TODO(T3): context.push('/profile/edit')
-                          },
+                      const SizedBox(height: 10),
+                      const Text(
+                        _kUsername,
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
+                          fontSize: 20,
+                          fontWeight:
+                              FontWeight.w600, // TODO: AppTextStyles.lgSemiBold
+                          height: 28 / 20,
+                          color: AppColors.bw100,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _ProfileActionButton(
-                          label: 'Chia sẻ trang cá nhân',
-                          onTap: () {
-                            // TODO(T6): show ShareProfileSheet
-                          },
+                      if (_kBio.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          _kBio,
+                          style: AppTextStyles.smRegular.copyWith(
+                            color: AppColors.bw100,
+                          ),
                         ),
+                      ],
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _ProfileActionButton(
+                              label: 'Chỉnh sửa',
+                              onTap: () => context.push('/profile/edit'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _ProfileActionButton(
+                              label: 'Chia sẻ trang cá nhân',
+                              onTap: () => ShareProfileSheet.show(
+                                context,
+                                uid: widget.uid,
+                                username: _kUsername,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 16),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                ],
+                ),
+                ProfileTabBar(
+                  activeTab: _activeTab,
+                  onTabChanged: (t) => setState(() => _activeTab = t),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: _activeTab == 0
+                      ? PhotoGrid(
+                          photos: _kMockPhotos,
+                          onTap: (index) => context
+                              .push('/profile/photo/mock-$index', extra: index),
+                        )
+                      : const DiaryTabContent(),
+                ),
+              ],
+            ),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: AppTaskbar(
+                  activeTab: TaskbarTab.profile,
+                  onTabSelected: (tab) {
+                    switch (tab) {
+                      case TaskbarTab.streak:
+                        context.go('/streak');
+                      case TaskbarTab.diary:
+                        context.go('/diary');
+                      case TaskbarTab.home:
+                        context.go('/home');
+                      case TaskbarTab.chat:
+                        context.go('/inbox');
+                      case TaskbarTab.profile:
+                        context.go('/profile', extra: widget.uid);
+                    }
+                  },
+                ),
               ),
-            ),
-            ProfileTabBar(
-              activeTab: _activeTab,
-              onTabChanged: (t) => setState(() => _activeTab = t),
-            ),
-            Expanded(
-              child: _activeTab == 0
-                  ? PhotoGrid(
-                      photos: _kMockPhotos,
-                      onTap: (index) {
-                        // TODO(T4): context.push('/profile/photo/${index}')
-                      },
-                    )
-                  : const _DiaryTabContent(),
             ),
           ],
         ),
@@ -137,6 +169,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 // ─── Avatar ──────────────────────────────────────────────────────────────────
 
 class _ProfileAvatar extends StatelessWidget {
+  // ignore: unused_element_parameter
   const _ProfileAvatar({required this.username, this.avatarUrl});
 
   final String username;
@@ -156,9 +189,11 @@ class _ProfileAvatar extends StatelessWidget {
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
         border: Border.fromBorderSide(
-          BorderSide(color: _cAvatarRing, width: 2), // TODO: AppColors.avatarRingIdle
+          BorderSide(
+              color: _cAvatarRing, width: 2), // ignore: require_trailing_commas
         ),
       ),
+      padding: const EdgeInsets.all(4),
       child: ClipOval(
         child: avatarUrl != null
             ? Image.network(avatarUrl!, fit: BoxFit.cover)
@@ -272,23 +307,6 @@ class _ProfileActionButton extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ─── Diary tab ───────────────────────────────────────────────────────────────
-
-class _DiaryTabContent extends StatelessWidget {
-  const _DiaryTabContent();
-
-  @override
-  Widget build(BuildContext context) {
-    // TODO(T8): connect DiaryRepository.getPublicEntries(uid) → DiaryMoodCard grid
-    return const Center(
-      child: Text(
-        'Chưa có nhật ký nào',
-        style: TextStyle(color: AppColors.bw500),
       ),
     );
   }

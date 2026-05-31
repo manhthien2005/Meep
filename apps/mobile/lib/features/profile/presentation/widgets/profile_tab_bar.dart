@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:meep/core/theme/app_colors.dart';
 
-// TODO: replace with SvgPicture.asset() when SVG assets are added
-// grid-3x3 → assets/icons/ic_grid_3x3.svg
-// book-heart → assets/icons/ic_book_heart.svg
 const _cInactiveIcon = Color(0xFF949494); // TODO: add AppColors.tabIconInactive
 
 class ProfileTabBar extends StatelessWidget {
@@ -25,7 +23,7 @@ class ProfileTabBar extends StatelessWidget {
           children: [
             Expanded(
               child: _TabItem(
-                icon: Icons.grid_view_rounded,
+                assetPath: 'assets/icons/ic_grid_3x3.svg',
                 isActive: activeTab == 0,
                 semanticsLabel: 'Tab ảnh',
                 onTap: () => onTabChanged(0),
@@ -33,7 +31,7 @@ class ProfileTabBar extends StatelessWidget {
             ),
             Expanded(
               child: _TabItem(
-                icon: Icons.menu_book_rounded,
+                assetPath: 'assets/icons/ic_book_heart.svg',
                 isActive: activeTab == 1,
                 semanticsLabel: 'Tab nhật ký',
                 onTap: () => onTabChanged(1),
@@ -43,7 +41,7 @@ class ProfileTabBar extends StatelessWidget {
         ),
         Stack(
           children: [
-            Container(height: 1, color: AppColors.bw300.withOpacity(0.5)),
+            Container(height: 1, color: AppColors.bw300.withValues(alpha: 0.5)),
             AnimatedAlign(
               alignment:
                   activeTab == 0 ? Alignment.centerLeft : Alignment.centerRight,
@@ -63,13 +61,13 @@ class ProfileTabBar extends StatelessWidget {
 
 class _TabItem extends StatelessWidget {
   const _TabItem({
-    required this.icon,
+    required this.assetPath,
     required this.isActive,
     required this.semanticsLabel,
     required this.onTap,
   });
 
-  final IconData icon;
+  final String assetPath;
   final bool isActive;
   final String semanticsLabel;
   final VoidCallback onTap;
@@ -85,10 +83,14 @@ class _TabItem extends StatelessWidget {
         child: SizedBox(
           height: 33,
           child: Center(
-            child: Icon(
-              icon,
-              size: 20,
-              color: isActive ? AppColors.bw100 : _cInactiveIcon,
+            child: SvgPicture.asset(
+              assetPath,
+              width: 20,
+              height: 20,
+              colorFilter: ColorFilter.mode(
+                isActive ? AppColors.bw100 : _cInactiveIcon,
+                BlendMode.srcIn,
+              ),
             ),
           ),
         ),

@@ -24,8 +24,8 @@ import 'package:meep/features/diary/presentation/diary_list_screen.dart';
 import 'package:meep/features/feed/presentation/home_screen.dart';
 import 'package:meep/features/home/presentation/home_page.dart';
 import 'package:meep/features/profile/presentation/edit_profile_screen.dart';
-import 'package:meep/features/profile/presentation/photo_detail_screen.dart';
 import 'package:meep/features/profile/presentation/friend_profile_screen.dart';
+import 'package:meep/features/profile/presentation/photo_detail_screen.dart';
 import 'package:meep/features/profile/presentation/profile_screen.dart';
 import 'package:meep/features/space/presentation/space_context_bottom_sheet.dart';
 import 'package:meep/features/space/presentation/space_create_sheet.dart';
@@ -303,8 +303,20 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: '/profile/photo/:postId',
-        builder: (_, state) =>
-            PhotoDetailScreen(postId: state.pathParameters['postId'] ?? ''),
+        builder: (_, state) {
+          final extra = state.extra;
+          if (extra is Map<String, dynamic>) {
+            return PhotoDetailScreen(
+              postId: state.pathParameters['postId'] ?? '',
+              initialIndex: (extra['index'] as int?) ?? 0,
+              photos: (extra['photos'] as List?)?.cast<String>(),
+            );
+          }
+          return PhotoDetailScreen(
+            postId: state.pathParameters['postId'] ?? '',
+            initialIndex: (extra as int?) ?? 0,
+          );
+        },
       ),
       GoRoute(
         path: '/friend-profile/:uid',
