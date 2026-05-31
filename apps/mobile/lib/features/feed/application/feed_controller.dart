@@ -1,6 +1,14 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/features/feed/application/feed_state.dart';
+import 'package:meep/features/feed/data/firebase_post_repository.dart';
+import 'package:meep/features/feed/data/firebase_storage_repository.dart';
 import 'package:meep/features/feed/data/post_repository.dart';
 import 'package:meep/features/feed/data/storage_repository.dart';
 
@@ -17,41 +25,69 @@ enum FeedFilter {
   space,
 }
 
-// ignore: avoid_classes_with_only_static_members
-class FeedState {
-  const FeedState._();
-}
+@Riverpod(keepAlive: true)
+PostRepository postRepository(Ref ref) =>
+    FirebasePostRepository(FirebaseFirestore.instance);
 
 @Riverpod(keepAlive: true)
-PostRepository postRepository(PostRepositoryRef ref) =>
-    throw UnimplementedError(
-      'postRepositoryProvider must be overridden — '
-      'wire FirestorePostRepository in main.dart (TODO: FE/T1/KhoaLND)',
-    );
+StorageRepository storageRepository(Ref ref) =>
+    FirebaseStorageRepository(FirebaseStorage.instance);
 
-@Riverpod(keepAlive: true)
-StorageRepository storageRepository(StorageRepositoryRef ref) =>
-    throw UnimplementedError(
-      'storageRepositoryProvider must be overridden — '
-      'wire FirebaseStorageRepository in main.dart (TODO: FE/T2/KhoaLND)',
-    );
-
+/// Async notifier — build() returns `Future<FeedState>` so `AsyncValue.when()` works in UI.
+///
+/// M2: uses watchFeed stream (first 10 posts, no cursor pagination).
+/// TODO(FE/T6/KhoaLND): full cursor pagination needs PostRepository.getPage() —
+///   requires leader to add method to interface first.
 @riverpod
 class FeedController extends _$FeedController {
+  static const int _prefetchAt = 4;
+
   @override
-  Future<List<Post>> build({
+  Future<FeedState> build({
     FeedFilter filter = FeedFilter.all,
     // filterUid: used with FeedFilter.person — filter by friend's uid
     String? filterUid,
     // filterSpaceId: used with FeedFilter.space — query feed WHERE spaceId == filterSpaceId
     String? filterSpaceId,
   }) async {
-    // TODO(FE/T3/KhoaLND): implement watchFeed stream
-    throw UnimplementedError('FeedController.build — TODO: FE/T3/KhoaLND');
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final repo = ref.read(postRepositoryProvider);
+
+    // Live stream so posts appear once the CF fan-out writes the feed doc —
+    // no manual refresh needed. A single subscription drives both the initial
+    // future (first emission) and subsequent state updates.
+    final completer = Completer<FeedState>();
+    final sub = repo.watchFeed(uid).listen(
+      (posts) {
+        final filtered = filter == FeedFilter.person && filterUid != null
+            ? posts.where((p) => p.authorId == filterUid).toList()
+            : posts;
+        final feedState = FeedState(posts: filtered, hasMore: false);
+        if (completer.isCompleted) {
+          state = AsyncData(feedState);
+        } else {
+          completer.complete(feedState);
+        }
+      },
+      onError: (Object e, StackTrace st) {
+        if (!completer.isCompleted) {
+          completer.completeError(e, st);
+        } else {
+          state = AsyncError(e, st);
+        }
+      },
+    );
+    ref.onDispose(sub.cancel);
+
+    return completer.future;
   }
 
-  Future<void> loadMore() async {
-    // TODO(FE/T4/KhoaLND): implement pagination
-    throw UnimplementedError('loadMore — TODO: FE/T4/KhoaLND');
+  // TODO(FE/T6/KhoaLND): loadMore requires PostRepository.getPage() interface method.
+  // Blocked until leader adds paginated query to PostRepository contract.
+  Future<void> loadMore() async {}
+
+  void onItemVisible(int index) {
+    final posts = state.valueOrNull?.posts ?? [];
+    if (index >= posts.length - _prefetchAt) loadMore();
   }
 }
