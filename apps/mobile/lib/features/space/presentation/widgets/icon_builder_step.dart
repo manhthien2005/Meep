@@ -1,0 +1,253 @@
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:meep/core/theme/app_colors.dart';
+import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/core/theme/hex_color.dart';
+import 'package:meep/features/space/presentation/widgets/space_color_overlay.dart';
+import 'package:meep/shared/widgets/app_primary_button.dart';
+
+/// 9 màu nền gợi ý cho icon — Figma 269:1334 source of truth.
+const kIconBgSuggestions = <String>[
+  '#FEEBCA',
+  '#FFCFBF',
+  '#C4F3D9',
+  '#BFD5FF',
+  '#CED9DA',
+  '#FFDEFC',
+  '#CDCAFE',
+  '#FECACF',
+  '#CAF2FE',
+];
+
+class IconBuilderStep extends StatefulWidget {
+  const IconBuilderStep({
+    super.key,
+    required this.initialEmoji,
+    required this.initialColor,
+    required this.onDone,
+  });
+
+  final String initialEmoji;
+  final String initialColor;
+  final void Function(String emoji, String color) onDone;
+
+  @override
+  State<IconBuilderStep> createState() => _IconBuilderStepState();
+}
+
+class _IconBuilderStepState extends State<IconBuilderStep> {
+  late String _emoji = widget.initialEmoji;
+  late String _color = widget.initialColor;
+
+  void _openEmojiPicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.bw800,
+      builder: (_) => SizedBox(
+        height: 300,
+        child: EmojiPicker(
+          onEmojiSelected: (category, emoji) {
+            setState(() => _emoji = emoji.emoji);
+            Navigator.of(context).pop();
+          },
+          config: const Config(
+            emojiViewConfig: EmojiViewConfig(
+              backgroundColor: AppColors.bw800,
+              columns: 7,
+              emojiSizeMax: 28,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openColorOverlay() async {
+    // Lưu màu gốc để revert nếu user đóng mà không xác nhận (hiện không có
+    // nút huỷ — đóng = giữ màu đã chỉnh). Live sync: mỗi lần overlay đổi màu,
+    // preview + suggestions cập nhật ngay qua onColorChanged.
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      // Không tối nền — để preview phía sau vẫn thấy rõ khi chỉnh màu.
+      barrierColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => SpaceColorOverlay(
+        initialColor: _color,
+        onColorChanged: (hex) => setState(() => _color = hex),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          const SizedBox(height: 16),
+          Text(
+            'Tạo theme cho Space',
+            style: AppTextStyles.xlBold.copyWith(color: Colors.white),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Cá nhân hóa Space cho riêng bạn',
+            style: AppTextStyles.baseBold.copyWith(
+              color: const Color(0xFFBABABA),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          // Preview circle
+          _PreviewCircle(emoji: _emoji, colorHex: _color),
+          const SizedBox(height: 16),
+          // 2 tab buttons: emoji / color
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _TabButton(
+                onTap: _openEmojiPicker,
+                child: SvgPicture.asset(
+                  'assets/icons/ic_smile.svg',
+                  width: 24,
+                  height: 24,
+                ),
+              ),
+              const SizedBox(width: 13),
+              _TabButton(
+                onTap: _openColorOverlay,
+                child: Image.asset(
+                  'assets/icons/ic_color_wheel.png',
+                  width: 24,
+                  height: 24,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          // Section "Gợi ý"
+          Row(
+            children: [
+              SvgPicture.asset(
+                'assets/icons/ic_paintbrush_vertical.svg',
+                width: 20,
+                height: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Gợi ý',
+                style: AppTextStyles.baseBold.copyWith(
+                  color: const Color(0xFFDDDDDD),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // 9 suggestion circles
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: 3,
+              mainAxisSpacing: 20,
+              crossAxisSpacing: 25,
+              children: [
+                for (final bg in kIconBgSuggestions)
+                  _SuggestionCircle(
+                    emoji: _emoji,
+                    colorHex: bg,
+                    isSelected: _color.toUpperCase() == bg,
+                    onTap: () => setState(() => _color = bg),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          AppPrimaryButton(
+            label: 'Xong',
+            showTrailingIcon: false,
+            onPressed: () => widget.onDone(_emoji, _color),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewCircle extends StatelessWidget {
+  const _PreviewCircle({required this.emoji, required this.colorHex});
+
+  final String emoji;
+  final String colorHex;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 100,
+      height: 100,
+      decoration: BoxDecoration(
+        color: hexToColor(colorHex),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(emoji, style: const TextStyle(fontSize: 36)),
+    );
+  }
+}
+
+class _TabButton extends StatelessWidget {
+  const _TabButton({required this.child, required this.onTap});
+
+  final Widget child;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0x66394041),
+          borderRadius: BorderRadius.circular(40),
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _SuggestionCircle extends StatelessWidget {
+  const _SuggestionCircle({
+    required this.emoji,
+    required this.colorHex,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String emoji;
+  final String colorHex;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        decoration: BoxDecoration(
+          color: hexToColor(colorHex),
+          shape: BoxShape.circle,
+          border: isSelected
+              ? Border.all(color: AppColors.turquoise500, width: 3)
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: Text(emoji, style: const TextStyle(fontSize: 36)),
+      ),
+    );
+  }
+}

@@ -4,41 +4,61 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/core/theme/hex_color.dart';
 
-/// Ring thickness around inbox avatars (Figma "Ellipse 29").
+/// Ring thickness around avatars.
 const double _kRingWidth = 2;
 
-/// Gap between the ring and the avatar image (Figma shows the dark bg between
-/// the turquoise ring and the photo).
+/// Gap between the ring and the avatar image.
 const double _kRingGap = 2;
 
-/// Circular avatar used across chat surfaces (inbox tile, bubbles, members).
+/// Circular avatar for user profile pictures.
 ///
-/// [ringColor] draws the Figma "Ellipse 29" ring with a small gap to the photo:
-/// turquoise = unread, bw700 = read. Pass null (default) for a plain avatar with
-/// no ring — used in the chat header where Figma shows a borderless circle.
-class ChatAvatar extends StatelessWidget {
-  const ChatAvatar({super.key, this.imageUrl, this.size = 50, this.ringColor});
+/// [ringColor] draws an optional ring with a small gap to the photo.
+/// Pass null (default) for a plain avatar with no ring.
+///
+/// [fallbackText] shows when [imageUrl] is null/empty — typically the user's
+/// first initial. If null, shows a solid gray circle.
+class AppAvatar extends StatelessWidget {
+  const AppAvatar({
+    super.key,
+    this.imageUrl,
+    this.size = 50,
+    this.ringColor,
+    this.fallbackText,
+  });
 
   final String? imageUrl;
   final double size;
   final Color? ringColor;
+  final String? fallbackText;
 
   @override
   Widget build(BuildContext context) {
     final inset = ringColor != null ? (_kRingWidth + _kRingGap) : 0.0;
     final inner = size - inset * 2;
     final avatar = ClipOval(
-      child: SizedBox(
+      child: Container(
         width: inner,
         height: inner,
-        child: (imageUrl != null && imageUrl!.isNotEmpty)
-            ? Image.network(
-                imageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    const ColoredBox(color: AppColors.bw600),
+        decoration: BoxDecoration(
+          color: AppColors.bw700,
+          shape: BoxShape.circle,
+          image: (imageUrl != null && imageUrl!.isNotEmpty)
+              ? DecorationImage(
+                  image: NetworkImage(imageUrl!),
+                  fit: BoxFit.cover,
+                )
+              : null,
+        ),
+        child: (imageUrl == null || imageUrl!.isEmpty) && fallbackText != null
+            ? Center(
+                child: Text(
+                  fallbackText!,
+                  style: AppTextStyles.mdBold.copyWith(
+                    color: AppColors.bw100,
+                  ),
+                ),
               )
-            : const ColoredBox(color: AppColors.bw600),
+            : null,
       ),
     );
 
@@ -63,9 +83,9 @@ class ChatAvatar extends StatelessWidget {
 }
 
 /// Avatar showing a Space's emoji on its themed color (group conversations).
-/// [ringColor] behaves like [ChatAvatar.ringColor].
-class SpaceAvatar extends StatelessWidget {
-  const SpaceAvatar({
+/// [ringColor] behaves like [AppAvatar.ringColor].
+class AppSpaceAvatar extends StatelessWidget {
+  const AppSpaceAvatar({
     super.key,
     required this.emoji,
     required this.colorHex,

@@ -4,7 +4,7 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/chat/data/conversation.dart';
 import 'package:meep/features/chat/presentation/chat_time_format.dart';
-import 'package:meep/features/chat/presentation/widgets/chat_avatar.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 
 /// One row in the inbox list — 1-1 or group conversation.
 ///
@@ -86,13 +86,13 @@ class ConversationTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             if (isGroup)
-              SpaceAvatar(
+              AppSpaceAvatar(
                 emoji: spaceEmoji!,
                 colorHex: spaceColorHex!,
                 ringColor: ringColor,
               )
             else
-              ChatAvatar(imageUrl: avatarUrl, ringColor: ringColor),
+              AppAvatar(imageUrl: avatarUrl, ringColor: ringColor),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
