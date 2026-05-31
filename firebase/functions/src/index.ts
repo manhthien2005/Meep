@@ -72,8 +72,8 @@ export const onPostCreated = onDocumentCreated(
 
 // ===== Friend module =====
 
-export { acceptFriendRequest } from './friend/acceptFriendRequest';
-export { onFriendshipDeleted } from './friend/onFriendshipDeleted';
+export { acceptFriendRequest } from './friend/acceptFriendRequest.js';
+export { onFriendshipDeleted } from './friend/onFriendshipDeleted.js';
 
 // ===== Settings module stubs =====
 
