@@ -138,8 +138,6 @@ export const acceptFriendRequest = onCall(
 
     await batch.commit();
 
-    // TODO: Step 4 - Send FCM notification to sender (deferred to Notification module)
-
     return { success: true, pairId };
   },
 );

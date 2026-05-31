@@ -31,16 +31,15 @@ export const onFriendshipDeleted = onDocumentDeleted(
     const db = getFirestore();
 
     // Step 1: Decrement friendCount for both users (idempotent with FieldValue.increment)
+    // Note: FieldValue.increment(-1) is atomic and idempotent per-document.
+    // Using Promise.all for parallel execution is safe here because each update
+    // operates on a different document. No transaction needed.
     await Promise.all([
       db.collection('users').doc(uid1).update({
         friendCount: FieldValue.increment(-1),
-      }).catch((error) => {
-        console.error(`Failed to decrement friendCount for ${uid1}:`, error);
       }),
       db.collection('users').doc(uid2).update({
         friendCount: FieldValue.increment(-1),
-      }).catch((error) => {
-        console.error(`Failed to decrement friendCount for ${uid2}:`, error);
       }),
     ]);
 
@@ -52,8 +51,6 @@ export const onFriendshipDeleted = onDocumentDeleted(
       await conversationRef.update({
         status: 'unfriended',
         updatedAt: FieldValue.serverTimestamp(),
-      }).catch((error) => {
-        console.error(`Failed to update conversation ${pairId}:`, error);
       });
     }
 
@@ -88,9 +85,7 @@ export const onFriendshipDeleted = onDocumentDeleted(
     });
 
     if (deleteCount > 0) {
-      await batch.commit().catch((error) => {
-        console.error(`Failed to delete feed entries:`, error);
-      });
+      await batch.commit();
     }
   },
 );
