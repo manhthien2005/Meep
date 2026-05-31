@@ -70,31 +70,9 @@ export const onPostCreated = onDocumentCreated(
   },
 );
 
-// ===== Friend module stubs =====
+// ===== Friend module =====
 
-/**
- * Accept a pending friend request and create the friendship doc.
- *
- * TODO(F/T5/ThienPDM):
- *   1. Verify request exists + status == 'pending' + request.auth.uid == receiverId
- *   2. Check sender.friendCount < 20 AND receiver.friendCount < 20
- *      → throw FAILED_PRECONDITION if either >= 20
- *   3. Firestore batch (1 commit, atomic):
- *      a. Create /friendships/{pairId} (uid1, uid2, members, createdAt)
- *      b. Create /conversations/{pairId} (type='direct', participantIds=[uid1,uid2])
- *      c. Update /friend_requests/{requestId}.status = 'accepted'
- *      d. FieldValue.increment(1) friendCount for both sender and receiver
- *   4. Send FCM notification to sender
- *   5. Return { success: true, pairId: string }
- *
- * Note: conversationId == pairId (sorted uid1_uid2) — consistent with friendship docId.
- * Idempotent: if A→B and B→A send requests simultaneously, detect and create 1 friendship only.
- */
-export const acceptFriendRequest = onCall((request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
-  // TODO(F/T5/ThienPDM): see comment above.
-  return { ok: true };
-});
+export { acceptFriendRequest } from './friend/acceptFriendRequest';
 
 /**
  * Clean up friend-related data when a friendship is deleted.
