@@ -73,30 +73,7 @@ export const onPostCreated = onDocumentCreated(
 // ===== Friend module =====
 
 export { acceptFriendRequest } from './friend/acceptFriendRequest';
-
-/**
- * Clean up friend-related data when a friendship is deleted.
- *
- * TODO(F/T6/ThienPDM):
- *   1. Decrement friendCount for uid1 and uid2 using FieldValue.increment(-1)
- *      → use transaction for idempotency
- *   2. Update /conversations/{pairId}.status = 'unfriended' if conversation exists
- *      → do NOT crash if conversation doesn't exist
- *   3. Batch delete cross-feed entries:
- *      - Delete /users/{uid1}/feed/{postId} WHERE authorId == uid2 AND spaceId == null
- *      - Delete /users/{uid2}/feed/{postId} WHERE authorId == uid1 AND spaceId == null
- *   4. Preserve Space posts (spaceId != null) — do NOT delete from feed
- *
- * Note: This CF owns feed cleanup (Home/Camera/Feed module concern).
- * Home/Camera/Feed module does NOT create a separate CF for this cleanup.
- * CF must be idempotent: re-running after partial failure produces same final state.
- */
-export const onFriendshipDeleted = onDocumentDeleted(
-  { document: 'friendships/{pairId}', region: 'asia-southeast1' },
-  (_event) => {
-    // TODO(F/T6/ThienPDM): see comment above.
-  },
-);
+export { onFriendshipDeleted } from './friend/onFriendshipDeleted';
 
 // ===== Settings module stubs =====
 
