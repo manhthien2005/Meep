@@ -118,7 +118,8 @@ void main() {
       await repository.cancelFriendRequest(docRef.id);
 
       // Assert
-      final doc = await firestore.collection('friend_requests').doc(docRef.id).get();
+      final doc =
+          await firestore.collection('friend_requests').doc(docRef.id).get();
       expect(doc.data()!['status'], 'cancelled');
     });
   });
@@ -138,7 +139,8 @@ void main() {
       await repository.declineFriendRequest(docRef.id);
 
       // Assert
-      final doc = await firestore.collection('friend_requests').doc(docRef.id).get();
+      final doc =
+          await firestore.collection('friend_requests').doc(docRef.id).get();
       expect(doc.data()!['status'], 'declined');
     });
   });
