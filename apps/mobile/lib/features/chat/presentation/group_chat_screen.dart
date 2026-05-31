@@ -6,11 +6,11 @@ import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/chat/presentation/chat_thread_view.dart';
-import 'package:meep/features/chat/presentation/widgets/chat_avatar.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_confirm_dialogs.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_input_bar.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_menu_sheet.dart';
 import 'package:meep/features/chat/presentation/widgets/space_members_sheet.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 
 /// Space group chat thread. Figma `564:8603` (+ menu `564:8733`).
 class GroupChatScreen extends ConsumerWidget {
@@ -148,7 +148,7 @@ class _GroupHeader extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SpaceAvatar(emoji: emoji, colorHex: colorHex, size: 30),
+                AppSpaceAvatar(emoji: emoji, colorHex: colorHex, size: 30),
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(

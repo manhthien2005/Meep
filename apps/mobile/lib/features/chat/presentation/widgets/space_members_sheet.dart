@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
-import 'package:meep/features/chat/presentation/widgets/chat_avatar.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
 
 /// Bottom sheet listing the members of a Space. Figma `564:8865`.
@@ -93,7 +93,7 @@ class _MemberRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          ChatAvatar(imageUrl: avatarUrl, size: 44),
+          AppAvatar(imageUrl: avatarUrl, size: 44),
           const SizedBox(width: 14),
           Text(
             name,

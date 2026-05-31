@@ -8,10 +8,10 @@ import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/chat/data/conversation.dart';
 import 'package:meep/features/chat/presentation/chat_thread_view.dart';
-import 'package:meep/features/chat/presentation/widgets/chat_avatar.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_confirm_dialogs.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_input_bar.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_menu_sheet.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 
 /// 1-1 direct chat thread. Figma `564:6934` (+ empty `769:3019`).
 class ChatScreen extends ConsumerWidget {
@@ -160,7 +160,7 @@ class _ChatHeader extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ChatAvatar(imageUrl: avatarUrl, size: 30),
+                AppAvatar(imageUrl: avatarUrl, size: 30),
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(

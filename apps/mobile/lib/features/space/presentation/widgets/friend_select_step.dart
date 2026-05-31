@@ -4,6 +4,7 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_primary_button.dart';
 
 class FriendSelectStep extends ConsumerStatefulWidget {
@@ -241,42 +242,14 @@ class _FriendListItem extends StatelessWidget {
         height: 50,
         child: Row(
           children: [
-            // Avatar — inner circle + outer ring xám mỏng (tách khỏi avatar)
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.bw600,
-                  width: 2,
-                ),
-              ),
-              padding: const EdgeInsets.all(3),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.bw700,
-                  shape: BoxShape.circle,
-                  image: friend.avatarUrl != null
-                      ? DecorationImage(
-                          image: NetworkImage(friend.avatarUrl!),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: friend.avatarUrl == null
-                    ? Center(
-                        child: Text(
-                          friend.displayName.isEmpty
-                              ? '?'
-                              : friend.displayName[0].toUpperCase(),
-                          style: AppTextStyles.mdBold.copyWith(
-                            color: AppColors.bw100,
-                          ),
-                        ),
-                      )
-                    : null,
-              ),
+            // Avatar with ring
+            AppAvatar(
+              imageUrl: friend.avatarUrl,
+              size: 50,
+              ringColor: AppColors.bw600,
+              fallbackText: friend.displayName.isEmpty
+                  ? '?'
+                  : friend.displayName[0].toUpperCase(),
             ),
             const SizedBox(width: 16),
             // Name
