@@ -35,6 +35,12 @@ dependencies:
   # Home-screen widget
   home_widget: ^0.7.0
 
+  # Camera & media
+  camera: ^0.12.0
+  geolocator: ^14.0.2
+  gal: ^2.3.2
+  http: ^1.6.0
+
   # Utility
   cached_network_image: ^3.4.1
   emoji_picker_flutter: ^4.4.0
