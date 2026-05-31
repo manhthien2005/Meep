@@ -70,55 +70,10 @@ export const onPostCreated = onDocumentCreated(
   },
 );
 
-// ===== Friend module stubs =====
+// ===== Friend module =====
 
-/**
- * Accept a pending friend request and create the friendship doc.
- *
- * TODO(F/T5/ThienPDM):
- *   1. Verify request exists + status == 'pending' + request.auth.uid == receiverId
- *   2. Check sender.friendCount < 20 AND receiver.friendCount < 20
- *      → throw FAILED_PRECONDITION if either >= 20
- *   3. Firestore batch (1 commit, atomic):
- *      a. Create /friendships/{pairId} (uid1, uid2, members, createdAt)
- *      b. Create /conversations/{pairId} (type='direct', participantIds=[uid1,uid2])
- *      c. Update /friend_requests/{requestId}.status = 'accepted'
- *      d. FieldValue.increment(1) friendCount for both sender and receiver
- *   4. Send FCM notification to sender
- *   5. Return { success: true, pairId: string }
- *
- * Note: conversationId == pairId (sorted uid1_uid2) — consistent with friendship docId.
- * Idempotent: if A→B and B→A send requests simultaneously, detect and create 1 friendship only.
- */
-export const acceptFriendRequest = onCall((request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
-  // TODO(F/T5/ThienPDM): see comment above.
-  return { ok: true };
-});
-
-/**
- * Clean up friend-related data when a friendship is deleted.
- *
- * TODO(F/T6/ThienPDM):
- *   1. Decrement friendCount for uid1 and uid2 using FieldValue.increment(-1)
- *      → use transaction for idempotency
- *   2. Update /conversations/{pairId}.status = 'unfriended' if conversation exists
- *      → do NOT crash if conversation doesn't exist
- *   3. Batch delete cross-feed entries:
- *      - Delete /users/{uid1}/feed/{postId} WHERE authorId == uid2 AND spaceId == null
- *      - Delete /users/{uid2}/feed/{postId} WHERE authorId == uid1 AND spaceId == null
- *   4. Preserve Space posts (spaceId != null) — do NOT delete from feed
- *
- * Note: This CF owns feed cleanup (Home/Camera/Feed module concern).
- * Home/Camera/Feed module does NOT create a separate CF for this cleanup.
- * CF must be idempotent: re-running after partial failure produces same final state.
- */
-export const onFriendshipDeleted = onDocumentDeleted(
-  { document: 'friendships/{pairId}', region: 'asia-southeast1' },
-  (_event) => {
-    // TODO(F/T6/ThienPDM): see comment above.
-  },
-);
+export { acceptFriendRequest } from './friend/acceptFriendRequest.js';
+export { onFriendshipDeleted } from './friend/onFriendshipDeleted.js';
 
 // ===== Settings module stubs =====
 

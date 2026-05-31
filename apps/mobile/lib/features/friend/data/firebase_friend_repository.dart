@@ -38,7 +38,8 @@ class FirebaseFriendRepository implements FriendRepository {
       final friendUids = <String>[];
       for (final doc in snapshot.docs) {
         final friendship = Friendship.fromJson(doc.data());
-        final friendUid = friendship.uid1 == uid ? friendship.uid2 : friendship.uid1;
+        final friendUid =
+            friendship.uid1 == uid ? friendship.uid2 : friendship.uid1;
         friendUids.add(friendUid);
       }
 
@@ -46,7 +47,8 @@ class FirebaseFriendRepository implements FriendRepository {
       if (friendUids.isEmpty) return <UserProfile>[];
 
       final userDocs = await Future.wait(
-        friendUids.map((fuid) => _firestore.collection('users').doc(fuid).get()),
+        friendUids
+            .map((fuid) => _firestore.collection('users').doc(fuid).get()),
       );
 
       return userDocs
