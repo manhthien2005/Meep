@@ -2,15 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/settings/presentation/_mock_data.dart';
+import 'package:meep/features/settings/presentation/unblock_confirm_dialog.dart';
 
-class BlockedAccountsPage extends StatelessWidget {
+class BlockedAccountsPage extends StatefulWidget {
   const BlockedAccountsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // TODO(T4/NganTNK): replace mock list with SettingsController.watchBlockedUsers()
-    const mockUsers = ['Lauren'];
+  State<BlockedAccountsPage> createState() => _BlockedAccountsPageState();
+}
 
+class _BlockedAccountsPageState extends State<BlockedAccountsPage> {
+  // TODO(T4/NganTNK): replace mock list with SettingsController.watchBlockedUsers()
+  late final List<Map<String, String>> _blockedUsers =
+      List<Map<String, String>>.from(SettingsMockData.mockBlockedUsers);
+
+  Future<void> _onUnblock(int index) async {
+    // Bỏ chặn cần xác nhận trước (Figma 1441:3341 — state 3).
+    final confirmed = await UnblockConfirmDialog.show(context);
+    if (!confirmed || !mounted) return;
+    // TODO(T4/NganTNK): SettingsController.unblockUser(uid)
+    setState(() => _blockedUsers.removeAt(index));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bw900,
       appBar: AppBar(
@@ -31,19 +47,17 @@ class BlockedAccountsPage extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      body: mockUsers.isEmpty
+      body: _blockedUsers.isEmpty
           ? const _EmptyState()
           : ListView.builder(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.screenHorizontal,
                 vertical: AppSpacing.xl,
               ),
-              itemCount: mockUsers.length,
+              itemCount: _blockedUsers.length,
               itemBuilder: (_, i) => _BlockedUserItem(
-                username: mockUsers[i],
-                onUnblock: () {
-                  // TODO(T4/NganTNK): SettingsController.unblockUser(uid)
-                },
+                username: _blockedUsers[i]['username']!,
+                onUnblock: () => _onUnblock(i),
               ),
             ),
     );
@@ -111,21 +125,25 @@ class _BlockedUserItem extends StatelessWidget {
               style: AppTextStyles.mdBold.copyWith(color: AppColors.bw100),
             ),
           ),
-          GestureDetector(
-            onTap: onUnblock,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 7,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.bw700,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                'Bỏ chặn',
-                style: AppTextStyles.smSemiBold.copyWith(
-                  color: const Color(0xFFDDDDDD),
+          Semantics(
+            button: true,
+            label: 'Bỏ chặn',
+            child: GestureDetector(
+              onTap: onUnblock,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.bw700,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Bỏ chặn',
+                  style: AppTextStyles.smSemiBold.copyWith(
+                    color: const Color(0xFFDDDDDD),
+                  ),
                 ),
               ),
             ),

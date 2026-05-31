@@ -12,6 +12,7 @@ import 'package:meep/features/settings/presentation/share_profile_sheet.dart';
 import 'package:meep/features/friend/presentation/friend_sheet.dart';
 import 'package:meep/features/settings/presentation/terms_page.dart';
 import 'package:meep/features/settings/presentation/widget_confirm_sheet.dart';
+import 'package:meep/features/settings/presentation/_mock_data.dart';
 
 const _sheetBg = AppColors.bw800; // #252627 - Design System
 const _cardBg = AppColors.bw800; // #252627 - Design System
@@ -62,7 +63,8 @@ class _SettingsSheetState extends State<SettingsSheet> {
                     label: 'Thêm tiện ích',
                     onTap: () => showModalBottomSheet<void>(
                       context: context,
-                      isScrollControlled: true,
+                      isScrollControlled:
+                          false, // Fixed: không expand full screen
                       backgroundColor: Colors.transparent,
                       builder: (_) => const WidgetConfirmSheet(),
                     ),
@@ -179,7 +181,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
         ),
         const SizedBox(height: AppSpacing.md),
         Text(
-          'username',
+          SettingsMockData.username,
           style: AppTextStyles.lgBold.copyWith(color: Colors.white),
           textAlign: TextAlign.center,
         ),
@@ -188,7 +190,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'meep.cam/username',
+              'meep.cam/${SettingsMockData.username}',
               style:
                   AppTextStyles.mdBold.copyWith(color: const Color(0xFFBABABA)),
             ),
@@ -196,7 +198,8 @@ class _SettingsSheetState extends State<SettingsSheet> {
             GestureDetector(
               onTap: () {
                 Clipboard.setData(
-                  const ClipboardData(text: 'meep://profile/username'),
+                  ClipboardData(
+                      text: 'meep://profile/${SettingsMockData.username}'),
                 );
                 // TODO(T3/NganTNK): show toast "Đã sao chép liên kết"
               },
@@ -214,7 +217,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
         Expanded(
           child: _quickActionBtn(
             icon: Icons.group_outlined,
-            label: '15 người bạn',
+            label: '${SettingsMockData.friendCount} người bạn',
             onTap: () {
               showModalBottomSheet<void>(
                 context: context,
@@ -234,8 +237,9 @@ class _SettingsSheetState extends State<SettingsSheet> {
               showModalBottomSheet<void>(
                 context: context,
                 backgroundColor: Colors.transparent,
-                isScrollControlled: true,
-                builder: (_) => const ShareProfileSheet(username: 'username'),
+                isScrollControlled: false, // Fixed: không expand full screen
+                builder: (_) =>
+                    ShareProfileSheet(username: SettingsMockData.username),
               );
             },
           ),
@@ -301,10 +305,10 @@ class _SettingsSheetState extends State<SettingsSheet> {
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: [
-              _spaceCard('Gia đình'),
-              const SizedBox(width: AppSpacing.md),
-              _spaceCard('Hội đồng quản trị'),
-              const SizedBox(width: AppSpacing.md),
+              for (final space in SettingsMockData.mockSpaces) ...[
+                _spaceCard(space['name'] as String),
+                const SizedBox(width: AppSpacing.md),
+              ],
               _createSpaceCard(),
             ],
           ),

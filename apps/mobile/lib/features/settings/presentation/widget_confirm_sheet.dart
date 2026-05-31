@@ -10,53 +10,55 @@ class WidgetConfirmSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppBottomSheet(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: AppSpacing.screenHorizontal,
-          right: AppSpacing.screenHorizontal,
-          top: AppSpacing.lg,
-          bottom: AppSpacing.xl + MediaQuery.of(context).padding.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Thêm vào màn hình chờ?',
-              style: TextStyle(
-                fontFamily: 'Nunito',
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: AppSpacing.screenHorizontal,
+            right: AppSpacing.screenHorizontal,
+            top: AppSpacing.md,
+            bottom: AppSpacing.lg + MediaQuery.of(context).padding.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Thêm vào màn hình chờ?',
+                style: TextStyle(
+                  fontFamily: 'Nunito',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Thêm và giữ Widget hoặc ấn Thêm để thêm vào màn hình chờ',
-              style: AppTextStyles.smMedium.copyWith(color: Colors.white),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            _buildWidgetPreview(),
-            const SizedBox(height: AppSpacing.xl),
-            _buildButton(
-              label: 'Thêm',
-              bg: AppColors.turquoise600,
-              textColor: AppColors.turquoise900,
-              onTap: () {
-                Navigator.of(context).pop();
-                // TODO(T4/NganTNK): requestPinAppWidget() Android intent
-                _showSuccessToast(context);
-              },
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _buildButton(
-              label: 'Huỷ',
-              bg: AppColors.bw700,
-              textColor: Colors.white,
-              onTap: () => Navigator.of(context).pop(),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Thêm và giữ Widget hoặc ấn Thêm để thêm vào màn hình chờ',
+                style: AppTextStyles.smMedium.copyWith(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _buildWidgetPreview(),
+              const SizedBox(height: AppSpacing.md),
+              _buildButton(
+                label: 'Thêm',
+                bg: AppColors.turquoise600,
+                textColor: AppColors.turquoise900,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  // TODO(T4/NganTNK): requestPinAppWidget() Android intent
+                  _showSuccessToast(context);
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _buildButton(
+                label: 'Huỷ',
+                bg: AppColors.bw700,
+                textColor: Colors.white,
+                onTap: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -92,9 +94,9 @@ class WidgetConfirmSheet extends StatelessWidget {
   Widget _buildWidgetPreview() {
     return Center(
       child: Container(
-        width: 220,
-        height: 220,
-        padding: const EdgeInsets.all(20),
+        width: 160,
+        height: 160,
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.bw700,
           borderRadius: BorderRadius.circular(20),
@@ -104,9 +106,9 @@ class WidgetConfirmSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 115,
-              height: 115,
-              padding: const EdgeInsets.all(17),
+              width: 90,
+              height: 90,
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: AppColors.bw800,
                 borderRadius: BorderRadius.circular(17),
@@ -115,22 +117,24 @@ class WidgetConfirmSheet extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _buildOverlappingAvatars(),
-                  const SizedBox(height: AppSpacing.sm),
+                  const SizedBox(height: 4),
                   Text(
                     '15 người bạn',
                     style: AppTextStyles.xsRegular.copyWith(
                       color: AppColors.bw200,
                       fontWeight: FontWeight.w700,
+                      fontSize: 10,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: 8),
             Text(
               'Meep Widget\n2 x 2',
               style: AppTextStyles.mdBold.copyWith(
                 color: AppColors.turquoise600,
+                fontSize: 12,
               ),
               textAlign: TextAlign.center,
             ),
