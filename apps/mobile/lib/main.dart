@@ -21,8 +21,7 @@ import 'package:meep/features/chat/data/fake_conversation_repository.dart';
 import 'package:meep/firebase_options.dart';
 
 // Pass --dart-define=USE_EMULATOR=true khi dev local để trỏ vào Firebase Emulator Suite.
-const _useEmulator =
-    bool.fromEnvironment('USE_EMULATOR', defaultValue: false);
+const _useEmulator = bool.fromEnvironment('USE_EMULATOR', defaultValue: false);
 // Android emulator truy cập host machine qua 10.0.2.2 (không phải 127.0.0.1)
 const _emulatorHost = '10.0.2.2';
 

@@ -144,8 +144,7 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                     right: 0,
                     child: Center(
                       child: _NotePill(
-                        text:
-                            _kMockNotes[_currentIndex % _kMockNotes.length],
+                        text: _kMockNotes[_currentIndex % _kMockNotes.length],
                       ),
                     ),
                   ),
