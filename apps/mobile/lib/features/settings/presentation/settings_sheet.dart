@@ -90,7 +90,6 @@ class _SettingsSheetState extends State<SettingsSheet> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: AppSpacing.xl),
                   _buildDivider(),
                   const SizedBox(height: AppSpacing.xl),
@@ -190,7 +189,8 @@ class _SettingsSheetState extends State<SettingsSheet> {
           children: [
             Text(
               'meep.cam/username',
-              style: AppTextStyles.mdBold.copyWith(color: const Color(0xFFBABABA)),
+              style:
+                  AppTextStyles.mdBold.copyWith(color: const Color(0xFFBABABA)),
             ),
             const SizedBox(width: AppSpacing.xs),
             GestureDetector(
@@ -267,7 +267,8 @@ class _SettingsSheetState extends State<SettingsSheet> {
             const SizedBox(width: AppSpacing.xs),
             Text(
               label,
-              style: AppTextStyles.mdBold.copyWith(color: const Color(0xFFDDDDDD)),
+              style:
+                  AppTextStyles.mdBold.copyWith(color: const Color(0xFFDDDDDD)),
             ),
           ],
         ),
@@ -474,5 +475,4 @@ class _SettingsSheetState extends State<SettingsSheet> {
       ),
     );
   }
-
 }

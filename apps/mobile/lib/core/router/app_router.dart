@@ -209,7 +209,8 @@ GoRouter appRouter(Ref ref) {
     },
     routes: [
       GoRoute(path: '/intro', builder: (_, __) => const IntroPage()),
-      GoRoute(path: '/test-settings', builder: (_, __) => const SettingsTestPage()),
+      GoRoute(
+          path: '/test-settings', builder: (_, __) => const SettingsTestPage()),
       GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
       GoRoute(
         path: '/signup/email',
