@@ -10,12 +10,20 @@ enum AudienceType { all, select }
 
 @freezed
 class Post with _$Post {
+  const Post._();
+
   const factory Post({
     required String postId,
     required String authorId,
     required String authorName,
     String? authorAvatarUrl,
-    required String imageUrl,
+
+    /// Single camera mode: imageUrl is set, backImageUrl/frontImageUrl are null.
+    /// Dual camera mode: backImageUrl/frontImageUrl are set, imageUrl is null.
+    String? imageUrl,
+    String? backImageUrl,
+    String? frontImageUrl,
+    @Default(false) bool isDualCamera,
     String? caption,
     CaptionType? captionType,
     required AudienceType audienceType,
@@ -28,6 +36,10 @@ class Post with _$Post {
   }) = _Post;
 
   factory Post.fromJson(Map<String, dynamic> json) => _$PostFromJson(json);
+
+  /// Representative image for single-image contexts (grid thumbnail, share).
+  /// Single mode → imageUrl. Dual mode → back lens (the "scene" photo).
+  String get coverImageUrl => imageUrl ?? backImageUrl ?? frontImageUrl ?? '';
 }
 
 class TimestampConverter implements JsonConverter<DateTime, Object> {

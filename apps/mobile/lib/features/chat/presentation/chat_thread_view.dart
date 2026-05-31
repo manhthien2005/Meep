@@ -95,7 +95,7 @@ class _ChatThreadViewState extends ConsumerState<ChatThreadView>
       children: [
         if (quoted != null)
           QuotedPhotoBlock(
-            imageUrl: quoted.imageUrl,
+            imageUrl: quoted.coverImageUrl,
             caption: quoted.caption,
             createdAt: quoted.createdAt,
           ),
