@@ -118,8 +118,14 @@ void main() {
 
   group('getPostsByAuthor', () {
     test('returns only posts by given author', () async {
-      await db.collection('posts').doc('p1').set(_makePost(postId: 'p1', authorId: 'uid1').toJson());
-      await db.collection('posts').doc('p2').set(_makePost(postId: 'p2', authorId: 'uid2').toJson());
+      await db
+          .collection('posts')
+          .doc('p1')
+          .set(_makePost(postId: 'p1', authorId: 'uid1').toJson());
+      await db
+          .collection('posts')
+          .doc('p2')
+          .set(_makePost(postId: 'p2', authorId: 'uid2').toJson());
 
       final posts = await repo.getPostsByAuthor('uid1');
       expect(posts.length, 1);

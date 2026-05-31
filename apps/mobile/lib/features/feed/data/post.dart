@@ -24,7 +24,6 @@ class Post with _$Post {
     String? backImageUrl,
     String? frontImageUrl,
     @Default(false) bool isDualCamera,
-
     String? caption,
     CaptionType? captionType,
     required AudienceType audienceType,
@@ -40,8 +39,7 @@ class Post with _$Post {
 
   /// Representative image for single-image contexts (grid thumbnail, share).
   /// Single mode → imageUrl. Dual mode → back lens (the "scene" photo).
-  String get coverImageUrl =>
-      imageUrl ?? backImageUrl ?? frontImageUrl ?? '';
+  String get coverImageUrl => imageUrl ?? backImageUrl ?? frontImageUrl ?? '';
 }
 
 class TimestampConverter implements JsonConverter<DateTime, Object> {
