@@ -22,6 +22,8 @@ import 'package:meep/features/chat/data/fake_conversation_repository.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/data/firebase_friend_repository.dart';
 import 'package:meep/features/friend/data/firebase_friend_request_repository.dart';
+import 'package:meep/features/space/application/space_controller.dart';
+import 'package:meep/features/space/data/firebase_space_repository.dart';
 import 'package:meep/firebase_options.dart';
 
 // Pass --dart-define=USE_EMULATOR=true khi dev local để trỏ vào Firebase Emulator Suite.
@@ -62,6 +64,12 @@ void main() async {
         ),
         friendRequestRepositoryProvider.overrideWithValue(
           FirebaseFriendRequestRepository(
+            FirebaseFirestore.instance,
+            FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
+          ),
+        ),
+        spaceRepositoryProvider.overrideWithValue(
+          FirebaseSpaceRepository(
             FirebaseFirestore.instance,
             FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
           ),
