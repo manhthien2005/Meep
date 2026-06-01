@@ -31,18 +31,12 @@ abstract final class AppProportions {
 
   // ── Note pill ─────────────────────────────────────────────────────────────
 
-  /// Pill total width — fixed ~50% of frame width so the editable caption has
-  /// a comfortable centered text area. Figma frame 412 → ~200px.
-  static const double pillWidthRatio = 200 / figmaFrameWidth;
-  static double pillWidth(double screenW) => screenW * pillWidthRatio;
-
-  /// Pill inner chrome consumed by horizontal padding + icon + gap. Used to
-  /// derive the editable text-area width from [pillWidth].
+  /// Horizontal padding inside the pill chrome. Pill is hug-content (it sizes
+  /// itself to the typed text) so we only need padding, no fixed width.
   static const double pillPaddingH = 14;
-  static const double pillIconGap = 6;
 
-  /// Font size inside pill. Figma: 14px on 412, bumped to 15 for legibility.
-  static const double pillFontRatio = 15 / figmaFrameWidth;
+  /// Font size inside pill. Figma frame 412 → 20px.
+  static const double pillFontRatio = 20 / figmaFrameWidth;
   static double pillFontSize(double screenW) => screenW * pillFontRatio;
 
   // ── Capture Button ────────────────────────────────────────────────────────

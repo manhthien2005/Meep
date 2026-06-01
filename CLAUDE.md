@@ -75,7 +75,7 @@ Khi anh planning sprint: em là tech lead giúp anh chia task khả thi.
 |---|---|---|
 | **User** | Authenticated person, identified by `uid` (Firebase Auth UID). Có `displayName`, `avatarUrl`. | Firestore: `/users/{uid}` |
 | **Post** | One photo + optional caption shared bởi User cho friends. NEVER public. | Firestore: `/posts/{postId}` |
-| **Caption** | Text accompanying a Post. ≤ 200 chars. Optional. | Field `caption` in `/posts/{postId}` |
+| **Caption** | Text accompanying a Post. App enforces ≤ 30 chars (single-line overlay pill); Firestore rule cap is 200. Optional. | Field `caption` in `/posts/{postId}` |
 | **Friend** | User khác có mutual accepted friendship. Bidirectional. | Derived from `/friendships/{pairId}` |
 | **Friend graph** | Set của tất cả friendships. Bidirectional, no public following. | Firestore: `/friendships` |
 | **Friend request** | Pending invite. Becomes Friend khi accepted. | Firestore: `/friend_requests/{requestId}` |
