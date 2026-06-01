@@ -27,6 +27,27 @@ SpaceRepository spaceRepository(Ref ref) => throw UnimplementedError(
       'wire FirebaseSpaceRepository in main.dart',
     );
 
+/// Current Space context cho Camera. `null` = "All friends" (mặc định).
+///
+/// Set: `ref.read(currentSpaceProvider.notifier).select(space)` khi user
+/// chọn Space từ [SpaceContextBottomSheet] (T4). Reset về null khi chọn
+/// "All friends" (`.clear()`) hoặc khi user signout.
+///
+/// `keepAlive: true` để Space context persist khi user qua lại Camera/Feed
+/// — không reset chỉ vì page rebuild. Disposed cùng app lifetime.
+///
+/// Watch bởi `CameraSection` (KhoaLND) để đổi viền + nút chụp theo
+/// `space.colorHex` + hiển thị badge "Đang gửi: [SpaceName]".
+@Riverpod(keepAlive: true)
+class CurrentSpace extends _$CurrentSpace {
+  @override
+  Space? build() => null;
+
+  void select(Space? space) => state = space;
+
+  void clear() => state = null;
+}
+
 /// Family controller — instance per uid. Sheet/screen lấy uid từ
 /// [currentUidProvider] trước khi watch để đảm bảo signed-in.
 @riverpod
