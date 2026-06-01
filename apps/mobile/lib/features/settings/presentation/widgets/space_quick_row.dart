@@ -94,20 +94,25 @@ class _SpaceCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
           ),
-          GestureDetector(
-            onTap: onEdit,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
-                vertical: 2,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.bw600,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                'Sửa',
-                style: AppTextStyles.xsSemiBold.copyWith(color: Colors.white),
+          Semantics(
+            button: true,
+            label: 'Sửa',
+            excludeSemantics: true,
+            child: GestureDetector(
+              onTap: onEdit,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.bw600,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Sửa',
+                  style: AppTextStyles.xsSemiBold.copyWith(color: Colors.white),
+                ),
               ),
             ),
           ),
@@ -124,44 +129,49 @@ class _CreateSpaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 115,
-        height: 115,
-        decoration: BoxDecoration(
-          color: AppColors.bw700,
-          borderRadius: BorderRadius.circular(17),
-          border: Border.all(
-            color: AppColors.bw600.withValues(alpha: 0.5),
-            width: 1,
+    return Semantics(
+      button: true,
+      label: 'Tạo Space',
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 115,
+          height: 115,
+          decoration: BoxDecoration(
+            color: AppColors.bw700,
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(
+              color: AppColors.bw600.withValues(alpha: 0.5),
+              width: 1,
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 43,
-              height: 43,
-              decoration: BoxDecoration(
-                color: AppColors.turquoise500.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.turquoise500, width: 2),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 43,
+                height: 43,
+                decoration: BoxDecoration(
+                  color: AppColors.turquoise500.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.turquoise500, width: 2),
+                ),
+                child: const Icon(
+                  Icons.add,
+                  color: AppColors.turquoise500,
+                  size: 20,
+                ),
               ),
-              child: const Icon(
-                Icons.add,
-                color: AppColors.turquoise500,
-                size: 20,
+              const SizedBox(height: 4),
+              Text(
+                'Tạo',
+                style: AppTextStyles.xsSemiBold.copyWith(
+                  color: AppColors.turquoise500,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Tạo',
-              style: AppTextStyles.xsSemiBold.copyWith(
-                color: AppColors.turquoise500,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

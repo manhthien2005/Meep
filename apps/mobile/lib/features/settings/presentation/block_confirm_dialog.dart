@@ -71,26 +71,31 @@ class _BlockConfirmDialogState extends State<BlockConfirmDialog> {
             const SizedBox(height: AppSpacing.xl),
             SizedBox(
               width: double.infinity,
-              child: GestureDetector(
-                onTap: _blocked
-                    ? null
-                    : () {
-                        setState(() => _blocked = true);
-                        // TODO(T4/NganTNK): SettingsController.blockUser(uid)
-                      },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  decoration: BoxDecoration(
-                    color: _blocked
-                        ? AppColors.turquoise500.withValues(alpha: 0.7)
-                        : AppColors.turquoise500,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: Text(
-                      _blocked ? 'Đã chặn!' : 'Chặn',
-                      style: AppTextStyles.mdSemiBold.copyWith(
-                        color: Colors.white,
+              child: Semantics(
+                button: true,
+                label: _blocked ? 'Đã chặn!' : 'Chặn',
+                excludeSemantics: true,
+                child: GestureDetector(
+                  onTap: _blocked
+                      ? null
+                      : () {
+                          setState(() => _blocked = true);
+                          // TODO(T4/NganTNK): SettingsController.blockUser(uid)
+                        },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: _blocked
+                          ? AppColors.turquoise500.withValues(alpha: 0.7)
+                          : AppColors.turquoise500,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Center(
+                      child: Text(
+                        _blocked ? 'Đã chặn!' : 'Chặn',
+                        style: AppTextStyles.mdSemiBold.copyWith(
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -98,13 +103,19 @@ class _BlockConfirmDialogState extends State<BlockConfirmDialog> {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            GestureDetector(
-              onTap: () => Navigator.of(context).pop(_blocked),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                child: Text(
-                  'Bỏ qua',
-                  style: AppTextStyles.mdRegular.copyWith(color: Colors.white),
+            Semantics(
+              button: true,
+              label: 'Bỏ qua',
+              excludeSemantics: true,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(_blocked),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  child: Text(
+                    'Bỏ qua',
+                    style:
+                        AppTextStyles.mdRegular.copyWith(color: Colors.white),
+                  ),
                 ),
               ),
             ),

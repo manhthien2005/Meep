@@ -44,12 +44,16 @@ class SettingsHeader extends StatelessWidget {
               style: AppTextStyles.mdBold.copyWith(color: AppColors.bw400),
             ),
             const SizedBox(width: AppSpacing.xs),
-            GestureDetector(
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: profileLink));
-                // TODO(T3/NganTNK): show toast "Đã sao chép liên kết"
-              },
-              child: const Icon(Icons.link, size: 20, color: AppColors.bw400),
+            Semantics(
+              button: true,
+              label: 'Sao chép liên kết',
+              child: GestureDetector(
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: profileLink));
+                  // TODO(T3/NganTNK): show toast "Đã sao chép liên kết"
+                },
+                child: const Icon(Icons.link, size: 20, color: AppColors.bw400),
+              ),
             ),
           ],
         ),

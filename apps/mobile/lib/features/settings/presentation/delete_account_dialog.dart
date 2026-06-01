@@ -154,18 +154,23 @@ class _ConfirmDialogButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.bw700,
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.smSemiBold.copyWith(color: textColor),
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.bw700,
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Text(
+            label,
+            style: AppTextStyles.smSemiBold.copyWith(color: textColor),
+          ),
         ),
       ),
     );

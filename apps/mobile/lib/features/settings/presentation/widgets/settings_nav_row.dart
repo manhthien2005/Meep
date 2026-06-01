@@ -23,27 +23,32 @@ class SettingsNavRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = isDestructive ? AppColors.error800 : Colors.white;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: color),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Text(
-                label,
-                style: AppTextStyles.mdRegular.copyWith(color: color),
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: color),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  label,
+                  style: AppTextStyles.mdRegular.copyWith(color: color),
+                ),
               ),
-            ),
-            Icon(
-              Icons.chevron_right,
-              size: 20,
-              color: isDestructive ? AppColors.error800 : AppColors.bw500,
-            ),
-          ],
+              Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: isDestructive ? AppColors.error800 : AppColors.bw500,
+              ),
+            ],
+          ),
         ),
       ),
     );

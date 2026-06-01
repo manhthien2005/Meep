@@ -107,19 +107,28 @@ class _BlockedUserItem extends StatelessWidget {
             label: 'Bỏ chặn',
             child: GestureDetector(
               onTap: onUnblock,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.bw700,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'Bỏ chặn',
-                  style: AppTextStyles.smSemiBold.copyWith(
-                    color: AppColors.bw300,
+              behavior: HitTestBehavior.opaque,
+              // minHeight 48: đảm bảo vùng chạm >= 48px (a11y) trong khi pill
+              // vẫn giữ kích thước thị giác ban đầu.
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Center(
+                  widthFactor: 1,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.bw700,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Bỏ chặn',
+                      style: AppTextStyles.smSemiBold.copyWith(
+                        color: AppColors.bw300,
+                      ),
+                    ),
                   ),
                 ),
               ),

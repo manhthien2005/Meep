@@ -67,18 +67,23 @@ class WidgetConfirmSheet extends StatelessWidget {
   }) {
     return SizedBox(
       width: double.infinity,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: AppTextStyles.mdBold.copyWith(color: textColor),
+      child: Semantics(
+        button: true,
+        label: label,
+        excludeSemantics: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Center(
+              child: Text(
+                label,
+                style: AppTextStyles.mdBold.copyWith(color: textColor),
+              ),
             ),
           ),
         ),
@@ -96,44 +101,53 @@ class WidgetConfirmSheet extends StatelessWidget {
           color: AppColors.bw700,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 90,
-              height: 90,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.bw800,
-                borderRadius: BorderRadius.circular(17),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildOverlappingAvatars(),
-                  const SizedBox(height: 4),
-                  Text(
-                    '15 người bạn',
-                    style: AppTextStyles.xsRegular.copyWith(
-                      color: AppColors.bw200,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 10,
-                    ),
+        // scaleDown: preview là minh hoạ trang trí, tránh overflow khi content
+        // (avatars chồng + nhãn) nhỉnh hơn box cố định.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 90,
+                height: 90,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.bw800,
+                  borderRadius: BorderRadius.circular(17),
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildOverlappingAvatars(),
+                      const SizedBox(height: 4),
+                      Text(
+                        '15 người bạn',
+                        style: AppTextStyles.xsRegular.copyWith(
+                          color: AppColors.bw200,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Meep Widget\n2 x 2',
-              style: AppTextStyles.mdBold.copyWith(
-                color: AppColors.turquoise600,
-                fontSize: 12,
+              const SizedBox(height: 8),
+              Text(
+                'Meep Widget\n2 x 2',
+                style: AppTextStyles.mdBold.copyWith(
+                  color: AppColors.turquoise600,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -205,13 +219,17 @@ class WidgetConfirmSheet extends StatelessWidget {
               Positioned(
                 top: 12,
                 left: 13,
-                child: GestureDetector(
-                  onTap: () => Navigator.of(dialogContext).pop(),
-                  behavior: HitTestBehavior.opaque,
-                  child: const Icon(
-                    Icons.close,
-                    size: 20,
-                    color: AppColors.bw500,
+                child: Semantics(
+                  button: true,
+                  label: 'Đóng',
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(dialogContext).pop(),
+                    behavior: HitTestBehavior.opaque,
+                    child: const Icon(
+                      Icons.close,
+                      size: 20,
+                      color: AppColors.bw500,
+                    ),
                   ),
                 ),
               ),
