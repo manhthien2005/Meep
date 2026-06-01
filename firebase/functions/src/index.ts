@@ -131,38 +131,34 @@ export const onReactionCreated = onDocumentCreated(
   (_event) => { /* TODO(N/impl) */ },
 );
 
-// ===== Space module stubs =====
+// ===== Space module =====
 
-export const createSpace = onCall((req) => {
-  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
-  return { ok: true }; // TODO(SP/impl)
-});
+export { createSpace } from './space/createSpace.js';
+
 export const leaveSpace = onCall((req) => {
   if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
-  return { ok: true }; // TODO(SP/impl)
+  return { ok: true }; // TODO(SP/T7/impl)
 });
 export const kickMember = onCall((req) => {
   if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
-  return { ok: true }; // TODO(SP/impl)
+  return { ok: true }; // TODO(SP/T7/impl)
 });
 export const transferOwnership = onCall((req) => {
   if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
-  return { ok: true }; // TODO(SP/impl)
+  return { ok: true }; // TODO(SP/T7/impl)
 });
 
 export const onSpaceMemberAdded = onDocumentCreated(
-  { document: 'spaces/{spaceId}/members/{uid}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(SP/impl) */ },
+  { document: 'space_members/{spaceId}/members/{uid}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(SP/T8/impl) */ },
 );
 export const onSpaceMemberRemoved = onDocumentDeleted(
-  { document: 'spaces/{spaceId}/members/{uid}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(SP/impl) */ },
+  { document: 'space_members/{spaceId}/members/{uid}', region: 'asia-southeast1' },
+  (_event) => { /* TODO(SP/T8/impl) */ },
 );
-export const onSpacePostCreated = onDocumentCreated(
-  { document: 'posts/{postId}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(SP/impl) — only processes posts where data.spaceId != null */ },
-);
+// onSpacePostCreated — DELETED per Option A. spacePostFanOut là helper
+// gọi từ feed/onPostCreated khi post.spaceId != null (T9).
 export const onSpaceDeleted = onDocumentUpdated(
   { document: 'spaces/{spaceId}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(SP/impl) — fires when deletedAt field is set (soft delete) */ },
+  (_event) => { /* TODO(SP/T10/impl) — fires when deletedAt field is set (soft delete) */ },
 );
