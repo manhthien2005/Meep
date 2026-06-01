@@ -15,6 +15,7 @@ import 'package:meep/features/feed/presentation/feed_section.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/presentation/friend_sheet.dart';
 import 'package:meep/features/settings/presentation/settings_sheet.dart';
+import 'package:meep/features/space/presentation/space_context_bottom_sheet.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 
@@ -323,11 +324,15 @@ class _HomeTopBar extends ConsumerWidget {
     );
   }
 
-  /// Camera page: pill hiển thị số bạn bè thật, bấm mở FriendSheet (Figma).
+  /// Camera page: pill hiển thị số bạn bè thật.
+  /// - Tap = mở FriendSheet (Figma).
+  /// - Long-press = mở SpaceContextBottomSheet để đổi Camera context
+  ///   (gửi cho All friends hay 1 Space cụ thể). Per Space spec T4.
   Widget _buildFriendCountPill(BuildContext context, int friendCount) {
     final label = friendCount == 0 ? 'Chưa có bạn bè' : '$friendCount bạn bè';
     return GestureDetector(
       onTap: () => _openFriendSheet(context),
+      onLongPress: () => SpaceContextBottomSheet.show(context),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
         decoration: BoxDecoration(

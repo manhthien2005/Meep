@@ -12,10 +12,15 @@ class AppCameraButton extends StatefulWidget {
     super.key,
     this.onPressed,
     this.size = 82,
+    this.ringColor,
   });
 
   final VoidCallback? onPressed;
   final double size;
+
+  /// Override viền ring (default = turquoise500). Dùng cho Space context
+  /// — pass `space.colorHex` để nút chụp đổi theme theo Space.
+  final Color? ringColor;
 
   @override
   State<AppCameraButton> createState() => _AppCameraButtonState();
@@ -77,7 +82,9 @@ class _AppCameraButtonState extends State<AppCameraButton>
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: enabled ? AppColors.turquoise500 : AppColors.bw600,
+                    color: enabled
+                        ? (widget.ringColor ?? AppColors.turquoise500)
+                        : AppColors.bw600,
                     width: AppProportions.captureRingWidth,
                   ),
                 ),
