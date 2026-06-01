@@ -21,20 +21,14 @@ let testEnv: RulesTestEnvironment;
 const RULES_PATH = resolve(__dirname, '../../../firestore.rules');
 
 beforeAll(async () => {
-  try {
-    testEnv = await initializeTestEnvironment({
-      projectId: 'meep-test-friend',
-      firestore: {
-        rules: readFileSync(RULES_PATH, 'utf8'),
-        host: '127.0.0.1',
-        port: 9998,
-      },
-    });
-  } catch (error) {
-    // Emulator not running — skip tests gracefully
-    console.warn('⚠️  Firestore emulator not running. Skipping friend.rules.test.ts');
-    console.warn('   Run via: firebase emulators:exec --only firestore "npm run test:rules"');
-  }
+  testEnv = await initializeTestEnvironment({
+    projectId: 'meep-test-friend',
+    firestore: {
+      rules: readFileSync(RULES_PATH, 'utf8'),
+      host: '127.0.0.1',
+      port: 9999,
+    },
+  });
 });
 
 afterAll(async () => {
@@ -67,7 +61,7 @@ function pairId(a: string, b: string): string {
 
 // ===== /friendships/{pairId} =====
 
-describe.skipIf(!testEnv)('/friendships/{pairId}', () => {
+describe('/friendships/{pairId}', () => {
   test('uid1 can read friendship', async () => {
     const alice = uid('alice');
     const bob = uid('bob');
@@ -83,6 +77,30 @@ describe.skipIf(!testEnv)('/friendships/{pairId}', () => {
     });
 
     await assertSucceeds(authed(alice).firestore().doc(`friendships/${pid}`).get());
+  });
+
+  test('member can QUERY friendships by members arrayContains (app query)', async () => {
+    const alice = uid('alice');
+    const bob = uid('bob');
+    const pid = pairId(alice, bob);
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`friendships/${pid}`).set({
+        uid1: alice,
+        uid2: bob,
+        members: [alice, bob],
+        createdAt: new Date(),
+      });
+    });
+
+    // Mirrors FirebaseFriendRepository.watchFriends()
+    await assertSucceeds(
+      authed(alice)
+          .firestore()
+          .collection('friendships')
+          .where('members', 'array-contains', alice)
+          .get(),
+    );
   });
 
   test('uid2 can read friendship', async () => {
@@ -190,7 +208,7 @@ describe.skipIf(!testEnv)('/friendships/{pairId}', () => {
 
 // ===== /friend_requests/{requestId} =====
 
-describe.skipIf(!testEnv)('/friend_requests/{requestId}', () => {
+describe('/friend_requests/{requestId}', () => {
   test('sender can create request with senderId != receiverId', async () => {
     const alice = uid('alice');
     const bob = uid('bob');
@@ -203,6 +221,58 @@ describe.skipIf(!testEnv)('/friend_requests/{requestId}', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       }),
+    );
+  });
+
+  test('receiver can QUERY pending requests (watchPendingRequests)', async () => {
+    const alice = uid('alice');
+    const bob = uid('bob');
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('friend_requests').add({
+        senderId: alice,
+        receiverId: bob,
+        status: 'pending',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    });
+
+    // Mirrors FirebaseFriendRequestRepository.watchPendingRequests()
+    await assertSucceeds(
+      authed(bob)
+          .firestore()
+          .collection('friend_requests')
+          .where('receiverId', '==', bob)
+          .where('status', '==', 'pending')
+          .orderBy('createdAt', 'desc')
+          .get(),
+    );
+  });
+
+  test('sender can QUERY sent requests (watchSentRequests)', async () => {
+    const alice = uid('alice');
+    const bob = uid('bob');
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('friend_requests').add({
+        senderId: alice,
+        receiverId: bob,
+        status: 'pending',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    });
+
+    // Mirrors FirebaseFriendRequestRepository.watchSentRequests()
+    await assertSucceeds(
+      authed(alice)
+          .firestore()
+          .collection('friend_requests')
+          .where('senderId', '==', alice)
+          .where('status', '==', 'pending')
+          .orderBy('createdAt', 'desc')
+          .get(),
     );
   });
 

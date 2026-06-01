@@ -44,6 +44,8 @@ class _SpaceCreateSheetState extends ConsumerState<SpaceCreateSheet> {
   @override
   Widget build(BuildContext context) {
     return AppBottomSheet(
+      // PageView cần bounded height — pin sheet ở 95% màn hình.
+      heightFactor: 0.95,
       child: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),
