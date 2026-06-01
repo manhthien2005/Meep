@@ -14,6 +14,7 @@ import 'package:meep/features/feed/presentation/camera_section.dart';
 import 'package:meep/features/feed/presentation/feed_section.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/presentation/friend_sheet.dart';
+import 'package:meep/features/settings/presentation/settings_sheet.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 
@@ -301,11 +302,20 @@ class _HomeTopBar extends ConsumerWidget {
           else
             _buildFriendCountPill(context, friendCount),
           const Spacer(),
-          GestureDetector(
-            onTap: () => _openFriendSheet(context),
-            child: AppAvatar(
-              imageUrl: avatarUrl,
-              size: 40,
+          Semantics(
+            button: true,
+            label: 'Cài đặt',
+            child: GestureDetector(
+              onTap: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const SettingsSheet(),
+              ),
+              child: AppAvatar(
+                imageUrl: avatarUrl,
+                size: 40,
+              ),
             ),
           ),
         ],
