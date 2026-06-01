@@ -33,7 +33,6 @@ import 'package:meep/features/space/presentation/space_context_bottom_sheet.dart
 import 'package:meep/features/space/presentation/space_create_sheet.dart';
 import 'package:meep/features/streak/presentation/streak_photo_detail_screen.dart';
 import 'package:meep/features/streak/presentation/streak_screen.dart';
-import 'package:meep/features/settings/presentation/settings_test_page.dart';
 
 part 'app_router.g.dart';
 
@@ -72,9 +71,6 @@ String? authRedirect({
       location.startsWith('/group-chat')) {
     return null;
   }
-
-  // Test routes — bypass auth guard entirely
-  if (location.startsWith('/test-')) return null;
 
   final onAuthRoute = location.startsWith('/login') ||
       location.startsWith('/signup') ||
@@ -149,7 +145,7 @@ GoRouter appRouter(Ref ref) {
         initialLocation = rawRoute;
       }
     }
-  } catch (_) {/* keep /intro */}
+  } catch (_) {/* giữ initialLocation mặc định */}
 
   final notifier = _RouterNotifier(ref);
 
@@ -209,10 +205,6 @@ GoRouter appRouter(Ref ref) {
     },
     routes: [
       GoRoute(path: '/intro', builder: (_, __) => const IntroPage()),
-      GoRoute(
-        path: '/test-settings',
-        builder: (_, __) => const SettingsTestPage(),
-      ),
       GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
       GoRoute(
         path: '/signup/email',
