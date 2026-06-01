@@ -16,8 +16,8 @@ class BlockedAccountsPage extends StatefulWidget {
 
 class _BlockedAccountsPageState extends State<BlockedAccountsPage> {
   // TODO(T4/NganTNK): replace mock list with SettingsController.watchBlockedUsers()
-  late final List<Map<String, String>> _blockedUsers =
-      List<Map<String, String>>.from(SettingsMockData.mockBlockedUsers);
+  late final List<BlockedUserView> _blockedUsers =
+      List<BlockedUserView>.from(SettingsMockData.mockBlockedUsers);
 
   Future<void> _onUnblock(int index) async {
     // Bỏ chặn cần xác nhận trước (Figma 1441:3341 — state 3).
@@ -40,7 +40,7 @@ class _BlockedAccountsPageState extends State<BlockedAccountsPage> {
               ),
               itemCount: _blockedUsers.length,
               itemBuilder: (_, i) => _BlockedUserItem(
-                username: _blockedUsers[i]['username']!,
+                username: _blockedUsers[i].username,
                 onUnblock: () => _onUnblock(i),
               ),
             ),

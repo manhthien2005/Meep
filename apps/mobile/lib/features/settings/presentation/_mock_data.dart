@@ -7,12 +7,24 @@ class SettingsMockData {
   static const friendCount = 15;
   static const avatarUrl = null; // null = show placeholder icon
 
-  static const mockSpaces = [
-    {'name': 'Gia đình', 'memberCount': 5},
-    {'name': 'Hội đồng quản trị', 'memberCount': 8},
-  ];
+  static const mockSpaces = <String>['Gia đình', 'Hội đồng quản trị'];
 
-  static const mockBlockedUsers = [
-    {'uid': 'mock-uid-1', 'username': 'Lauren'},
+  static const mockBlockedUsers = <BlockedUserView>[
+    BlockedUserView(uid: 'mock-uid-1', username: 'Lauren'),
   ];
+}
+
+/// View model cho BlockedAccountsPage. T3 sẽ join `Block` (uid) với
+/// `/users/{uid}` (username, avatar) thành list `BlockedUserView` qua
+/// SettingsController.watchBlockedUsers().
+class BlockedUserView {
+  const BlockedUserView({
+    required this.uid,
+    required this.username,
+    this.avatarUrl,
+  });
+
+  final String uid;
+  final String username;
+  final String? avatarUrl;
 }

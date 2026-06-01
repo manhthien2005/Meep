@@ -48,11 +48,8 @@ class SettingsSheet extends StatelessWidget {
                     username: SettingsMockData.username,
                   ),
                   const SizedBox(height: AppSpacing.xl),
-                  SpaceQuickRow(
-                    spaceNames: [
-                      for (final space in SettingsMockData.mockSpaces)
-                        space['name'] as String,
-                    ],
+                  const SpaceQuickRow(
+                    spaceNames: SettingsMockData.mockSpaces,
                     // TODO(T2/NganTNK): navigate Space edit/create (Space module)
                   ),
                   const SizedBox(height: AppSpacing.xl),
