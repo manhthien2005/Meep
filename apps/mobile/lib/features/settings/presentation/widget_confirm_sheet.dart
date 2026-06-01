@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
@@ -189,43 +191,78 @@ class WidgetConfirmSheet extends StatelessWidget {
     showDialog<void>(
       context: context,
       barrierColor: AppColors.bw900.withValues(alpha: 0.45),
-      builder: (dialogContext) {
-        // Tự đóng sau 3 giây
-        final navigator = Navigator.of(dialogContext);
-        Future.delayed(const Duration(seconds: 3), () {
-          if (navigator.canPop()) {
-            navigator.pop();
-          }
-        });
-        return Dialog(
-          backgroundColor: AppColors.bw800,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 50),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+      builder: (_) => const _SuccessToastDialog(),
+    );
+  }
+}
+
+/// Toast hiển thị 3 giây rồi tự đóng. Stateful để Timer huỷ được trong
+/// `dispose()` — nếu user tap close hoặc barrier sớm, Timer huỷ ngay,
+/// tránh pop nhầm route khác.
+class _SuccessToastDialog extends StatefulWidget {
+  const _SuccessToastDialog();
+
+  @override
+  State<_SuccessToastDialog> createState() => _SuccessToastDialogState();
+}
+
+class _SuccessToastDialogState extends State<_SuccessToastDialog> {
+  static const _autoDismissDuration = Duration(seconds: 3);
+
+  Timer? _autoDismissTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _autoDismissTimer = Timer(_autoDismissDuration, () {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoDismissTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.bw800,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 50),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 28,
+              vertical: 28,
+            ),
+            child: Text(
+              'Đã thêm tiện ích vào màn hình chờ thành công!',
+              style: AppTextStyles.mdBold.copyWith(color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
           ),
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 28,
-                  vertical: 28,
-                ),
-                child: Text(
-                  'Đã thêm tiện ích vào màn hình chờ thành công!',
-                  style: AppTextStyles.mdBold.copyWith(color: Colors.white),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Positioned(
-                top: 12,
-                left: 13,
-                child: Semantics(
-                  button: true,
-                  label: 'Đóng',
-                  child: GestureDetector(
-                    onTap: () => Navigator.of(dialogContext).pop(),
-                    behavior: HitTestBehavior.opaque,
-                    child: const Icon(
+          // Touch area 48x48 a11y compliant — Icon vẫn 20px visual.
+          Positioned(
+            top: 0,
+            left: 0,
+            child: Semantics(
+              button: true,
+              label: 'Đóng',
+              excludeSemantics: true,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                behavior: HitTestBehavior.opaque,
+                child: const SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Center(
+                    child: Icon(
                       Icons.close,
                       size: 20,
                       color: AppColors.bw500,
@@ -233,10 +270,10 @@ class WidgetConfirmSheet extends StatelessWidget {
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

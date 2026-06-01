@@ -63,44 +63,47 @@ class _SpaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 115,
-      height: 115,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.bw700,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(
-          color: AppColors.bw600.withValues(alpha: 0.5),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            width: 43,
-            height: 43,
-            decoration: BoxDecoration(
-              color: AppColors.bw600,
-              borderRadius: BorderRadius.circular(21.5),
-              border: Border.all(color: AppColors.bw500, width: 2),
+    // Toàn card tappable: pill "Sửa" thuần visual indicator. Card 115x115 đã
+    // vượt yêu cầu touch target 48x48, nhỏ hơn sẽ không vừa avatar + name + pill.
+    return Semantics(
+      button: true,
+      label: 'Sửa Space $name',
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onEdit,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: 115,
+          height: 115,
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.bw700,
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(
+              color: AppColors.bw600.withValues(alpha: 0.5),
+              width: 1,
             ),
           ),
-          Text(
-            name,
-            style: AppTextStyles.xsSemiBold.copyWith(color: Colors.white),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-          Semantics(
-            button: true,
-            label: 'Sửa',
-            excludeSemantics: true,
-            child: GestureDetector(
-              onTap: onEdit,
-              child: Container(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 43,
+                height: 43,
+                decoration: BoxDecoration(
+                  color: AppColors.bw600,
+                  borderRadius: BorderRadius.circular(21.5),
+                  border: Border.all(color: AppColors.bw500, width: 2),
+                ),
+              ),
+              Text(
+                name,
+                style: AppTextStyles.xsSemiBold.copyWith(color: Colors.white),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+              Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.sm,
                   vertical: 2,
@@ -114,9 +117,9 @@ class _SpaceCard extends StatelessWidget {
                   style: AppTextStyles.xsSemiBold.copyWith(color: Colors.white),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
