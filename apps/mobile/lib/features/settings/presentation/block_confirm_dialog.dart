@@ -27,7 +27,6 @@ class _BlockConfirmDialogState extends State<BlockConfirmDialog> {
   @override
   Widget build(BuildContext context) {
     return AppBottomSheet(
-      backgroundColor: const Color(0xFF1C1C1E),
       child: Padding(
         padding: EdgeInsets.only(
           left: AppSpacing.screenHorizontal,

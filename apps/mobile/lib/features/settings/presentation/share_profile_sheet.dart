@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:meep/core/config/app_config.dart';
+import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
@@ -14,7 +16,7 @@ class ShareProfileSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final profileLink = 'meep.cam/$username';
+    final profileLink = '${AppConfig.shareBaseUrl}/$username';
     return AppBottomSheet(
       child: Padding(
         padding: EdgeInsets.only(
@@ -72,16 +74,13 @@ class ShareProfileSheet extends StatelessWidget {
             children: [
               Text(
                 'Kết bạn với tôi trên Meep nhé!',
-                style: AppTextStyles.mdBold.copyWith(
-                  color: Colors.white,
-                  fontSize: 18,
-                ),
+                style: AppTextStyles.baseBold.copyWith(color: Colors.white),
               ),
               const SizedBox(height: 2),
               Text(
                 profileLink,
                 style: AppTextStyles.smRegular.copyWith(
-                  color: const Color(0xFFBABABA),
+                  color: AppColors.bw400,
                 ),
               ),
             ],

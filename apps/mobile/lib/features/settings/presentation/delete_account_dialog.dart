@@ -80,7 +80,7 @@ class _ReauthDialogState extends State<_ReauthDialog> {
                 hintStyle:
                     AppTextStyles.mdRegular.copyWith(color: AppColors.bw500),
                 filled: true,
-                fillColor: const Color(0xFF3A3A3C),
+                fillColor: AppColors.bw700,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 20,
                   vertical: 14,
@@ -119,6 +119,12 @@ class _ReauthDialogState extends State<_ReauthDialog> {
                     label: 'Xác nhận',
                     textColor: AppColors.error800,
                     onTap: () {
+                      if (_passwordController.text.isEmpty) {
+                        setState(
+                          () => _errorText = 'Vui lòng nhập mật khẩu',
+                        );
+                        return;
+                      }
                       // TODO(T6/NganTNK): reauthenticate + SettingsController.deleteAccount()
                       // On FirebaseAuthException(requires-recent-login):
                       //   setState(() => _errorText = 'Vui lòng xác thực lại để tiếp tục');

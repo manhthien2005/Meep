@@ -21,14 +21,9 @@ class WidgetConfirmSheet extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'Thêm vào màn hình chờ?',
-                style: TextStyle(
-                  fontFamily: 'Nunito',
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
+                style: AppTextStyles.baseBold.copyWith(color: Colors.white),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -179,7 +174,7 @@ class WidgetConfirmSheet extends StatelessWidget {
   void _showSuccessToast(BuildContext context) {
     showDialog<void>(
       context: context,
-      barrierColor: const Color(0x73000000),
+      barrierColor: AppColors.bw900.withValues(alpha: 0.45),
       builder: (dialogContext) {
         // Tự đóng sau 3 giây
         final navigator = Navigator.of(dialogContext);

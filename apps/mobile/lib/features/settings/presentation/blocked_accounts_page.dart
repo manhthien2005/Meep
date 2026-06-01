@@ -4,6 +4,8 @@ import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/settings/presentation/_mock_data.dart';
 import 'package:meep/features/settings/presentation/unblock_confirm_dialog.dart';
+import 'package:meep/features/settings/presentation/widgets/settings_scaffold.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 
 class BlockedAccountsPage extends StatefulWidget {
   const BlockedAccountsPage({super.key});
@@ -27,26 +29,8 @@ class _BlockedAccountsPageState extends State<BlockedAccountsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bw900,
-      appBar: AppBar(
-        backgroundColor: AppColors.bw900,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Tài khoản bị chặn',
-          style: TextStyle(
-            fontFamily: 'Nunito',
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-          ),
-        ),
-        centerTitle: true,
-      ),
+    return SettingsScaffold(
+      title: 'Tài khoản bị chặn',
       body: _blockedUsers.isEmpty
           ? const _EmptyState()
           : ListView.builder(
@@ -106,17 +90,10 @@ class _BlockedUserItem extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.lg),
       child: Row(
         children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: AppColors.bw600,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.bw300, width: 4),
-            ),
-            child: const Center(
-              child: Icon(Icons.person, color: Colors.white54, size: 24),
-            ),
+          AppAvatar(
+            size: 50,
+            fallbackText:
+                username.isNotEmpty ? username[0].toUpperCase() : null,
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -142,7 +119,7 @@ class _BlockedUserItem extends StatelessWidget {
                 child: Text(
                   'Bỏ chặn',
                   style: AppTextStyles.smSemiBold.copyWith(
-                    color: const Color(0xFFDDDDDD),
+                    color: AppColors.bw300,
                   ),
                 ),
               ),

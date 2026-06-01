@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/settings/presentation/widgets/settings_scaffold.dart';
 
 class PrivacyDataPage extends StatefulWidget {
   const PrivacyDataPage({super.key});
@@ -15,26 +16,8 @@ class _PrivacyDataPageState extends State<PrivacyDataPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bw900,
-      appBar: AppBar(
-        backgroundColor: AppColors.bw900,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Quyền riêng tư và dữ liệu',
-          style: TextStyle(
-            fontFamily: 'Nunito',
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-          ),
-        ),
-        centerTitle: true,
-      ),
+    return SettingsScaffold(
+      title: 'Quyền riêng tư và dữ liệu',
       body: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.screenHorizontal,
@@ -88,7 +71,7 @@ class _PrivacyDataPageState extends State<PrivacyDataPage> {
               activeThumbColor: Colors.white,
               activeTrackColor: AppColors.turquoise500,
               inactiveThumbColor: Colors.white,
-              inactiveTrackColor: const Color(0xFF48484A),
+              inactiveTrackColor: AppColors.bw300,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),

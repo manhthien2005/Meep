@@ -2,33 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/settings/presentation/widgets/settings_scaffold.dart';
 
 class TermsPage extends StatelessWidget {
   const TermsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bw900,
-      appBar: AppBar(
-        backgroundColor: AppColors.bw900,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Điều khoản dịch vụ',
-          style: TextStyle(
-            fontFamily: 'Nunito',
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: const SingleChildScrollView(
+    return const SettingsScaffold(
+      title: 'Điều khoản dịch vụ',
+      body: SingleChildScrollView(
         padding: EdgeInsets.only(
           left: AppSpacing.screenHorizontal,
           right: AppSpacing.screenHorizontal,
