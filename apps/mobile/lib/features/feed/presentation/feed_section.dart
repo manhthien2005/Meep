@@ -131,64 +131,109 @@ class OwnPostCard extends StatelessWidget {
       onLongPress: () => _showShareModal(context, post, isAuthor: true),
       footer: SizedBox(
         width: photoSize,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text.rich(
-              TextSpan(
-                children: [
-                  const TextSpan(
-                    text: 'Bạn ',
-                    style: TextStyle(color: AppColors.bw100),
-                  ),
-                  TextSpan(
-                    text: _formatDate(post.createdAt),
-                    style: const TextStyle(color: AppColors.bw500),
-                  ),
-                ],
-              ),
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'Nunito',
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0x66252627),
-                borderRadius: BorderRadius.circular(40),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.auto_awesome_outlined,
-                    color: AppColors.bw400,
-                    size: 18,
-                  ),
-                  SizedBox(width: 10),
-                  Text(
-                    'Chưa có hoạt động nào!',
-                    style: TextStyle(
-                      color: AppColors.bw400,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      fontFamily: 'Nunito',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+        child: OwnPostFooter(post: post),
       ),
     );
   }
+}
 
-  String _formatDate(DateTime dt) => '${dt.day} thg ${dt.month}';
+/// Author label + activity pill shown under the photo on own posts.
+/// Extracted so [OwnPostPage] can position it at the bottom of the screen
+/// (separately from the photo).
+class OwnPostFooter extends StatelessWidget {
+  const OwnPostFooter({super.key, required this.post});
+
+  final Post post;
+
+  static String _formatDate(DateTime dt) => '${dt.day} thg ${dt.month}';
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(
+                text: 'Bạn ',
+                style: TextStyle(color: AppColors.bw100),
+              ),
+              TextSpan(
+                text: _formatDate(post.createdAt),
+                style: const TextStyle(color: AppColors.bw500),
+              ),
+            ],
+          ),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Nunito',
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0x66252627),
+            borderRadius: BorderRadius.circular(40),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.auto_awesome_outlined,
+                color: AppColors.bw400,
+                size: 18,
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Chưa có hoạt động nào!',
+                style: TextStyle(
+                  color: AppColors.bw400,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Nunito',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Own post variant for the home PageView: photo near the top, footer
+/// (label + activity pill) pinned near the taskbar at ~4% screen height.
+/// Used instead of [OwnPostCard] when the post fills a full screen page.
+class OwnPostPage extends StatelessWidget {
+  const OwnPostPage({super.key, required this.post});
+
+  final Post post;
+
+  /// Spacing from the bottom of the screen (above the taskbar). Tuned by
+  /// product preference; pill should sit just above the nav bar.
+  static const double _bottomGapRatio = 0.04;
+
+  @override
+  Widget build(BuildContext context) {
+    final screenH = MediaQuery.sizeOf(context).height;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        PostCard(
+          post: post,
+          onLongPress: () => _showShareModal(context, post, isAuthor: true),
+        ),
+        const Spacer(),
+        OwnPostFooter(post: post),
+        SizedBox(height: screenH * _bottomGapRatio),
+      ],
+    );
+  }
 }
 
 void _showShareModal(

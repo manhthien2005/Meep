@@ -546,12 +546,15 @@ class _PostPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (post.authorId == currentUid) {
+      // Own post: use the full-screen layout (photo top, footer ~4% above
+      // the taskbar). No scroll because the column is sized to the screen.
+      return OwnPostPage(post: post);
+    }
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.only(bottom: 20),
-        child: post.authorId == currentUid
-            ? OwnPostCard(post: post)
-            : FriendPostCard(post: post),
+        child: FriendPostCard(post: post),
       ),
     );
   }
