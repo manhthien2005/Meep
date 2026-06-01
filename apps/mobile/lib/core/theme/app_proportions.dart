@@ -31,12 +31,15 @@ abstract final class AppProportions {
 
   // ── Note pill ─────────────────────────────────────────────────────────────
 
-  /// Pill total width. Figma: 126/412 → 30.6%.
-  static const double pillWidthRatio = 126 / figmaFrameWidth;
+  /// Pill total width — fixed ~50% of frame width so the editable caption has
+  /// a comfortable centered text area. Figma frame 412 → ~200px.
+  static const double pillWidthRatio = 200 / figmaFrameWidth;
   static double pillWidth(double screenW) => screenW * pillWidthRatio;
 
-  /// Pill chrome = icon(22) + iconGap(6) + paddingH(15×2) = 58.
-  static const double pillChrome = 58.0;
+  /// Pill inner chrome consumed by horizontal padding + icon + gap. Used to
+  /// derive the editable text-area width from [pillWidth].
+  static const double pillPaddingH = 14;
+  static const double pillIconGap = 6;
 
   /// Font size inside pill. Figma: 14px on 412, bumped to 15 for legibility.
   static const double pillFontRatio = 15 / figmaFrameWidth;
@@ -44,7 +47,8 @@ abstract final class AppProportions {
 
   // ── Capture Button ────────────────────────────────────────────────────────
 
-  static const double captureOuterRatio = 79 / figmaFrameWidth;
+  // Bumped ~15% over Figma (79) for a larger, easier-to-hit capture/send button.
+  static const double captureOuterRatio = 92 / figmaFrameWidth;
   static const double captureInnerToOuterRatio = 69 / 79;
   static const double captureRingWidth = 3;
 
@@ -54,7 +58,8 @@ abstract final class AppProportions {
 
   // ── Side icons ────────────────────────────────────────────────────────────
 
-  static const double sideIconRatio = 36 / figmaFrameWidth;
+  // Bumped ~15% over Figma (36) to match the larger capture/send button.
+  static const double sideIconRatio = 44 / figmaFrameWidth;
   static double sideIconSize(double screenW) => screenW * sideIconRatio;
 
   static const double captureRowGapRatio = 60 / figmaFrameWidth;

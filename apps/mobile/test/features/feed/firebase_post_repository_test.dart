@@ -78,6 +78,41 @@ void main() {
       expect(snap.data()!['audienceType'], 'select');
       expect(snap.data()!['audienceUids'], ['uid2', 'uid3']);
     });
+
+    test('strips null fields so Firestore rule does not reject the create',
+        () async {
+      // Single-camera post WITHOUT a caption — used to write
+      // `caption: null` which trips the `caption is string` rule branch and
+      // causes a permission-denied in prod. Repo must drop those keys.
+      final post = _makePost();
+      await repo.createPost(post);
+
+      final data = (await db.collection('posts').doc('p1').get()).data()!;
+      expect(data.containsKey('caption'), isFalse);
+      expect(data.containsKey('backImageUrl'), isFalse);
+      expect(data.containsKey('frontImageUrl'), isFalse);
+      expect(data.containsKey('captionType'), isFalse);
+      expect(data.containsKey('spaceId'), isFalse);
+      expect(data.containsKey('authorAvatarUrl'), isFalse);
+      // Non-null fields stay.
+      expect(data['authorId'], 'uid1');
+      expect(data['imageUrl'], isNotNull);
+    });
+
+    test('keeps caption key when caption is a non-empty string', () async {
+      final post = Post(
+        postId: 'p2',
+        authorId: 'uid1',
+        authorName: 'Test User',
+        imageUrl: 'https://example.com/photo.jpg',
+        caption: 'hello world',
+        audienceType: AudienceType.all,
+        createdAt: DateTime(2026, 5, 27),
+      );
+      await repo.createPost(post);
+      final data = (await db.collection('posts').doc('p2').get()).data()!;
+      expect(data['caption'], 'hello world');
+    });
   });
 
   group('watchFeed', () {

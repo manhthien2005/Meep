@@ -116,7 +116,10 @@ class _CapturePreviewScreenState extends ConsumerState<CapturePreviewScreen> {
               onDownload: _saveToGallery,
               savedToGallery: _savedToGallery,
             ),
-            const SizedBox(height: 12),
+            // Spacer above the photo, balanced by the spacer below the dots, so
+            // the (photo + dots) cluster sits vertically centered between the
+            // header and the action bar.
+            const Spacer(),
             GestureDetector(
               onHorizontalDragEnd: (d) {
                 final v = d.primaryVelocity;

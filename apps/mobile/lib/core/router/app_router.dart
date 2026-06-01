@@ -21,6 +21,8 @@ import 'package:meep/dev/widget_catalog_page.dart';
 import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
 import 'package:meep/features/diary/presentation/diary_create_screen.dart';
 import 'package:meep/features/diary/presentation/diary_list_screen.dart';
+import 'package:meep/features/feed/presentation/capture_preview_args.dart';
+import 'package:meep/features/feed/presentation/capture_preview_screen.dart';
 import 'package:meep/features/feed/presentation/home_screen.dart';
 import 'package:meep/features/home/presentation/home_page.dart';
 import 'package:meep/features/profile/presentation/edit_profile_screen.dart';
@@ -288,7 +290,8 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: '/capture-preview',
-        builder: (_, __) => const HomeScreen(),
+        builder: (_, state) =>
+            CapturePreviewScreen(args: state.extra as CapturePreviewArgs),
       ),
       GoRoute(
         path: '/caption-modal',

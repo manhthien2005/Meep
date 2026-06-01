@@ -18,7 +18,13 @@ class FirebasePostRepository implements PostRepository {
     }
 
     final ref = _db.collection(_posts).doc(post.postId);
+    // Strip null fields BEFORE writing: Firestore rule `/posts/{postId}` requires
+    // `caption is string` whenever the `caption` key is present, so leaving an
+    // explicit `caption: null` (or other null fields) in the payload trips a
+    // permission-denied. Removing the keys makes the rule's `!('caption' in data)`
+    // branch satisfy instead.
     final data = post.toJson()
+      ..removeWhere((_, value) => value == null)
       ..['createdAt'] = FieldValue
           .serverTimestamp(); // spec: serverTimestamp, not device clock
     await ref.set(data);

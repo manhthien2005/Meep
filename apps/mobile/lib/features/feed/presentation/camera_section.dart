@@ -95,7 +95,10 @@ class _CameraSectionState extends ConsumerState<CameraSection> {
 
     return Column(
       children: [
-        const SizedBox(height: 12),
+        // Spacer above the photo, balanced by the spacer below the dots, so
+        // the (photo + dots) cluster sits vertically centered in the space
+        // between the top bar and the action bar.
+        const Spacer(),
         GestureDetector(
           onHorizontalDragEnd: (d) => _onViewfinderSwipe(d.primaryVelocity),
           child: AppPhotoFrame(
