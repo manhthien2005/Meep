@@ -50,5 +50,19 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // WorkManager — periodic widget refresh (T3)
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // Coroutines — Worker runs on Dispatchers.Default; .await() for Firebase Tasks
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+
+    // Firebase native access from WidgetSyncWorker (T3) — BoM pins versions
+    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+
+    // Glide — image download + cache + circular avatar transform (T3)
+    implementation("com.github.bumptech.glide:glide:4.16.0")
 }
