@@ -36,8 +36,21 @@ class MeepWidget : AppWidgetProvider() {
         appWidgetIds.forEach { id ->
             appWidgetManager.updateAppWidget(id, views)
         }
-        // TODO(W/T3/KhoaLND): enqueue WidgetSyncWorker here so images and
-        // unread count are refreshed right after the system update tick.
+        // Kick a one-time background refresh — pulls Firestore + images so
+        // the widget can replace this fast text path with real photo/count.
+        WidgetSyncWorker.enqueueOneTime(context)
+    }
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        // First widget added to the home screen → start the 15-minute cadence.
+        WidgetSyncWorker.schedulePeriodic(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        // Last widget removed → stop the background work.
+        WidgetSyncWorker.cancelPeriodic(context)
     }
 
     internal fun buildRemoteViews(context: Context, data: WidgetData?): RemoteViews {

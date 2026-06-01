@@ -58,4 +58,15 @@ object WidgetDataStore {
             lastViewedAtMillis = prefs.getLong(KEY_LAST_VIEWED_AT, 0L),
         )
     }
+
+    /**
+     * Standalone reader for [KEY_LAST_VIEWED_AT].
+     *
+     * [WidgetSyncWorker] needs this value even when no widget data exists yet
+     * (first launch). Defaults to 0L → every feed post counts as unread.
+     */
+    fun readLastViewedAt(context: Context): Long {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getLong(KEY_LAST_VIEWED_AT, 0L)
+    }
 }
