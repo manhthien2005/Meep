@@ -24,6 +24,8 @@ class FirebaseBlockRepository implements BlockRepository {
   }) async {
     // CF Admin SDK bypass rules → atomic block + unfriend + conversation
     // status update (Task T5 #119). Client KHÔNG write Firestore trực tiếp.
+    // blockerUid giữ trong signature theo contract — CF tự derive từ
+    // request.auth.uid, không cần pass payload.
     try {
       final callable = _functions.httpsCallable('blockUser');
       await callable.call<void>({'targetUid': targetUid});
@@ -39,10 +41,14 @@ class FirebaseBlockRepository implements BlockRepository {
   }) async {
     // Client-side delete OK — blocker chính chủ doc, rule cho phép xoá
     // khi request.auth.uid == blockerUid (resolved OQ5 trong #116).
-    await _firestore
-        .collection(_blocksCollection)
-        .doc(_blockIdOf(blockerUid, targetUid))
-        .delete();
+    try {
+      await _firestore
+          .collection(_blocksCollection)
+          .doc(_blockIdOf(blockerUid, targetUid))
+          .delete();
+    } on FirebaseException catch (e) {
+      throw _mapFirestoreException(e, 'bỏ chặn người dùng');
+    }
   }
 
   @override
@@ -54,23 +60,65 @@ class FirebaseBlockRepository implements BlockRepository {
         .map(
           (snapshot) =>
               snapshot.docs.map((doc) => Block.fromJson(doc.data())).toList(),
-        );
+        )
+        .handleError((Object e, StackTrace s) {
+      if (e is FirebaseException) {
+        throw _mapFirestoreException(e, 'tải danh sách tài khoản đã chặn');
+      }
+      Error.throwWithStackTrace(e, s);
+    });
   }
 
   @override
   Future<bool> isBlocked({required String uid1, required String uid2}) async {
     // Check cả 2 chiều song song: tồn tại 1 trong 2 doc là true.
-    final results = await Future.wait([
-      _firestore
-          .collection(_blocksCollection)
-          .doc(_blockIdOf(uid1, uid2))
-          .get(),
-      _firestore
-          .collection(_blocksCollection)
-          .doc(_blockIdOf(uid2, uid1))
-          .get(),
-    ]);
-    return results.any((doc) => doc.exists);
+    try {
+      final results = await Future.wait([
+        _firestore
+            .collection(_blocksCollection)
+            .doc(_blockIdOf(uid1, uid2))
+            .get(),
+        _firestore
+            .collection(_blocksCollection)
+            .doc(_blockIdOf(uid2, uid1))
+            .get(),
+      ]);
+      return results.any((doc) => doc.exists);
+    } on FirebaseException catch (e) {
+      throw _mapFirestoreException(e, 'kiểm tra trạng thái chặn');
+    }
+  }
+
+  /// Map [FirebaseException] (Firestore) sang [AppError] tương ứng.
+  /// [action] = động từ tiếng Việt mô tả thao tác cho fallback message.
+  AppError _mapFirestoreException(FirebaseException e, String action) {
+    final serverMessage = e.message;
+    switch (e.code) {
+      case 'permission-denied':
+        return ForbiddenError(action);
+      case 'not-found':
+        return NotFoundError(serverMessage ?? action);
+      case 'unavailable':
+      case 'deadline-exceeded':
+      case 'cancelled':
+        return NetworkError(
+          message: serverMessage ?? 'Mất kết nối khi $action. Thử lại sau.',
+          code: e.code,
+          cause: e,
+        );
+      case 'failed-precondition':
+        return ValidationError(
+          message: serverMessage ?? 'Không thể $action: dữ liệu không hợp lệ',
+          code: e.code,
+          cause: e,
+        );
+      default:
+        return UnexpectedError(
+          message: serverMessage ?? 'Không thể $action. Thử lại sau.',
+          code: e.code,
+          cause: e,
+        );
+    }
   }
 
   /// Map [FirebaseFunctionsException] sang [AppError] tương ứng.
