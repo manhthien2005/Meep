@@ -1,16 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:meep/core/theme/app_proportions.dart';
 import 'package:meep/shared/widgets/app_note_pill.dart';
 
 void main() {
-  // Phone-sized surface so pillWidth resolves to the Figma ~200px target.
+  // Phone-sized surface so MediaQuery-driven font sizing is deterministic.
   Widget wrap(Widget w) => MaterialApp(
         home: MediaQuery(
           data: const MediaQueryData(size: Size(412, 917)),
           child: Scaffold(body: Center(child: w)),
         ),
+      );
+
+  Size pillSize(WidgetTester tester) => tester.getSize(
+        find
+            .descendant(
+              of: find.byType(AppNotePill),
+              matching: find.byType(Container),
+            )
+            .first,
       );
 
   group('AppNotePill', () {
@@ -20,34 +28,25 @@ void main() {
       expect(field.textAlign, TextAlign.center);
     });
 
-    testWidgets('pill has fixed width from proportions', (tester) async {
+    testWidgets('width grows with text length (hug content)', (tester) async {
       await tester.pumpWidget(wrap(const AppNotePill(text: '')));
-      final size = tester.getSize(
-        find
-            .descendant(
-              of: find.byType(AppNotePill),
-              matching: find.byType(Container),
-            )
-            .first,
+      await tester.pump();
+      final emptyW = pillSize(tester).width;
+
+      await tester.pumpWidget(
+        wrap(const AppNotePill(text: 'a much longer caption here')),
       );
-      expect(size.width, closeTo(AppProportions.pillWidth(412), 0.5));
+      await tester.pump();
+      final longW = pillSize(tester).width;
+
+      expect(longW, greaterThan(emptyW));
     });
 
-    testWidgets('width is independent of text length', (tester) async {
-      await tester.pumpWidget(
-        wrap(
-          const AppNotePill(text: 'A very long caption that would overflow'),
-        ),
-      );
-      final size = tester.getSize(
-        find
-            .descendant(
-              of: find.byType(AppNotePill),
-              matching: find.byType(Container),
-            )
-            .first,
-      );
-      expect(size.width, closeTo(AppProportions.pillWidth(412), 0.5));
+    testWidgets('enforces 30-char maxLength', (tester) async {
+      await tester.pumpWidget(wrap(const AppNotePill(text: '')));
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.maxLength, AppNotePill.maxLength);
+      expect(AppNotePill.maxLength, 30);
     });
   });
 }

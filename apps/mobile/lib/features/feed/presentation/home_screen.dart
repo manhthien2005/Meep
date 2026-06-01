@@ -546,14 +546,10 @@ class _PostPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: post.authorId == currentUid
-            ? OwnPostCard(post: post)
-            : FriendPostCard(post: post),
-      ),
-    );
+    if (post.authorId == currentUid) {
+      return OwnPostPage(post: post);
+    }
+    return FriendPostPage(post: post);
   }
 }
 

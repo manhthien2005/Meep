@@ -3,8 +3,11 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_proportions.dart';
 
 /// Editable caption overlay pill. cornerRadius 30, semi-transparent bg.
-/// Fixed-width text area: marquee ping-pong when readOnly + text overflows.
-/// Width and font size are computed internally from MediaQuery.
+///
+/// Hug-content: the pill sizes itself to the current text instead of being
+/// fixed-width. The text area is measured with [TextPainter] each rebuild,
+/// then clamped to a sane min (so an empty pill is still tappable) and a max
+/// (so a maxed-out 30-char caption never overflows the photo frame).
 class AppNotePill extends StatefulWidget {
   const AppNotePill({
     super.key,
@@ -17,17 +20,17 @@ class AppNotePill extends StatefulWidget {
   final ValueChanged<String>? onChanged;
   final bool readOnly;
 
+  /// Max length the editable pill enforces. Matches the Firestore rule cap
+  /// (which is 200) but app-side we keep captions short enough to render
+  /// nicely in a single-line overlay.
+  static const int maxLength = 30;
+
   @override
   State<AppNotePill> createState() => _AppNotePillState();
 }
 
-class _AppNotePillState extends State<AppNotePill>
-    with SingleTickerProviderStateMixin {
+class _AppNotePillState extends State<AppNotePill> {
   late final TextEditingController _ctrl;
-  AnimationController? _marqueeCtrl;
-  Animation<double>? _marqueeAnim;
-
-  double _textAreaWidth = 0;
   double _fontSize = 14;
 
   TextStyle _textStyle(double fontSize) => TextStyle(
@@ -41,32 +44,11 @@ class _AppNotePillState extends State<AppNotePill>
   void initState() {
     super.initState();
     _ctrl = TextEditingController(text: widget.text);
-    _ctrl.addListener(() => widget.onChanged?.call(_ctrl.text));
-
-    if (widget.readOnly) {
-      _marqueeCtrl = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 2500),
-      );
-      WidgetsBinding.instance.addPostFrameCallback((_) => _setupMarquee());
-    }
-  }
-
-  void _setupMarquee() {
-    final tp = TextPainter(
-      text: TextSpan(text: widget.text, style: _textStyle(_fontSize)),
-      maxLines: 1,
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    final overflow = tp.width - _textAreaWidth;
-    if (overflow > 0 && _marqueeCtrl != null) {
-      _marqueeAnim = Tween<double>(begin: 0, end: -(overflow + 8)).animate(
-        CurvedAnimation(parent: _marqueeCtrl!, curve: Curves.easeInOut),
-      );
-      _marqueeCtrl!.repeat(reverse: true);
+    _ctrl.addListener(() {
+      widget.onChanged?.call(_ctrl.text);
+      // Re-measure so the pill grows / shrinks as the user types.
       if (mounted) setState(() {});
-    }
+    });
   }
 
   @override
@@ -80,89 +62,80 @@ class _AppNotePillState extends State<AppNotePill>
   @override
   void dispose() {
     _ctrl.dispose();
-    _marqueeCtrl?.dispose();
     super.dispose();
+  }
+
+  /// Measure the visual width of [text] at the current font.
+  double _measureText(String text) {
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: _textStyle(_fontSize)),
+      maxLines: 1,
+      textDirection: TextDirection.ltr,
+    )..layout();
+    return tp.width;
   }
 
   @override
   Widget build(BuildContext context) {
     final screenW = MediaQuery.sizeOf(context).width;
-    final pillW = AppProportions.pillWidth(screenW);
     _fontSize = AppProportions.pillFontSize(screenW);
-    final iconSize = _fontSize + 2;
-    // Fixed-width pill: text area = pill width minus padding, icon, and gap.
-    _textAreaWidth = pillW -
-        AppProportions.pillPaddingH * 2 -
-        iconSize -
-        AppProportions.pillIconGap;
 
     return Container(
-      width: pillW,
       padding: const EdgeInsets.symmetric(
         horizontal: AppProportions.pillPaddingH,
-        vertical: 8,
+        vertical: 4,
       ),
       decoration: BoxDecoration(
         color: const Color(0x66394041),
         borderRadius: BorderRadius.circular(30),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.text_fields, color: AppColors.bw300, size: iconSize),
-          const SizedBox(width: AppProportions.pillIconGap),
-          SizedBox(
-            width: _textAreaWidth,
-            child: widget.readOnly ? _buildMarquee() : _buildTextField(),
-          ),
-        ],
-      ),
+      child: widget.readOnly ? _buildReadOnly() : _buildTextField(screenW),
     );
   }
 
-  Widget _buildMarquee() {
-    if (_marqueeAnim == null) {
-      return Text(
-        widget.text,
-        style: _textStyle(_fontSize),
-        maxLines: 1,
-        textAlign: TextAlign.center,
-        overflow: TextOverflow.ellipsis,
-      );
-    }
-    return ClipRect(
-      child: AnimatedBuilder(
-        animation: _marqueeAnim!,
-        builder: (_, child) => Transform.translate(
-          offset: Offset(_marqueeAnim!.value, 0),
-          child: child,
-        ),
-        child: Text(
-          widget.text,
-          style: _textStyle(_fontSize),
-          maxLines: 1,
-          softWrap: false,
-          overflow: TextOverflow.visible,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField() {
-    return TextField(
-      controller: _ctrl,
+  Widget _buildReadOnly() {
+    // 30-char cap on input means the readOnly pill never needs marquee or
+    // wrap — a single line with ellipsis is enough as a safety net.
+    return Text(
+      widget.text,
       style: _textStyle(_fontSize),
+      maxLines: 1,
       textAlign: TextAlign.center,
-      decoration: InputDecoration(
-        isDense: true,
-        border: InputBorder.none,
-        hintText: 'Nhập chú thích...',
-        hintStyle: TextStyle(color: AppColors.bw500, fontSize: _fontSize),
-        contentPadding: EdgeInsets.zero,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  Widget _buildTextField(double screenW) {
+    // Hug width: measure the typed text, clamp to [min, max] so the pill is
+    // always tappable when empty and never spills past the photo frame.
+    final text = _ctrl.text;
+    final measured = _measureText(text.isEmpty ? 'A' : text);
+    final minW = _fontSize; // ~1 character of space when empty
+    final maxW =
+        screenW - AppProportions.pillPaddingH * 2 - 24; // 24 = safety margin
+    final width = measured.clamp(minW, maxW);
+
+    return SizedBox(
+      width: width,
+      child: TextField(
+        controller: _ctrl,
+        style: _textStyle(_fontSize),
+        textAlign: TextAlign.center,
+        decoration: const InputDecoration(
+          isDense: true,
+          border: InputBorder.none,
+          hintText: '',
+          contentPadding: EdgeInsets.zero,
+        ),
+        maxLength: AppNotePill.maxLength,
+        buildCounter: (
+          _, {
+          required currentLength,
+          required isFocused,
+          maxLength,
+        }) =>
+            null,
       ),
-      maxLength: 200,
-      buildCounter:
-          (_, {required currentLength, required isFocused, maxLength}) => null,
     );
   }
 }

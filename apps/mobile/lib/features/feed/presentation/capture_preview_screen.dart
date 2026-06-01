@@ -6,11 +6,15 @@ import 'package:gal/gal.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_proportions.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/feed/application/post_controller.dart';
 import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/feed/presentation/capture_action_bar.dart';
 import 'package:meep/features/feed/presentation/capture_preview_args.dart';
 import 'package:meep/features/feed/presentation/caption_preset_modal.dart';
+import 'package:meep/features/friend/application/friend_controller.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_dots_indicator.dart';
 import 'package:meep/shared/widgets/app_note_pill.dart';
 import 'package:meep/shared/widgets/app_photo_frame.dart';
@@ -242,7 +246,7 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _AudienceRow extends StatelessWidget {
+class _AudienceRow extends ConsumerWidget {
   const _AudienceRow({
     required this.screenW,
     required this.audienceType,
@@ -258,12 +262,35 @@ class _AudienceRow extends StatelessWidget {
   // Figma: Buttons frame x=73 on 412 → left edge of X button
   static const double _leftPaddingRatio = 73 / 412;
 
+  /// Toggle a friend in the selected list. Empty result flips back to
+  /// AudienceType.all so the user doesn't need an explicit "deselect" gesture.
+  void _toggleFriend(String friendUid) {
+    final next = selectedUids.contains(friendUid)
+        ? selectedUids.where((u) => u != friendUid).toList()
+        : [...selectedUids, friendUid];
+    if (next.isEmpty) {
+      onAudienceChanged(AudienceType.all, const []);
+    } else {
+      onAudienceChanged(AudienceType.select, next);
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final leftPad = screenW * _leftPaddingRatio;
     final avatarSize = AppProportions.audienceAvatarSize(screenW);
     final labelSize = avatarSize * 0.43; // keep below overflow threshold
     final isAll = audienceType == AudienceType.all;
+
+    final currentUid = ref.watch(currentUidProvider).valueOrNull;
+    // Avoid throwing UnimplementedError when auth not ready — just render
+    // the "Tất cả" tile until the uid resolves.
+    final friends = currentUid == null
+        ? const <UserProfile>[]
+        : ref.watch(
+            friendControllerProvider(currentUid).select((s) => s.friends),
+          );
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: SizedBox(
@@ -272,51 +299,141 @@ class _AudienceRow extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           padding: EdgeInsets.only(left: leftPad, right: 20),
           children: [
-            // TODO(Friend/KhoaLND): prepend friend avatar buttons from FriendRepository
-            GestureDetector(
-              onTap: () => onAudienceChanged(AudienceType.all, []),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: avatarSize,
-                    height: avatarSize,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isAll ? AppColors.turquoise500 : AppColors.bw600,
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Container(
-                      margin: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFF394041),
-                      ),
-                      child: Icon(
-                        Icons.group_outlined,
-                        color: isAll ? AppColors.turquoise500 : AppColors.bw100,
-                        size: avatarSize * 0.45,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Tất cả',
-                    style: TextStyle(
-                      color: isAll ? AppColors.turquoise500 : AppColors.bw100,
-                      fontSize: labelSize,
-                      fontWeight: FontWeight.w800,
-                      fontFamily: 'Nunito',
-                      height: 1.1,
-                    ),
-                  ),
-                ],
-              ),
+            _AllAudienceTile(
+              isSelected: isAll,
+              avatarSize: avatarSize,
+              labelSize: labelSize,
+              onTap: () => onAudienceChanged(AudienceType.all, const []),
             ),
+            for (final friend in friends) ...[
+              const SizedBox(width: 12),
+              _FriendAudienceTile(
+                friend: friend,
+                isSelected: selectedUids.contains(friend.uid),
+                avatarSize: avatarSize,
+                labelSize: labelSize,
+                onTap: () => _toggleFriend(friend.uid),
+              ),
+            ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// "Tất cả" tile — selected by default, picks AudienceType.all.
+class _AllAudienceTile extends StatelessWidget {
+  const _AllAudienceTile({
+    required this.isSelected,
+    required this.avatarSize,
+    required this.labelSize,
+    required this.onTap,
+  });
+
+  final bool isSelected;
+  final double avatarSize;
+  final double labelSize;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isSelected ? AppColors.turquoise500 : AppColors.bw100;
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: avatarSize,
+            height: avatarSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected ? AppColors.turquoise500 : AppColors.bw600,
+                width: 1.5,
+              ),
+            ),
+            child: Container(
+              margin: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF394041),
+              ),
+              child: Icon(
+                Icons.group_outlined,
+                color: accent,
+                size: avatarSize * 0.45,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tất cả',
+            style: TextStyle(
+              color: accent,
+              fontSize: labelSize,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'Nunito',
+              height: 1.1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Friend avatar tile — tap to add/remove this uid from the recipient list.
+class _FriendAudienceTile extends StatelessWidget {
+  const _FriendAudienceTile({
+    required this.friend,
+    required this.isSelected,
+    required this.avatarSize,
+    required this.labelSize,
+    required this.onTap,
+  });
+
+  final UserProfile friend;
+  final bool isSelected;
+  final double avatarSize;
+  final double labelSize;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isSelected ? AppColors.turquoise500 : AppColors.bw100;
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppAvatar(
+            imageUrl: friend.avatarUrl,
+            size: avatarSize,
+            ringColor: isSelected ? AppColors.turquoise500 : null,
+            fallbackText: friend.displayName.isNotEmpty
+                ? friend.displayName[0].toUpperCase()
+                : null,
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: avatarSize + 8,
+            child: Text(
+              friend.displayName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: accent,
+                fontSize: labelSize,
+                fontWeight: FontWeight.w800,
+                fontFamily: 'Nunito',
+                height: 1.1,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
