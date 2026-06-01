@@ -134,19 +134,9 @@ export const onReactionCreated = onDocumentCreated(
 // ===== Space module =====
 
 export { createSpace } from './space/createSpace.js';
-
-export const leaveSpace = onCall((req) => {
-  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
-  return { ok: true }; // TODO(SP/T7/impl)
-});
-export const kickMember = onCall((req) => {
-  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
-  return { ok: true }; // TODO(SP/T7/impl)
-});
-export const transferOwnership = onCall((req) => {
-  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
-  return { ok: true }; // TODO(SP/T7/impl)
-});
+export { leaveSpace } from './space/leaveSpace.js';
+export { kickMember } from './space/kickMember.js';
+export { transferOwnership } from './space/transferOwnership.js';
 
 export const onSpaceMemberAdded = onDocumentCreated(
   { document: 'space_members/{spaceId}/members/{uid}', region: 'asia-southeast1' },
