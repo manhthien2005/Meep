@@ -38,7 +38,7 @@ class _PostCardState extends State<PostCard> {
     final post = widget.post;
     final s = MediaQuery.sizeOf(context);
     final photoSize = AppProportions.photoSize(s.width, s.height);
-    final hasCaption = (post.caption ?? '').isNotEmpty;
+    final hasCaption = (post.caption ?? '').trim().isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

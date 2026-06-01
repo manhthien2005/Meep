@@ -137,6 +137,9 @@ class PostController extends _$PostController {
       final postRepo = ref.read(postRepositoryProvider);
       final user = FirebaseAuth.instance.currentUser!;
 
+      // Empty / whitespace caption → store null so it never renders downstream.
+      final trimmedCaption = state.caption?.trim();
+
       final post = Post(
         postId: postId,
         authorId: uid,
@@ -146,7 +149,9 @@ class PostController extends _$PostController {
         backImageUrl: backImageUrl,
         frontImageUrl: frontImageUrl,
         isDualCamera: state.isDualMode,
-        caption: state.caption,
+        caption: (trimmedCaption == null || trimmedCaption.isEmpty)
+            ? null
+            : trimmedCaption,
         captionType: state.captionType,
         audienceType: state.audienceType,
         audienceUids:

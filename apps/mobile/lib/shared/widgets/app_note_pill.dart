@@ -87,12 +87,21 @@ class _AppNotePillState extends State<AppNotePill>
   @override
   Widget build(BuildContext context) {
     final screenW = MediaQuery.sizeOf(context).width;
-    _textAreaWidth =
-        AppProportions.pillWidth(screenW) - AppProportions.pillChrome;
+    final pillW = AppProportions.pillWidth(screenW);
     _fontSize = AppProportions.pillFontSize(screenW);
+    final iconSize = _fontSize + 2;
+    // Fixed-width pill: text area = pill width minus padding, icon, and gap.
+    _textAreaWidth = pillW -
+        AppProportions.pillPaddingH * 2 -
+        iconSize -
+        AppProportions.pillIconGap;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      width: pillW,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppProportions.pillPaddingH,
+        vertical: 8,
+      ),
       decoration: BoxDecoration(
         color: const Color(0x66394041),
         borderRadius: BorderRadius.circular(30),
@@ -100,8 +109,8 @@ class _AppNotePillState extends State<AppNotePill>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.text_fields, color: AppColors.bw300, size: _fontSize + 2),
-          const SizedBox(width: 6),
+          Icon(Icons.text_fields, color: AppColors.bw300, size: iconSize),
+          const SizedBox(width: AppProportions.pillIconGap),
           SizedBox(
             width: _textAreaWidth,
             child: widget.readOnly ? _buildMarquee() : _buildTextField(),
@@ -117,6 +126,7 @@ class _AppNotePillState extends State<AppNotePill>
         widget.text,
         style: _textStyle(_fontSize),
         maxLines: 1,
+        textAlign: TextAlign.center,
         overflow: TextOverflow.ellipsis,
       );
     }
@@ -142,6 +152,7 @@ class _AppNotePillState extends State<AppNotePill>
     return TextField(
       controller: _ctrl,
       style: _textStyle(_fontSize),
+      textAlign: TextAlign.center,
       decoration: InputDecoration(
         isDense: true,
         border: InputBorder.none,

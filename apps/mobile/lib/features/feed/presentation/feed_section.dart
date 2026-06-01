@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meep/core/theme/app_colors.dart';
+import 'package:meep/core/theme/app_proportions.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/shared/widgets/post_card.dart';
@@ -120,36 +121,65 @@ class OwnPostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = MediaQuery.sizeOf(context);
+    final photoSize = AppProportions.photoSize(s.width, s.height);
+
+    // Footer matches the photo width so its centered content lines up under
+    // the square frame (PostCard's outer column is start-aligned).
     return PostCard(
       post: post,
       onLongPress: () => _showShareModal(context, post, isAuthor: true),
-      footer: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+      footer: SizedBox(
+        width: photoSize,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              'Bạn · ${_formatDate(post.createdAt)}',
+            Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(
+                    text: 'Bạn ',
+                    style: TextStyle(color: AppColors.bw100),
+                  ),
+                  TextSpan(
+                    text: _formatDate(post.createdAt),
+                    style: const TextStyle(color: AppColors.bw500),
+                  ),
+                ],
+              ),
+              textAlign: TextAlign.center,
               style: const TextStyle(
-                color: AppColors.bw400,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Nunito',
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
               decoration: BoxDecoration(
-                color: AppColors.bw800,
-                borderRadius: BorderRadius.circular(20),
+                color: const Color(0x66252627),
+                borderRadius: BorderRadius.circular(40),
               ),
-              child: const Text(
-                '✨ Chưa có hoạt động nào!',
-                style: TextStyle(
-                  color: AppColors.bw300,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.auto_awesome_outlined,
+                    color: AppColors.bw400,
+                    size: 18,
+                  ),
+                  SizedBox(width: 10),
+                  Text(
+                    'Chưa có hoạt động nào!',
+                    style: TextStyle(
+                      color: AppColors.bw400,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Nunito',
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -158,13 +188,7 @@ class OwnPostCard extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime dt) {
-    final now = DateTime.now();
-    if (dt.day == now.day && dt.month == now.month && dt.year == now.year) {
-      return 'hôm nay';
-    }
-    return '${dt.day}/${dt.month}';
-  }
+  String _formatDate(DateTime dt) => '${dt.day} thg ${dt.month}';
 }
 
 void _showShareModal(
