@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -84,18 +85,23 @@ class PostController extends _$PostController {
     }
 
     state = state.copyWith(isUploading: true, errorMessage: null);
+    final postId = FirebaseFirestore.instance.collection('posts').doc().id;
+    final storageRepo = ref.read(storageRepositoryProvider);
+
+    String? imageUrl;
+    String? backImageUrl;
+    String? frontImageUrl;
+
+    // ── Step 1 + 2: compress + upload to Storage ─────────────────────────────
     try {
-      final postId = FirebaseFirestore.instance.collection('posts').doc().id;
-      final storageRepo = ref.read(storageRepositoryProvider);
-
-      String? imageUrl;
-      String? backImageUrl;
-      String? frontImageUrl;
-
       if (state.isDualMode) {
         final backBytes = await _compress(state.pendingBackImagePath!);
         final frontBytes = await _compress(state.pendingFrontImagePath!);
         if (backBytes == null || frontBytes == null) {
+          _log(
+            'compress dual returned null',
+            'backBytes=${backBytes?.length} frontBytes=${frontBytes?.length}',
+          );
           state = state.copyWith(
             isUploading: false,
             errorMessage: 'Không thể xử lý ảnh',
@@ -119,6 +125,7 @@ class PostController extends _$PostController {
       } else {
         final compressed = await _compress(state.pendingImagePath!);
         if (compressed == null) {
+          _log('compress single returned null', state.pendingImagePath);
           state = state.copyWith(
             isUploading: false,
             errorMessage: 'Không thể xử lý ảnh',
@@ -132,8 +139,17 @@ class PostController extends _$PostController {
           mimeType: 'image/jpeg',
         );
       }
+    } catch (e, st) {
+      _log('upload storage failed', e, st);
+      state = state.copyWith(
+        isUploading: false,
+        errorMessage: _errorMessage('upload', e),
+      );
+      return false;
+    }
 
-      // Create Firestore post doc
+    // ── Step 3: create Firestore post doc ────────────────────────────────────
+    try {
       final postRepo = ref.read(postRepositoryProvider);
       final user = FirebaseAuth.instance.currentUser!;
 
@@ -165,13 +181,49 @@ class PostController extends _$PostController {
 
       state = const PostState();
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      _log('create post doc failed', e, st);
       state = state.copyWith(
         isUploading: false,
-        errorMessage: 'Tải ảnh thất bại — thử lại',
+        errorMessage: _errorMessage('createPost', e),
       );
       return false;
     }
+  }
+
+  /// Map an arbitrary error to a user-facing Vietnamese message. Differentiates
+  /// FirebaseException by `code` so the UI gives a real hint (permission /
+  /// auth / network) instead of one opaque "thử lại" for every failure.
+  String _errorMessage(String step, Object e) {
+    if (e is FirebaseException) {
+      switch (e.code) {
+        case 'permission-denied':
+        case 'unauthorized':
+          return 'Không có quyền gửi — kiểm tra đăng nhập / quyền truy cập';
+        case 'unauthenticated':
+          return 'Phiên đăng nhập hết hạn — đăng nhập lại';
+        case 'unavailable':
+        case 'deadline-exceeded':
+        case 'cancelled':
+          return 'Mất kết nối — thử lại';
+        case 'resource-exhausted':
+          return 'Quá tải — chờ một lát rồi thử lại';
+        default:
+          return 'Tải ảnh thất bại (${e.code}) — thử lại';
+      }
+    }
+    return 'Tải ảnh thất bại — thử lại';
+  }
+
+  void _log(String message, [Object? detail, StackTrace? st]) {
+    if (!kDebugMode) return;
+    final detailStr = detail == null
+        ? ''
+        : detail is FirebaseException
+            ? ' [${detail.runtimeType} code=${detail.code} msg=${detail.message}]'
+            : ' [${detail.runtimeType}] $detail';
+    debugPrint('[PostController.submit] $message$detailStr');
+    if (st != null) debugPrint(st.toString());
   }
 
   Future<void> deletePost(String postId) async {
