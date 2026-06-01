@@ -1,49 +1,55 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
-import 'package:meep/features/settings/presentation/_mock_data.dart';
+import 'package:meep/features/settings/application/blocked_user_view.dart';
+import 'package:meep/features/settings/application/blocked_users_provider.dart';
+import 'package:meep/features/settings/application/settings_controller.dart';
 import 'package:meep/features/settings/presentation/unblock_confirm_dialog.dart';
 import 'package:meep/features/settings/presentation/widgets/settings_scaffold.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 
-class BlockedAccountsPage extends StatefulWidget {
+class BlockedAccountsPage extends ConsumerWidget {
   const BlockedAccountsPage({super.key});
 
-  @override
-  State<BlockedAccountsPage> createState() => _BlockedAccountsPageState();
-}
-
-class _BlockedAccountsPageState extends State<BlockedAccountsPage> {
-  // TODO(T4/NganTNK): replace mock list with SettingsController.watchBlockedUsers()
-  late final List<BlockedUserView> _blockedUsers =
-      List<BlockedUserView>.from(SettingsMockData.mockBlockedUsers);
-
-  Future<void> _onUnblock(int index) async {
+  Future<void> _onUnblock(
+    BuildContext context,
+    WidgetRef ref,
+    BlockedUserView user,
+  ) async {
     // Bỏ chặn cần xác nhận trước (Figma 1441:3341 — state 3).
     final confirmed = await UnblockConfirmDialog.show(context);
-    if (!confirmed || !mounted) return;
-    // TODO(T4/NganTNK): SettingsController.unblockUser(uid)
-    setState(() => _blockedUsers.removeAt(index));
+    if (!confirmed) return;
+    await ref.read(settingsControllerProvider.notifier).unblockUser(user.uid);
+    // Stream provider auto re-emits sau unblock → list refresh tự động.
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final blocked = ref.watch(blockedUsersProvider);
     return SettingsScaffold(
       title: 'Tài khoản bị chặn',
-      body: _blockedUsers.isEmpty
-          ? const _EmptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.screenHorizontal,
-                vertical: AppSpacing.xl,
+      body: blocked.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.turquoise500),
+        ),
+        error: (_, __) => const _ErrorState(),
+        data: (users) => users.isEmpty
+            ? const _EmptyState()
+            : ListView.builder(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.screenHorizontal,
+                  vertical: AppSpacing.xl,
+                ),
+                itemCount: users.length,
+                itemBuilder: (_, i) => _BlockedUserItem(
+                  user: users[i],
+                  onUnblock: () => _onUnblock(context, ref, users[i]),
+                ),
               ),
-              itemCount: _blockedUsers.length,
-              itemBuilder: (_, i) => _BlockedUserItem(
-                username: _blockedUsers[i].username,
-                onUnblock: () => _onUnblock(i),
-              ),
-            ),
+      ),
     );
   }
 }
@@ -75,13 +81,34 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
+class _ErrorState extends StatelessWidget {
+  const _ErrorState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: const Alignment(0, -0.3),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.screenHorizontal,
+        ),
+        child: Text(
+          'Không thể tải danh sách. Kiểm tra kết nối và thử lại.',
+          style: AppTextStyles.mdRegular.copyWith(color: AppColors.bw400),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+}
+
 class _BlockedUserItem extends StatelessWidget {
   const _BlockedUserItem({
-    required this.username,
+    required this.user,
     required this.onUnblock,
   });
 
-  final String username;
+  final BlockedUserView user;
   final VoidCallback onUnblock;
 
   @override
@@ -92,13 +119,15 @@ class _BlockedUserItem extends StatelessWidget {
         children: [
           AppAvatar(
             size: 50,
-            fallbackText:
-                username.isNotEmpty ? username[0].toUpperCase() : null,
+            imageUrl: user.avatarUrl,
+            fallbackText: user.username.isNotEmpty
+                ? user.username[0].toUpperCase()
+                : null,
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Text(
-              username,
+              user.username,
               style: AppTextStyles.mdBold.copyWith(color: AppColors.bw100),
             ),
           ),
