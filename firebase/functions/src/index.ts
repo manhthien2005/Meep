@@ -1,6 +1,6 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { initializeApp } from 'firebase-admin/app';
 import { z } from 'zod';
 
@@ -137,18 +137,8 @@ export { createSpace } from './space/createSpace.js';
 export { leaveSpace } from './space/leaveSpace.js';
 export { kickMember } from './space/kickMember.js';
 export { transferOwnership } from './space/transferOwnership.js';
-
-export const onSpaceMemberAdded = onDocumentCreated(
-  { document: 'space_members/{spaceId}/members/{uid}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(SP/T8/impl) */ },
-);
-export const onSpaceMemberRemoved = onDocumentDeleted(
-  { document: 'space_members/{spaceId}/members/{uid}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(SP/T8/impl) */ },
-);
-// onSpacePostCreated — DELETED per Option A. spacePostFanOut là helper
-// gọi từ feed/onPostCreated khi post.spaceId != null (T9).
-export const onSpaceDeleted = onDocumentUpdated(
-  { document: 'spaces/{spaceId}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(SP/T10/impl) — fires when deletedAt field is set (soft delete) */ },
-);
+export { onSpaceMemberAdded } from './space/onSpaceMemberAdded.js';
+export { onSpaceMemberRemoved } from './space/onSpaceMemberRemoved.js';
+export { onSpaceDeleted } from './space/onSpaceDeleted.js';
+// onSpacePostCreated — KHÔNG export per Option A: spacePostFanOut là
+// helper gọi từ feed/onPostCreated khi post.spaceId != null (đã wire).

@@ -2,6 +2,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { logger } from 'firebase-functions/v2';
+import { spacePostFanOut } from '../space/spacePostFanOut.js';
 
 interface PostData {
   postId: string;
@@ -45,9 +46,16 @@ export const onPostCreated = onDocumentCreated(
       { merge: true },
     );
 
-    // 2. Skip friend fan-out for Space posts
+    // 2. Space post — delegate sang spacePostFanOut helper (Option A) thay
+    // vì fan-out tới friends. Helper đọc /space_members để xác định members.
     if (spaceId != null && spaceId !== '') {
-      logger.info(`Post ${postId} is a Space post — skipping friend fan-out`);
+      await spacePostFanOut({
+        postId,
+        authorId,
+        authorName: post.authorName,
+        spaceId,
+        createdAt: post.createdAt,
+      });
       return;
     }
 
