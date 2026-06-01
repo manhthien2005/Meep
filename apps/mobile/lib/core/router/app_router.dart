@@ -145,7 +145,7 @@ GoRouter appRouter(Ref ref) {
         initialLocation = rawRoute;
       }
     }
-  } catch (_) {/* keep /intro */}
+  } catch (_) {/* giữ initialLocation mặc định */}
 
   final notifier = _RouterNotifier(ref);
 

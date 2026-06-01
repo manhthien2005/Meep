@@ -19,7 +19,7 @@
 ## Phase 2 — UI (song song Phase 1)
 
 - [ ] **T2** — `SettingsSheet` full layout (Figma 572:4183): header + quick actions + SpaceQuickRow stub + menu sections + static pages (Terms/Privacy)
-- [ ] **T4** — `BlockedAccountsPage` + `BlockConfirmDialog` + `WidgetConfirmSheet`
+- [ ] **T4** — `BlockedAccountsPage` + `BlockConfirmDialog` + `UnblockConfirmDialog` + `WidgetConfirmSheet`
 
 ---
 
