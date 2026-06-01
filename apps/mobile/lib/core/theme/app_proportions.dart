@@ -47,7 +47,8 @@ abstract final class AppProportions {
 
   // ── Capture Button ────────────────────────────────────────────────────────
 
-  static const double captureOuterRatio = 79 / figmaFrameWidth;
+  // Bumped ~15% over Figma (79) for a larger, easier-to-hit capture/send button.
+  static const double captureOuterRatio = 92 / figmaFrameWidth;
   static const double captureInnerToOuterRatio = 69 / 79;
   static const double captureRingWidth = 3;
 
@@ -57,7 +58,8 @@ abstract final class AppProportions {
 
   // ── Side icons ────────────────────────────────────────────────────────────
 
-  static const double sideIconRatio = 36 / figmaFrameWidth;
+  // Bumped ~15% over Figma (36) to match the larger capture/send button.
+  static const double sideIconRatio = 44 / figmaFrameWidth;
   static double sideIconSize(double screenW) => screenW * sideIconRatio;
 
   static const double captureRowGapRatio = 60 / figmaFrameWidth;
