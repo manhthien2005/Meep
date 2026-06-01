@@ -41,7 +41,9 @@ class _PostCardState extends State<PostCard> {
     final hasCaption = (post.caption ?? '').trim().isNotEmpty;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      // Center so the square photo (screenW - 12) sits between equal 6px
+      // gutters on both sides instead of sticking to the left edge.
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         GestureDetector(
           onLongPress: widget.onLongPress,
@@ -79,7 +81,9 @@ class _PostCardState extends State<PostCard> {
           ),
         ),
         if (widget.footer != null) ...[
-          const SizedBox(height: 10),
+          // 1% of screen height (~9px on a 917-tall device) per product spec —
+          // header pill sits just under the photo without crowding it.
+          SizedBox(height: s.height * 0.01),
           widget.footer!,
         ],
       ],
