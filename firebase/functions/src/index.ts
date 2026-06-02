@@ -10,6 +10,7 @@ export { onPostDeleted } from './feed/onPostDeleted.js';
 
 // Settings module
 export { blockUser } from './settings/blockUser.js';
+export { deleteAccount } from './settings/deleteAccount.js';
 
 initializeApp();
 
@@ -70,18 +71,7 @@ export { onFriendshipDeleted } from './friend/onFriendshipDeleted.js';
 // blockUser — implemented in ./settings/blockUser.ts (exported above).
 // unblockUser stub gỡ bỏ: T1 đã quyết unblock = client-side delete
 // `/blocks/{blockerUid}_{targetUid}` (OQ5 resolved trong #116). CF không cần.
-
-/**
- * Delete account: re-authenticate, then cascade-delete all user data.
- *
- * TODO(SE/T7 #119): implement cascade Storage → Firestore subcollections →
- *   docs → admin.auth().deleteUser (Auth xóa cuối, idempotent, retry-safe).
- */
-export const deleteAccount = onCall((request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
-  // TODO(SE/T7 #119): see comment above.
-  return { ok: true };
-});
+// deleteAccount — implemented in ./settings/deleteAccount.ts (exported above).
 
 // onPostCreated + onPostDeleted implemented in ./feed/ — exported above
 
