@@ -1,31 +1,75 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/settings/application/settings_controller.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
 
-class BlockConfirmDialog extends StatefulWidget {
-  const BlockConfirmDialog({super.key, required this.targetName});
+/// Confirm dialog cho block user (Figma 605:1991 + state "Đã chặn!" 624:1906).
+/// Trigger từ `PhotoActionSheet` ở feed module (KhoaLND) khi user tap "Chặn".
+///
+/// Flow:
+/// - User tap "Chặn" → controller.blockUser(targetUid)
+/// - Success → button đổi "Đã chặn!" (disabled, hơi mờ)
+/// - Error → giữ button "Chặn" (errorMessage trong SettingsState, caller có
+///   thể inspect nếu muốn show toast)
+/// - User tap "Bỏ qua" → pop dialog với kết quả `_blocked` (bool)
+class BlockConfirmDialog extends ConsumerStatefulWidget {
+  const BlockConfirmDialog({
+    super.key,
+    required this.targetUid,
+    required this.targetName,
+  });
 
+  final String targetUid;
   final String targetName;
 
-  static Future<bool?> show(BuildContext context, String targetName) =>
+  static Future<bool?> show(
+    BuildContext context, {
+    required String targetUid,
+    required String targetName,
+  }) =>
       showModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => BlockConfirmDialog(targetName: targetName),
+        builder: (_) => BlockConfirmDialog(
+          targetUid: targetUid,
+          targetName: targetName,
+        ),
       );
 
   @override
-  State<BlockConfirmDialog> createState() => _BlockConfirmDialogState();
+  ConsumerState<BlockConfirmDialog> createState() => _BlockConfirmDialogState();
 }
 
-class _BlockConfirmDialogState extends State<BlockConfirmDialog> {
+class _BlockConfirmDialogState extends ConsumerState<BlockConfirmDialog> {
   bool _blocked = false;
+  bool _isBlocking = false;
+
+  Future<void> _onBlockTap() async {
+    setState(() => _isBlocking = true);
+    await ref
+        .read(settingsControllerProvider.notifier)
+        .blockUser(widget.targetUid);
+    if (!mounted) return;
+    final errorMsg = ref.read(settingsControllerProvider).errorMessage;
+    if (errorMsg != null) {
+      // Error: cho phép retry, errorMessage đã set trong state cho caller inspect.
+      setState(() => _isBlocking = false);
+      return;
+    }
+    setState(() {
+      _blocked = true;
+      _isBlocking = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isBusyOrDone = _blocked || _isBlocking;
     return AppBottomSheet(
       child: Padding(
         padding: EdgeInsets.only(
@@ -76,27 +120,31 @@ class _BlockConfirmDialogState extends State<BlockConfirmDialog> {
                 label: _blocked ? 'Đã chặn!' : 'Chặn',
                 excludeSemantics: true,
                 child: GestureDetector(
-                  onTap: _blocked
-                      ? null
-                      : () {
-                          setState(() => _blocked = true);
-                          // TODO(T4/NganTNK): SettingsController.blockUser(uid)
-                        },
+                  onTap: isBusyOrDone ? null : _onBlockTap,
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      color: _blocked
+                      color: isBusyOrDone
                           ? AppColors.turquoise500.withValues(alpha: 0.7)
                           : AppColors.turquoise500,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Center(
-                      child: Text(
-                        _blocked ? 'Đã chặn!' : 'Chặn',
-                        style: AppTextStyles.mdSemiBold.copyWith(
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: _isBlocking
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              _blocked ? 'Đã chặn!' : 'Chặn',
+                              style: AppTextStyles.mdSemiBold.copyWith(
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
                 ),

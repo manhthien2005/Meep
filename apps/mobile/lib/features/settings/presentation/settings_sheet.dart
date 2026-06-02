@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/settings/application/settings_controller.dart';
 import 'package:meep/features/settings/presentation/_mock_data.dart';
 import 'package:meep/features/settings/presentation/blocked_accounts_page.dart';
 import 'package:meep/features/settings/presentation/delete_account_dialog.dart';
@@ -17,11 +19,11 @@ import 'package:meep/features/settings/presentation/widgets/settings_quick_actio
 import 'package:meep/features/settings/presentation/widgets/space_quick_row.dart';
 
 /// Bottom sheet cài đặt — trigger từ avatar topbar homepage (Figma 572:4183).
-class SettingsSheet extends StatelessWidget {
+class SettingsSheet extends ConsumerWidget {
   const SettingsSheet({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.bw800,
@@ -123,10 +125,12 @@ class SettingsSheet extends StatelessWidget {
                     label: 'Đăng xuất',
                     onTap: () async {
                       final confirmed = await LogoutConfirmDialog.show(context);
-                      if (confirmed == true && context.mounted) {
-                        Navigator.of(context).pop();
-                        // TODO(T3/NganTNK): SettingsController.logout()
-                      }
+                      if (confirmed != true) return;
+                      if (context.mounted) Navigator.of(context).pop();
+                      // Router auth listener tự redirect /intro khi uid → null.
+                      await ref
+                          .read(settingsControllerProvider.notifier)
+                          .logout();
                     },
                   ),
                   SettingsNavRow(

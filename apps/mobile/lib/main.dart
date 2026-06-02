@@ -22,6 +22,8 @@ import 'package:meep/features/chat/data/fake_conversation_repository.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/data/firebase_friend_repository.dart';
 import 'package:meep/features/friend/data/firebase_friend_request_repository.dart';
+import 'package:meep/features/settings/application/settings_controller.dart';
+import 'package:meep/features/settings/data/firebase_block_repository.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/firebase_space_repository.dart';
 import 'package:meep/firebase_options.dart';
@@ -70,6 +72,12 @@ void main() async {
         ),
         spaceRepositoryProvider.overrideWithValue(
           FirebaseSpaceRepository(
+            FirebaseFirestore.instance,
+            FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
+          ),
+        ),
+        blockRepositoryProvider.overrideWithValue(
+          FirebaseBlockRepository(
             FirebaseFirestore.instance,
             FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
           ),
