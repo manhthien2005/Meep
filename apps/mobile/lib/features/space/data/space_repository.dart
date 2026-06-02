@@ -1,4 +1,5 @@
 import 'package:meep/features/space/data/space.dart';
+import 'package:meep/features/space/data/space_member.dart';
 
 /// Single source of truth cho mọi Space data ops — Firestore reads + CF mutations.
 ///
@@ -15,6 +16,20 @@ abstract class SpaceRepository {
 
   /// Get a single Space by ID. Returns null if not found or soft-deleted.
   Future<Space?> getSpace(String spaceId);
+
+  /// Stream a single Space by ID — realtime updates (rename, deletedAt set,
+  /// memberCount change). Emits null khi không tồn tại hoặc đã soft-deleted.
+  ///
+  /// Dùng cho `SpaceManagementSheet` deeplink (`/space/:spaceId`) để sheet
+  /// re-render khi creator update Space mid-session.
+  Stream<Space?> watchSpace(String spaceId);
+
+  /// Stream all members của Space — realtime updates (member added/removed,
+  /// role transfer creator↔member).
+  ///
+  /// Dùng cho `SpaceManagementSheet` kick picker + creator-leave transfer
+  /// picker. Order không guaranteed — caller sort theo joinedAt nếu cần.
+  Stream<List<SpaceMember>> watchMembers(String spaceId);
 
   /// Soft-delete a Space — sets `deletedAt = serverTimestamp()`. Creator only
   /// (Firestore rule enforces). Client-side guard cũng check creator ở
