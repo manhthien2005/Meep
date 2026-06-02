@@ -28,7 +28,8 @@ void main() {
       expect(field.textAlign, TextAlign.center);
     });
 
-    testWidgets('editable pill width is fixed at 40% of screen', (tester) async {
+    testWidgets('editable pill width is fixed at 40% of screen',
+        (tester) async {
       // Screen is 412 in wrap(), so the editable pill (which has horizontal
       // padding around the 40% TextField) should be ≥ 0.40 * 412 ≈ 164.8 px
       // regardless of content length — the pill no longer hugs typed text.
