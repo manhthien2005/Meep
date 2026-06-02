@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/data/chat_seed_data.dart';
 import 'package:meep/features/chat/data/conversation.dart';
-import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/data/message.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/space/data/space.dart';
 import 'package:meep/features/space/data/space_member.dart';
@@ -13,11 +14,10 @@ import 'package:meep/features/space/data/space_member.dart';
 part 'chat_providers.g.dart';
 
 /// Current logged-in uid for the Chat module.
-///
-/// FE-first round returns a mock uid (matches [ChatSeed.currentUid]).
-/// TODO(C/wire): read from `currentUidProvider` (auth) once integrated.
 @riverpod
-String currentChatUid(Ref ref) => ChatSeed.currentUid;
+String currentChatUid(Ref ref) {
+  return ref.watch(currentUidProvider).valueOrNull ?? '';
+}
 
 /// Live conversations for the inbox, sorted by lastMessageAt DESC.
 @riverpod
