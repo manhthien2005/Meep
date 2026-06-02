@@ -141,11 +141,12 @@ class _ConversationList extends ConsumerWidget {
         final isUnread = (unread[conv.conversationId] ?? 0) > 0;
 
         if (conv.type == ConversationType.space) {
-          final space = ref.watch(chatSpaceProvider(conv.spaceId ?? ''));
+          final spaceAsync = ref.watch(chatSpaceProvider(conv.spaceId ?? ''));
+          final space = spaceAsync.valueOrNull;
           return ConversationTile.group(
-            spaceName: space.name,
-            emoji: space.iconEmoji,
-            colorHex: space.colorHex,
+            spaceName: space?.name ?? 'Space',
+            emoji: space?.iconEmoji ?? '👥',
+            colorHex: space?.colorHex ?? '#00DEEE',
             conversation: conv,
             isUnread: isUnread,
             onTap: () => context.push('/group-chat/${conv.conversationId}'),
