@@ -10,6 +10,7 @@ import 'package:meep/features/feed/application/caption_service_impl.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/application/post_state.dart';
 import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/features/space/application/space_controller.dart';
 
 part 'post_controller.g.dart';
 
@@ -156,6 +157,12 @@ class PostController extends _$PostController {
       // Empty / whitespace caption → store null so it never renders downstream.
       final trimmedCaption = state.caption?.trim();
 
+      // Space context khi camera đang ở Space — null = post chung cho friends.
+      // currentSpaceProvider được CameraSection set qua SpaceContextBottomSheet
+      // long-press FriendsButton. CF spacePostFanOut sẽ fan-out feed entry
+      // cho mọi Space member khi post.spaceId != null.
+      final currentSpace = ref.read(currentSpaceProvider);
+
       final post = Post(
         postId: postId,
         authorId: uid,
@@ -172,6 +179,7 @@ class PostController extends _$PostController {
         audienceType: state.audienceType,
         audienceUids:
             state.audienceType == AudienceType.all ? [] : state.selectedUids,
+        spaceId: currentSpace?.spaceId,
         createdAt: DateTime.now(),
       );
       await postRepo.createPost(post);

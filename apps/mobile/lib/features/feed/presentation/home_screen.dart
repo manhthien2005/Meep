@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/core/theme/hex_color.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/feed/application/app_camera_controller.dart';
@@ -15,6 +16,8 @@ import 'package:meep/features/feed/presentation/feed_section.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/presentation/friend_sheet.dart';
 import 'package:meep/features/settings/presentation/settings_sheet.dart';
+import 'package:meep/features/space/application/space_controller.dart';
+import 'package:meep/features/space/data/space.dart';
 import 'package:meep/features/space/presentation/space_context_bottom_sheet.dart';
 import 'package:meep/features/space/presentation/space_management_sheet.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
@@ -40,6 +43,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// null = "Mọi người" (all friends' feed). Otherwise filter by this author
   /// uid: currentUid = "Bạn" (own posts), or a friend's uid.
   String? _selectedAuthorUid;
+
+  /// Selected Space filter từ dropdown (mutually exclusive với author).
+  /// null = không filter theo Space. Khi set → `_filter == FeedFilter.space`
+  /// và `_activeFilterSpaceId` trả về giá trị này (ưu tiên hơn widget.spaceId
+  /// route param). Reset về null khi user chọn "Mọi người" / friend.
+  String? _selectedSpaceId;
   String _selectedLabel = 'Mọi người';
 
   @override
@@ -74,7 +83,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             feedControllerProvider(
               filter: _filter,
               filterUid: _activeFilterUid,
-              filterSpaceId: widget.spaceId,
+              filterSpaceId: _activeFilterSpaceId,
             ).notifier,
           )
           .onItemVisible(index - 1);
@@ -82,23 +91,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   /// Feed filter derived from topbar selector + space context.
-  /// Space context (Bước 2) takes precedence; otherwise the selector chooses
-  /// between "Mọi người" (all) and a specific author (person).
+  /// Priority order: local `_selectedSpaceId` (chọn từ dropdown) >
+  /// `widget.spaceId` (route param `/space/:spaceId`) > `_selectedAuthorUid`
+  /// (chọn friend từ dropdown) > all.
   FeedFilter get _filter {
-    if (widget.spaceId != null) return FeedFilter.space;
+    if (_selectedSpaceId != null || widget.spaceId != null) {
+      return FeedFilter.space;
+    }
     return _selectedAuthorUid != null ? FeedFilter.person : FeedFilter.all;
   }
 
   /// Author uid passed to [FeedFilter.person]. Null in space/all modes.
   String? get _activeFilterUid =>
-      widget.spaceId != null ? null : _selectedAuthorUid;
+      (_selectedSpaceId != null || widget.spaceId != null)
+          ? null
+          : _selectedAuthorUid;
+
+  /// Space ID passed to [FeedFilter.space]. Ưu tiên local state từ dropdown
+  /// (cho phép user switch Space khi đang ở /home), fallback widget.spaceId
+  /// route param (giữ tương thích deeplink `/space/:spaceId`).
+  String? get _activeFilterSpaceId => _selectedSpaceId ?? widget.spaceId;
 
   void _onFilterSelected(String? authorUid, String label) {
     setState(() {
       _selectedAuthorUid = authorUid;
+      _selectedSpaceId = null; // reset Space khi chọn person/all
       _selectedLabel = label;
     });
     // Jump back to the camera page so the freshly filtered feed loads cleanly.
+    _pageController.jumpToPage(0);
+  }
+
+  /// Khi user chọn 1 Space từ dropdown — set local space filter + clear
+  /// author filter. `currentSpaceProvider` cũng sync để Camera page biết
+  /// context Space (badge "Đang gửi: [name]" + viền camera theo colorHex).
+  void _onSpaceFilterSelected(Space space) {
+    setState(() {
+      _selectedSpaceId = space.spaceId;
+      _selectedAuthorUid = null;
+      _selectedLabel = space.name;
+    });
+    ref.read(currentSpaceProvider.notifier).select(space);
     _pageController.jumpToPage(0);
   }
 
@@ -168,7 +201,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       feedControllerProvider(
         filter: _filter,
         filterUid: _activeFilterUid,
-        filterSpaceId: widget.spaceId,
+        filterSpaceId: _activeFilterSpaceId,
       ),
     );
 
@@ -185,6 +218,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               isFeedMode: _currentPage >= 1,
               selectedLabel: _selectedLabel,
               onFilterSelected: _onFilterSelected,
+              onSpaceFilterSelected: _onSpaceFilterSelected,
               spaceId: widget.spaceId,
             ),
             Expanded(
@@ -243,6 +277,7 @@ class _HomeTopBar extends ConsumerWidget {
     required this.isFeedMode,
     required this.selectedLabel,
     required this.onFilterSelected,
+    required this.onSpaceFilterSelected,
     this.spaceId,
   });
 
@@ -255,6 +290,10 @@ class _HomeTopBar extends ConsumerWidget {
 
   /// Called with (authorUid, label). authorUid null = "Mọi người".
   final void Function(String? authorUid, String label) onFilterSelected;
+
+  /// Called khi user chọn Space từ dropdown — set local space filter +
+  /// sync currentSpaceProvider cho Camera context.
+  final void Function(Space space) onSpaceFilterSelected;
 
   /// Non-null khi HomeScreen mở qua deeplink `/space/:spaceId`. Topbar
   /// thay slot avatar bằng "..." icon mở [SpaceManagementSheet] (T10b).
@@ -288,6 +327,7 @@ class _HomeTopBar extends ConsumerWidget {
         currentUid: currentUid,
         selectedLabel: selectedLabel,
         onFilterSelected: onFilterSelected,
+        onSpaceFilterSelected: onSpaceFilterSelected,
       ),
     );
   }
@@ -426,29 +466,39 @@ class _HomeTopBar extends ConsumerWidget {
   }
 }
 
-/// Feed filter dropdown — "Mọi người" / "Bạn" / per-friend.
-/// Mirrors Figma "ListFriend" (269:1667): rounded card, dark rows with dividers.
-/// TODO(Friend/KhoaLND): thêm danh sách Space khi watchSpaceFeed sẵn sàng (Bước 2).
+/// Feed filter dropdown — "Mọi người" / "Bạn" / per-friend / per-Space.
+/// Mirrors Figma "ListFriend" (269:1667): rounded card, dark rows with
+/// dividers. Spaces section (nếu user thuộc Space nào) hiện dưới friends.
 class _FeedFilterDropdown extends ConsumerWidget {
   const _FeedFilterDropdown({
     required this.currentUid,
     required this.selectedLabel,
     required this.onFilterSelected,
+    required this.onSpaceFilterSelected,
   });
 
   final String currentUid;
   final String selectedLabel;
   final void Function(String? authorUid, String label) onFilterSelected;
+  final void Function(Space space) onSpaceFilterSelected;
 
   void _select(BuildContext context, String? authorUid, String label) {
     Navigator.of(context).pop();
     onFilterSelected(authorUid, label);
   }
 
+  void _selectSpace(BuildContext context, Space space) {
+    Navigator.of(context).pop();
+    onSpaceFilterSelected(space);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final friends = ref.watch(friendControllerProvider(currentUid)).friends;
     final profile = ref.watch(currentUserProfileProvider).valueOrNull;
+    final spaces = ref.watch(
+      spaceControllerProvider(currentUid).select((s) => s.spaces),
+    );
 
     return Align(
       alignment: Alignment.topCenter,
@@ -463,43 +513,58 @@ class _FeedFilterDropdown extends ConsumerWidget {
               borderRadius: BorderRadius.circular(25),
             ),
             clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _FilterRow(
-                  label: 'Mọi người',
-                  leading: _iconCircle('assets/icons/ic_users_round.svg'),
-                  onTap: () => _select(context, null, 'Mọi người'),
-                ),
-                _FilterRow(
-                  label: 'Bạn',
-                  leading: AppAvatar(
-                    imageUrl: profile?.avatarUrl,
-                    size: 25,
-                    fallbackText: (profile?.displayName.isNotEmpty ?? false)
-                        ? profile!.displayName[0].toUpperCase()
-                        : null,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _FilterRow(
+                    label: 'Mọi người',
+                    leading: _iconCircle('assets/icons/ic_users_round.svg'),
+                    onTap: () => _select(context, null, 'Mọi người'),
                   ),
-                  onTap: () => _select(context, currentUid, 'Bạn'),
-                ),
-                ...friends.map(
-                  (friend) => _FilterRow(
-                    label: friend.displayName,
+                  _FilterRow(
+                    label: 'Bạn',
                     leading: AppAvatar(
-                      imageUrl: friend.avatarUrl,
+                      imageUrl: profile?.avatarUrl,
                       size: 25,
-                      fallbackText: friend.displayName.isNotEmpty
-                          ? friend.displayName[0].toUpperCase()
+                      fallbackText: (profile?.displayName.isNotEmpty ?? false)
+                          ? profile!.displayName[0].toUpperCase()
                           : null,
                     ),
-                    onTap: () => _select(
-                      context,
-                      friend.uid,
-                      friend.displayName,
+                    onTap: () => _select(context, currentUid, 'Bạn'),
+                  ),
+                  ...friends.map(
+                    (friend) => _FilterRow(
+                      label: friend.displayName,
+                      leading: AppAvatar(
+                        imageUrl: friend.avatarUrl,
+                        size: 25,
+                        fallbackText: friend.displayName.isNotEmpty
+                            ? friend.displayName[0].toUpperCase()
+                            : null,
+                      ),
+                      onTap: () => _select(
+                        context,
+                        friend.uid,
+                        friend.displayName,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  // Spaces section — chỉ render nếu user thuộc Space nào.
+                  // Header phân tách khỏi friends list, leading dùng emoji
+                  // + colorHex paired (giống SpaceListTile / SpaceQuickRow).
+                  if (spaces.isNotEmpty) ...[
+                    const _SpacesSectionHeader(),
+                    ...spaces.map(
+                      (space) => _FilterRow(
+                        label: space.name,
+                        leading: _SpaceLeadingCircle(space: space),
+                        onTap: () => _selectSpace(context, space),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         ),
@@ -519,6 +584,55 @@ class _FeedFilterDropdown extends ConsumerWidget {
       child: SvgPicture.asset(
         iconPath,
         colorFilter: const ColorFilter.mode(AppColors.bw100, BlendMode.srcIn),
+      ),
+    );
+  }
+}
+
+/// Section divider/header "SPACES" giữa friends list và Spaces list.
+class _SpacesSectionHeader extends StatelessWidget {
+  const _SpacesSectionHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: const BoxDecoration(
+        color: AppColors.bw700,
+        border: Border(bottom: BorderSide(color: AppColors.bw800)),
+      ),
+      child: Text(
+        'SPACES',
+        style: AppTextStyles.xsSemiBold.copyWith(
+          color: AppColors.bw400,
+          letterSpacing: 1,
+        ),
+      ),
+    );
+  }
+}
+
+/// Leading 25px circle dùng colorHex bg + emoji centered. Mirror pattern
+/// SpaceListTile / SpaceQuickRow để Space identity consistent xuyên UI.
+class _SpaceLeadingCircle extends StatelessWidget {
+  const _SpaceLeadingCircle({required this.space});
+
+  final Space space;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 25,
+      height: 25,
+      decoration: BoxDecoration(
+        color: hexToColor(space.colorHex),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        space.iconEmoji,
+        style: const TextStyle(fontSize: 14),
       ),
     );
   }

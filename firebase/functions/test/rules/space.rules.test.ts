@@ -126,6 +126,52 @@ describe('/spaces/{spaceId} — read', () => {
 
     await assertFails(unauthed().firestore().doc('spaces/s1').get());
   });
+
+  // QUERY tests — quan trọng vì `watchMySpaces` dùng collection query với
+  // arrayContains, không phải single doc get. Pattern rule check subcol
+  // qua exists() KHÔNG work cho query — đây là gap đã gây PERMISSION_DENIED
+  // trong prod trước khi đổi sang `resource.data.memberIds in` pattern.
+
+  test('member can query spaces where memberIds arrayContains uid', async () => {
+    const alice = uid('alice');
+    const bob = uid('bob');
+    await seedSpace('s1', alice, [alice, bob]);
+    await seedSpace('s2', alice, [alice]); // bob KHÔNG trong s2
+
+    // Bob query collection /spaces where memberIds arrayContains bob.
+    // Rule `request.auth.uid in resource.data.memberIds` filter per-doc:
+    // s1 pass (bob trong memberIds), s2 không match query (bob không
+    // trong memberIds) → query trả về s1 only.
+    const querySnap = await assertSucceeds(
+      authed(bob)
+        .firestore()
+        .collection('spaces')
+        .where('memberIds', 'array-contains', bob)
+        .get(),
+    );
+    // querySnap is QuerySnapshot returned by assertSucceeds.
+    // Verify chỉ trả về Space mà bob là member.
+    // (rules-unit-testing assertSucceeds trả về raw promise result.)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const docs = (querySnap as any).docs as Array<{ id: string }>;
+    if (docs.length !== 1 || docs[0]?.id !== 's1') {
+      throw new Error(
+        `Expected query to return [s1], got [${docs.map((d) => d.id).join(', ')}]`,
+      );
+    }
+  });
+
+  test('non-member query without filter fails (rule blocks)', async () => {
+    const alice = uid('alice');
+    const charlie = uid('charlie');
+    await seedSpace('s1', alice, [alice]);
+
+    // Charlie không trong bất kỳ memberIds nào — query without where filter
+    // sẽ trả về tất cả docs nhưng mỗi doc fail rule → query reject.
+    await assertFails(
+      authed(charlie).firestore().collection('spaces').get(),
+    );
+  });
 });
 
 // ===== /spaces/{spaceId} — write =====
@@ -206,6 +252,161 @@ describe('/spaces/{spaceId} — write', () => {
     await seedSpace('s1', alice, [alice]);
 
     await assertFails(authed(alice).firestore().doc('spaces/s1').delete());
+  });
+});
+
+// ===== /spaces/{spaceId} — update field whitelist + type validation =====
+//
+// Sau khi siết rule update với:
+//   - affectedKeys().hasOnly([name, iconEmoji, colorHex, deletedAt, updatedAt])
+//   - type/size check cho name (1-30), iconEmoji (1-32), colorHex (#RRGGBB)
+// 12 cases: 4 happy + 4 forbidden field + 3 type validation + 1 combined.
+
+describe('/spaces/{spaceId} — update whitelist', () => {
+  test('creator can update name to valid string (1-30 chars)', async () => {
+    const alice = uid('alice');
+    await seedSpace('s1', alice, [alice]);
+
+    await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .doc('spaces/s1')
+        .update({ name: 'Renamed Space' }),
+    );
+  });
+
+  test('creator can update iconEmoji', async () => {
+    const alice = uid('alice');
+    await seedSpace('s1', alice, [alice]);
+
+    await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .doc('spaces/s1')
+        .update({ iconEmoji: '🎉' }),
+    );
+  });
+
+  test('creator can update colorHex with valid hex', async () => {
+    const alice = uid('alice');
+    await seedSpace('s1', alice, [alice]);
+
+    await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .doc('spaces/s1')
+        .update({ colorHex: '#FF6B6B' }),
+    );
+  });
+
+  test('creator can update name + iconEmoji + colorHex combined', async () => {
+    const alice = uid('alice');
+    await seedSpace('s1', alice, [alice]);
+
+    await assertSucceeds(
+      authed(alice).firestore().doc('spaces/s1').update({
+        name: 'Renamed',
+        iconEmoji: '🌟',
+        colorHex: '#22D3EE',
+      }),
+    );
+  });
+
+  test('creator CANNOT update creatorId (whitelist block)', async () => {
+    const alice = uid('alice');
+    const bob = uid('bob');
+    await seedSpace('s1', alice, [alice, bob]);
+
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc('spaces/s1')
+        .update({ creatorId: bob }),
+    );
+  });
+
+  test('creator CANNOT update memberIds (whitelist block)', async () => {
+    const alice = uid('alice');
+    await seedSpace('s1', alice, [alice]);
+
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc('spaces/s1')
+        .update({ memberIds: [alice, uid('hacker')] }),
+    );
+  });
+
+  test('creator CANNOT update memberCount (whitelist block)', async () => {
+    const alice = uid('alice');
+    await seedSpace('s1', alice, [alice]);
+
+    await assertFails(
+      authed(alice).firestore().doc('spaces/s1').update({ memberCount: 99 }),
+    );
+  });
+
+  test('creator CANNOT update createdAt (whitelist block)', async () => {
+    const alice = uid('alice');
+    await seedSpace('s1', alice, [alice]);
+
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc('spaces/s1')
+        .update({ createdAt: new Date(0) }),
+    );
+  });
+
+  test('creator CANNOT update name to empty string (size < 1)', async () => {
+    const alice = uid('alice');
+    await seedSpace('s1', alice, [alice]);
+
+    await assertFails(
+      authed(alice).firestore().doc('spaces/s1').update({ name: '' }),
+    );
+  });
+
+  test('creator CANNOT update name to > 30 chars', async () => {
+    const alice = uid('alice');
+    await seedSpace('s1', alice, [alice]);
+
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc('spaces/s1')
+        .update({ name: 'a'.repeat(31) }),
+    );
+  });
+
+  test('creator CANNOT update colorHex with invalid format', async () => {
+    const alice = uid('alice');
+    await seedSpace('s1', alice, [alice]);
+
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc('spaces/s1')
+        .update({ colorHex: 'red' }),
+    );
+  });
+
+  test('creator CANNOT update name + memberIds combined (whitelist block toàn bộ)', async () => {
+    const alice = uid('alice');
+    await seedSpace('s1', alice, [alice]);
+
+    // Tampering trick: try update field allowed (name) cùng field cấm
+    // (memberIds) trong cùng update. hasOnly() block toàn bộ — đảm bảo
+    // client không bypass whitelist bằng cách piggy-back.
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc('spaces/s1')
+        .update({
+          name: 'Renamed',
+          memberIds: [alice, uid('hacker')],
+        }),
+    );
   });
 });
 

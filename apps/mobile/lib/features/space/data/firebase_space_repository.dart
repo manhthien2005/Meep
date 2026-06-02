@@ -111,6 +111,28 @@ class FirebaseSpaceRepository implements SpaceRepository {
   }
 
   @override
+  Future<void> updateSpace({
+    required String spaceId,
+    String? name,
+    String? iconEmoji,
+    String? colorHex,
+  }) async {
+    // Partial update — chỉ truyền field non-null xuống CF. CF zod schema
+    // refine reject empty patch nên ít nhất 1 field phải pass.
+    final payload = <String, Object?>{'spaceId': spaceId};
+    if (name != null) payload['name'] = name;
+    if (iconEmoji != null) payload['iconEmoji'] = iconEmoji;
+    if (colorHex != null) payload['colorHex'] = colorHex;
+
+    try {
+      final callable = _functions.httpsCallable('updateSpace');
+      await callable.call<void>(payload);
+    } on FirebaseFunctionsException catch (e) {
+      throw _mapFunctionsException(e, 'cập nhật Space');
+    }
+  }
+
+  @override
   Future<void> leaveSpace(String spaceId) async {
     try {
       final callable = _functions.httpsCallable('leaveSpace');

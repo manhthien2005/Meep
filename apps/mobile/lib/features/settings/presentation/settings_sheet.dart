@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/settings/application/settings_controller.dart';
 import 'package:meep/features/settings/presentation/_mock_data.dart';
 import 'package:meep/features/settings/presentation/blocked_accounts_page.dart';
@@ -17,7 +18,10 @@ import 'package:meep/features/settings/presentation/widgets/settings_header.dart
 import 'package:meep/features/settings/presentation/widgets/settings_nav_row.dart';
 import 'package:meep/features/settings/presentation/widgets/settings_quick_actions.dart';
 import 'package:meep/features/settings/presentation/widgets/space_quick_row.dart';
+import 'package:meep/features/space/application/space_controller.dart';
+import 'package:meep/features/space/data/space.dart';
 import 'package:meep/features/space/presentation/space_create_sheet.dart';
+import 'package:meep/features/space/presentation/space_edit_sheet.dart';
 
 /// Bottom sheet cài đặt — trigger từ avatar topbar homepage (Figma 572:4183).
 class SettingsSheet extends ConsumerWidget {
@@ -25,6 +29,19 @@ class SettingsSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider).valueOrNull;
+    // Watch select để chỉ rebuild khi `spaces` thay đổi (không phải mỗi
+    // state.copyWith do mutation khác trong controller).
+    final spaces = uid == null
+        ? const <Space>[]
+        : ref.watch(
+            spaceControllerProvider(uid).select((s) => s.spaces),
+          );
+    final isLoadingSpaces = uid != null &&
+        ref.watch(
+          spaceControllerProvider(uid).select((s) => s.isLoading),
+        );
+
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.bw800,
@@ -52,28 +69,25 @@ class SettingsSheet extends ConsumerWidget {
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   SpaceQuickRow(
-                    spaceNames: SettingsMockData.mockSpaces,
-                    // T2/NganTNK gate: thêm hook `onCreateSpace` để Space module
-                    // wire. Em (ThienPDM) wire tạm vào `SpaceCreateSheet` để
-                    // unblock manual test Space — capture rootContext trước pop
-                    // SettingsSheet vì sheet context unmount sau pop, không show
-                    // được modal mới với context cũ.
-                    onCreateSpace: () {
-                      final rootContext =
-                          Navigator.of(context, rootNavigator: true).context;
-                      Navigator.of(context).pop();
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (!rootContext.mounted) return;
-                        showModalBottomSheet<void>(
-                          context: rootContext,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => const FractionallySizedBox(
-                            heightFactor: 0.9,
-                            child: SpaceCreateSheet(),
+                    spaces: spaces,
+                    isLoading: isLoadingSpaces,
+                    onCreateSpace: () => _openCreateSheet(context),
+                    // Permission filter: chỉ creator được edit. Non-creator
+                    // tap card → snackbar info, không mở SpaceEditSheet.
+                    // CF + rules là final boundary, đây là UI hint layer 1.
+                    onEditSpace: (space) {
+                      if (uid == null) return;
+                      if (space.creatorId != uid) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Chỉ creator có quyền chỉnh sửa Space',
+                            ),
                           ),
                         );
-                      });
+                        return;
+                      }
+                      _openEditSheet(context, space.spaceId);
                     },
                   ),
                   const SizedBox(height: AppSpacing.xl),
@@ -175,6 +189,42 @@ class SettingsSheet extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// Mở SpaceCreateSheet sau khi pop SettingsSheet — capture rootContext
+  /// trước pop vì sheet context unmount sau pop, không show được modal
+  /// mới với context cũ. Pattern PR #214.
+  void _openCreateSheet(BuildContext context) {
+    final rootContext = Navigator.of(context, rootNavigator: true).context;
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!rootContext.mounted) return;
+      showModalBottomSheet<void>(
+        context: rootContext,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const FractionallySizedBox(
+          heightFactor: 0.9,
+          child: SpaceCreateSheet(),
+        ),
+      );
+    });
+  }
+
+  /// Mở SpaceEditSheet sau khi pop SettingsSheet — cùng pattern rootContext
+  /// như openCreate. Sheet build re-check creator (defense layer 2).
+  void _openEditSheet(BuildContext context, String spaceId) {
+    final rootContext = Navigator.of(context, rootNavigator: true).context;
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!rootContext.mounted) return;
+      showModalBottomSheet<void>(
+        context: rootContext,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => SpaceEditSheet(spaceId: spaceId),
+      );
+    });
   }
 
   Widget _dragHandle() => Center(

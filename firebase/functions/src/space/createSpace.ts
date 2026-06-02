@@ -119,6 +119,7 @@ export const createSpace = onCall(
       memberCount,
       memberIds,
       createdAt: now,
+      updatedAt: now,
     });
 
     // 3b. /space_members/{spaceId}/members/{uid} subcollection.

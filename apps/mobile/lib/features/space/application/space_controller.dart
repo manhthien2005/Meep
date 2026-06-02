@@ -227,6 +227,96 @@ class SpaceController extends _$SpaceController {
     }
   }
 
+  /// Update Space cosmetic fields (name/iconEmoji/colorHex). Creator-only —
+  /// client fail-fast guard, server CF + rules là security boundary.
+  ///
+  /// Partial update: pass null cho field không đổi. Ít nhất 1 field phải
+  /// non-null (server refine cũng enforce). Validation client-side:
+  /// - name (nếu pass): trim + 1-30 chars
+  /// - colorHex (nếu pass): regex `^#[0-9A-Fa-f]{6}$`
+  Future<void> updateSpace({
+    required String spaceId,
+    String? name,
+    String? iconEmoji,
+    String? colorHex,
+  }) async {
+    final currentUid = ref.read(currentUidProvider).valueOrNull;
+    if (currentUid == null) {
+      state = state.copyWith(errorMessage: 'Chưa đăng nhập');
+      return;
+    }
+
+    final space = _findSpace(spaceId);
+    if (space != null && space.creatorId != currentUid) {
+      state = state.copyWith(
+        errorMessage: 'Chỉ creator mới có quyền chỉnh sửa Space',
+      );
+      return;
+    }
+
+    // Validate ít nhất 1 field cosmetic — match server refine.
+    if (name == null && iconEmoji == null && colorHex == null) {
+      state = state.copyWith(
+        errorMessage: 'Vui lòng chọn ít nhất một thay đổi',
+      );
+      return;
+    }
+
+    // Trim + validate name.
+    String? trimmedName;
+    if (name != null) {
+      trimmedName = name.trim();
+      if (trimmedName.isEmpty) {
+        state = state.copyWith(errorMessage: 'Tên Space không được trống');
+        return;
+      }
+      if (trimmedName.length > 30) {
+        state = state.copyWith(errorMessage: 'Tên Space tối đa 30 ký tự');
+        return;
+      }
+    }
+
+    // Validate iconEmoji length.
+    if (iconEmoji != null) {
+      if (iconEmoji.isEmpty) {
+        state = state.copyWith(errorMessage: 'Icon Space không được trống');
+        return;
+      }
+      if (iconEmoji.length > 32) {
+        state = state.copyWith(errorMessage: 'Icon Space tối đa 32 ký tự');
+        return;
+      }
+    }
+
+    // Validate colorHex format — match server regex.
+    if (colorHex != null) {
+      final hexRegex = RegExp(r'^#[0-9A-Fa-f]{6}$');
+      if (!hexRegex.hasMatch(colorHex)) {
+        state = state.copyWith(
+          errorMessage: 'Mã màu phải định dạng #RRGGBB',
+        );
+        return;
+      }
+    }
+
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      await ref.read(spaceRepositoryProvider).updateSpace(
+            spaceId: spaceId,
+            name: trimmedName,
+            iconEmoji: iconEmoji,
+            colorHex: colorHex,
+          );
+      state = state.copyWith(isLoading: false);
+    } catch (e) {
+      final err = AppError.fromUnknown(
+        e,
+        fallback: 'Không thể cập nhật Space',
+      );
+      state = state.copyWith(isLoading: false, errorMessage: err.message);
+    }
+  }
+
   Future<void> kickMember(String spaceId, String targetUid) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
