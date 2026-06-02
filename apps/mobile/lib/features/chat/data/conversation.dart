@@ -33,6 +33,14 @@ class Conversation with _$Conversation {
     @Default('') String lastSenderId,
     @Default(ConversationStatus.active) ConversationStatus status,
     @TimestampConverter() required DateTime createdAt,
+
+    /// Per-user "last read" timestamp keyed by uid. Empty map = nobody đã đọc.
+    /// Unread count derive: lastMessageAt > lastReadAt[uid] → có unread.
+    /// Update qua [ConversationRepository.markAsRead] khi user mở chat screen
+    /// hoặc nhận msg mới trong screen.
+    @TimestampMapConverter()
+    @Default(<String, DateTime>{})
+    Map<String, DateTime> lastReadAt,
   }) = _Conversation;
 
   factory Conversation.fromJson(Map<String, dynamic> json) =>
@@ -51,4 +59,35 @@ class TimestampConverter implements JsonConverter<DateTime, Object> {
 
   @override
   Object toJson(DateTime date) => Timestamp.fromDate(date);
+}
+
+/// Converter cho `Map<String, DateTime>` field — Firestore lưu
+/// `Map<String, Timestamp>`. Tolerant với 3 type giống [TimestampConverter]
+/// để fake_cloud_firestore tests (dùng `Timestamp.fromDate(DateTime)`) +
+/// production Firestore (raw `Timestamp`).
+class TimestampMapConverter
+    implements JsonConverter<Map<String, DateTime>, Object?> {
+  const TimestampMapConverter();
+
+  @override
+  Map<String, DateTime> fromJson(Object? json) {
+    if (json == null) return <String, DateTime>{};
+    final raw = json as Map<dynamic, dynamic>;
+    return <String, DateTime>{
+      for (final entry in raw.entries)
+        entry.key as String: _parseDate(entry.value),
+    };
+  }
+
+  @override
+  Object toJson(Map<String, DateTime> map) => <String, Object>{
+        for (final entry in map.entries)
+          entry.key: Timestamp.fromDate(entry.value),
+      };
+
+  static DateTime _parseDate(Object? value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.parse(value);
+    return DateTime.fromMillisecondsSinceEpoch(value! as int);
+  }
 }
