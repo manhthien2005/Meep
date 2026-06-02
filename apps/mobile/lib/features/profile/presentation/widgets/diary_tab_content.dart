@@ -2,36 +2,53 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/diary/data/diary_entry.dart' show MoodTemplate;
+import 'package:meep/features/diary/presentation/widgets/diary_mood_card.dart';
 
 // MOCK DATA — xóa khi DiaryRepository.getPublicEntries(uid) được wire (TODO T8)
 class _DiaryEntry {
   const _DiaryEntry({
     required this.title,
     required this.dateLabel,
-    required this.colorIndex,
+    required this.mood,
   });
 
   final String title;
   final String dateLabel;
-  final int colorIndex;
+  final MoodTemplate mood;
 }
 
 const _kMockEntries = <_DiaryEntry>[
-  _DiaryEntry(title: 'Happy!', dateLabel: '22 tháng 5', colorIndex: 0),
-  _DiaryEntry(title: 'Tired', dateLabel: '20 tháng 5', colorIndex: 1),
-  _DiaryEntry(title: 'Title nhật ký', dateLabel: '19 tháng 5', colorIndex: 2),
-  _DiaryEntry(title: 'Đà lạt', dateLabel: '18 tháng 5', colorIndex: 3),
-  _DiaryEntry(title: 'Thư giãn', dateLabel: '17 tháng 5', colorIndex: 4),
-  _DiaryEntry(title: 'Bồn chồn', dateLabel: '15 tháng 5', colorIndex: 5),
-];
-
-const _kImageColors = <Color>[
-  Color(0xFF4A6FA5),
-  Color(0xFF6B8E75),
-  Color(0xFF8E6B6B),
-  Color(0xFF8E7F6B),
-  Color(0xFF6B7F8E),
-  Color(0xFF7B6B8E),
+  _DiaryEntry(
+    title: 'Happy!',
+    dateLabel: '22 tháng 5',
+    mood: MoodTemplate.happy,
+  ),
+  _DiaryEntry(
+    title: 'Tired',
+    dateLabel: '20 tháng 5',
+    mood: MoodTemplate.tired,
+  ),
+  _DiaryEntry(
+    title: 'Title nhật ký',
+    dateLabel: '19 tháng 5',
+    mood: MoodTemplate.bored,
+  ),
+  _DiaryEntry(
+    title: 'Đà lạt',
+    dateLabel: '18 tháng 5',
+    mood: MoodTemplate.happy,
+  ),
+  _DiaryEntry(
+    title: 'Thư giãn',
+    dateLabel: '17 tháng 5',
+    mood: MoodTemplate.shy,
+  ),
+  _DiaryEntry(
+    title: 'Bồn chồn',
+    dateLabel: '15 tháng 5',
+    mood: MoodTemplate.sad,
+  ),
 ];
 
 class DiaryTabContent extends StatefulWidget {
@@ -141,34 +158,12 @@ class _DiaryGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _kImageColors[entry.colorIndex % _kImageColors.length];
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: color,
-            border: Border.all(color: Colors.white, width: 2),
-          ),
-        ),
-        const SizedBox(height: 9),
-        Text(
-          entry.title,
-          style: AppTextStyles.lgBold.copyWith(color: AppColors.bw100),
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 2),
-        Text(
-          entry.dateLabel,
-          style: AppTextStyles.smSemiBold.copyWith(color: AppColors.bw600),
-          textAlign: TextAlign.center,
-        ),
-      ],
+    return Center(
+      child: DiaryMoodCard(
+        title: entry.title,
+        date: entry.dateLabel,
+        mood: entry.mood,
+      ),
     );
   }
 }
@@ -200,20 +195,18 @@ class _DiaryListRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _kImageColors[entry.colorIndex % _kImageColors.length];
     return SizedBox(
       height: 85,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Row(
           children: [
-            Container(
+            SizedBox(
               width: 65,
               height: 65,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color,
-                border: Border.all(color: Colors.white, width: 2),
+              child: Image.asset(
+                'assets/icons/bg_${entry.mood.name}.png',
+                fit: BoxFit.contain,
               ),
             ),
             const SizedBox(width: 19),
