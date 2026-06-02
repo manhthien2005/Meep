@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meep/core/theme/app_colors.dart';
+import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
@@ -179,11 +180,90 @@ class ActivityPill extends StatelessWidget {
   }
 }
 
-/// Friend message bar — "Gửi tin nhắn..." + quick reactions. Full-width by
-/// design (it's the chat input), but sized to the same content area as the
-/// activity pill on own posts so both pages have matching horizontal gutters.
-class FriendMessageBar extends StatelessWidget {
-  const FriendMessageBar({super.key});
+/// Friend message bar — 2-state inline composer trên Feed:
+/// - **Collapsed** (mặc định): text "Gửi tin nhắn..." + 3 emoji quick-react +
+///   icon add-reaction. Tap vùng text trái → expand sang TextField.
+/// - **Expanded:** TextField focused + send button. Tap-outside hoặc submit →
+///   collapse. Submit gọi `ChatController.sendMessageFromFeed(postId, authorId)`
+///   để tạo/lookup direct conversation rồi append message. KHÔNG navigate —
+///   theo spec, user vẫn ở Feed sau khi gửi (input chỉ collapse).
+///
+/// Emoji quick-react ở collapsed state hiện chưa wire (chờ T5 reactions —
+/// `tasks/todo-chat.md`). Trong PR này chỉ wire text → send flow.
+class FriendMessageBar extends ConsumerStatefulWidget {
+  const FriendMessageBar({
+    super.key,
+    required this.postId,
+    required this.authorId,
+  });
+
+  /// postId — context cho `sendMessageFromFeed` (lưu quotedPostId tương lai).
+  final String postId;
+
+  /// authorId — peer uid để `getOrCreateConversation` tính pairId.
+  final String authorId;
+
+  @override
+  ConsumerState<FriendMessageBar> createState() => _FriendMessageBarState();
+}
+
+class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode();
+  bool _expanded = false;
+  bool _isSending = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _expand() {
+    setState(() => _expanded = true);
+    // Defer requestFocus để widget render TextField xong trước.
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _focusNode.requestFocus());
+  }
+
+  void _collapse() {
+    _focusNode.unfocus();
+    _controller.clear();
+    setState(() => _expanded = false);
+  }
+
+  Future<void> _send() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _isSending) return;
+    setState(() => _isSending = true);
+    final conversationId =
+        await ref.read(chatControllerProvider.notifier).sendMessageFromFeed(
+              postId: widget.postId,
+              authorId: widget.authorId,
+              text: text,
+            );
+    if (!mounted) return;
+    setState(() => _isSending = false);
+    if (conversationId != null) {
+      _collapse();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã gửi tin nhắn'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else {
+      // Controller đã set errorMessage trong state — read để show.
+      final err = ref.read(chatControllerProvider).errorMessage;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(err ?? 'Không gửi được tin nhắn'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -197,9 +277,17 @@ class FriendMessageBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(
+      child: _expanded ? _buildExpanded(screenW) : _buildCollapsed(screenW),
+    );
+  }
+
+  Widget _buildCollapsed(double screenW) {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _expand,
             child: Text(
               'Gửi tin nhắn...',
               style: TextStyle(
@@ -210,19 +298,76 @@ class FriendMessageBar extends StatelessWidget {
               ),
             ),
           ),
-          const Text('💙', style: TextStyle(fontSize: 18)),
-          const SizedBox(width: 10),
-          const Text('😂', style: TextStyle(fontSize: 18)),
-          const SizedBox(width: 10),
-          const Text('🥰', style: TextStyle(fontSize: 18)),
-          const SizedBox(width: 10),
-          const Icon(
-            Icons.add_reaction_outlined,
-            color: AppColors.bw500,
-            size: 20,
+        ),
+        const Text('💙', style: TextStyle(fontSize: 18)),
+        const SizedBox(width: 10),
+        const Text('😂', style: TextStyle(fontSize: 18)),
+        const SizedBox(width: 10),
+        const Text('🥰', style: TextStyle(fontSize: 18)),
+        const SizedBox(width: 10),
+        const Icon(
+          Icons.add_reaction_outlined,
+          color: AppColors.bw500,
+          size: 20,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExpanded(double screenW) {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _controller,
+            focusNode: _focusNode,
+            enabled: !_isSending,
+            maxLength: 500,
+            textInputAction: TextInputAction.send,
+            onSubmitted: (_) => _send(),
+            onTapOutside: (_) {
+              if (_controller.text.trim().isEmpty) _collapse();
+            },
+            decoration: InputDecoration(
+              hintText: 'Gửi tin nhắn...',
+              hintStyle: TextStyle(
+                color: AppColors.bw500,
+                fontSize: screenW * 0.042,
+                fontWeight: FontWeight.w800,
+                fontFamily: 'Nunito',
+              ),
+              border: InputBorder.none,
+              isCollapsed: true,
+              counterText: '',
+            ),
+            style: TextStyle(
+              color: AppColors.bw100,
+              fontSize: screenW * 0.042,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'Nunito',
+            ),
+            onChanged: (_) => setState(() {}),
           ),
-        ],
-      ),
+        ),
+        if (_controller.text.trim().isNotEmpty)
+          GestureDetector(
+            onTap: _send,
+            child: Icon(
+              Icons.send_rounded,
+              color: _isSending ? AppColors.bw500 : AppColors.turquoise500,
+              size: 22,
+            ),
+          )
+        else
+          GestureDetector(
+            onTap: _collapse,
+            child: const Icon(
+              Icons.close,
+              color: AppColors.bw500,
+              size: 20,
+            ),
+          ),
+      ],
     );
   }
 }
@@ -242,9 +387,12 @@ class FriendPostCard extends StatelessWidget {
         children: [
           PostHeaderRow(post: post, isOwn: false),
           const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 6),
-            child: FriendMessageBar(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: FriendMessageBar(
+              postId: post.postId,
+              authorId: post.authorId,
+            ),
           ),
         ],
       ),
@@ -351,9 +499,12 @@ class FriendPostPage extends StatelessWidget {
         SizedBox(height: screenH * 0.01),
         PostHeaderRow(post: post, isOwn: false),
         const Spacer(),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: _gutter),
-          child: FriendMessageBar(),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: _gutter),
+          child: FriendMessageBar(
+            postId: post.postId,
+            authorId: post.authorId,
+          ),
         ),
         SizedBox(height: screenH * _bottomGapRatio),
       ],
