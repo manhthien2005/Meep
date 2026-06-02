@@ -174,7 +174,11 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
               stream: friendsStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.turquoise500,
+                    ),
+                  );
                 }
                 if (snapshot.hasError) {
                   return Center(
