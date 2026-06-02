@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:share_plus/share_plus.dart';
+
 import 'package:meep/core/config/app_config.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
@@ -33,18 +35,30 @@ class ShareProfileSheet extends StatelessWidget {
             _buildOption(
               icon: Icons.chat_bubble_outline,
               label: 'Gửi qua Messenger',
-              onTap: () {
+              onTap: () async {
+                // System share sheet — Messenger + nhiều app khác tự xuất hiện.
+                // Share trước, pop sau: nếu share fail / dismiss, sheet vẫn ở
+                // đó để user retry.
+                await Share.share(
+                  'Kết bạn với tôi trên Meep: $profileLink',
+                );
+                if (!context.mounted) return;
                 Navigator.of(context).pop();
-                // TODO(T3/NganTNK): share qua Messenger SDK / share_plus
               },
             ),
             _buildOption(
               icon: Icons.link,
               label: 'Sao chép liên kết',
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: profileLink));
+              onTap: () async {
+                await Clipboard.setData(ClipboardData(text: profileLink));
+                if (!context.mounted) return;
                 Navigator.of(context).pop();
-                // TODO(T3/NganTNK): show toast "Đã sao chép liên kết"
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Đã sao chép liên kết'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
               },
             ),
           ],

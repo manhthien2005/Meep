@@ -4,12 +4,32 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/settings/presentation/settings_sheet.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/space.dart';
 import 'package:meep/features/space/data/space_repository.dart';
 
 class MockSpaceRepository extends Mock implements SpaceRepository {}
+
+UserProfile _profile({
+  String uid = 'user1',
+  String username = 'ngantran',
+  String displayName = 'Ngan Tran',
+  int friendCount = 15,
+  String? avatarUrl,
+}) {
+  return UserProfile(
+    uid: uid,
+    email: '$uid@test.com',
+    displayName: displayName,
+    username: username,
+    friendCount: friendCount,
+    avatarUrl: avatarUrl,
+    createdAt: DateTime(2026, 1, 1),
+    updatedAt: DateTime(2026, 1, 1),
+  );
+}
 
 void main() {
   late MockSpaceRepository spaceRepo;
@@ -24,6 +44,8 @@ void main() {
   Widget harness({
     String? currentUid = 'user1',
     List<Space>? spacesStream,
+    UserProfile? profile,
+    bool useNullProfile = false,
   }) {
     if (spacesStream != null) {
       when(() => spaceRepo.watchMySpaces('user1')).thenAnswer(
@@ -36,6 +58,11 @@ void main() {
         currentUidProvider.overrideWith(
           (ref) => Stream.value(currentUid),
         ),
+        currentUserProfileProvider.overrideWith(
+          (ref) => Stream<UserProfile?>.value(
+            useNullProfile ? null : (profile ?? _profile()),
+          ),
+        ),
       ],
       child: const MaterialApp(home: Scaffold(body: SettingsSheet())),
     );
@@ -47,11 +74,30 @@ void main() {
       await tester.pumpWidget(harness());
       await tester.pump();
 
-      // Header dùng mock username 'ngantran'.
+      // Header đọc currentUserProfileProvider — default _profile()
+      // có username 'ngantran'.
       expect(find.text('ngantran'), findsOneWidget);
       expect(find.text('Tài khoản đã chặn'), findsOneWidget);
       expect(find.text('Đăng xuất'), findsOneWidget);
       expect(find.text('Xoá tài khoản'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('friendCount hiển thị từ profile thật (7 → "7 người bạn")',
+        (tester) async {
+      await tester.pumpWidget(harness(profile: _profile(friendCount: 7)));
+      await tester.pump();
+
+      expect(find.text('7 người bạn'), findsOneWidget);
+    });
+
+    testWidgets(
+        'profile null → fallback "0 người bạn", username rỗng, không crash',
+        (tester) async {
+      await tester.pumpWidget(harness(useNullProfile: true));
+      await tester.pump();
+
+      expect(find.text('0 người bạn'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
