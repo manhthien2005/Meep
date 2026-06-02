@@ -140,12 +140,21 @@ export const createSpace = onCall(
     // 3c. /conversations/{spaceId} — group chat. conversationId === spaceId
     // để Chat module lookup conversation từ Space context không cần extra
     // mapping. participantIds đồng bộ memberIds.
+    //
+    // lastMessage/lastMessageAt/lastSenderId BẮT BUỘC khởi tạo dù chưa có
+    // message nào — Inbox query dùng .orderBy('lastMessageAt') sẽ LOẠI TRỪ
+    // docs thiếu field này (Firestore behavior). Thiếu = group chat invisible
+    // cho đến khi gửi msg đầu tiên. Init lastMessageAt = now để Space mới hiện
+    // ngay trên đầu Inbox.
     batch.set(db.collection('conversations').doc(spaceId), {
       conversationId: spaceId,
       type: 'space',
       participantIds: memberIds,
       spaceId,
       status: 'active',
+      lastMessage: '',
+      lastMessageAt: now,
+      lastSenderId: '',
       createdAt: now,
       updatedAt: now,
     });
