@@ -130,7 +130,6 @@ class _ConversationList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profiles = ref.watch(chatUserProfilesProvider);
     final unread = ref.watch(unreadCountsProvider);
     final myUid = ref.watch(currentChatUidProvider);
 
@@ -157,7 +156,8 @@ class _ConversationList extends ConsumerWidget {
           (id) => id != myUid,
           orElse: () => myUid,
         );
-        final other = profiles[otherUid];
+        final otherAsync = ref.watch(chatUserProfileProvider(otherUid));
+        final other = otherAsync.valueOrNull;
         return ConversationTile.direct(
           displayName: other?.displayName ?? 'Người dùng',
           avatarUrl: other?.avatarUrl,

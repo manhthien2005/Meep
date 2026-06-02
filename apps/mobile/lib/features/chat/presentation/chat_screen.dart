@@ -3,10 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
-import 'package:meep/features/chat/data/conversation.dart';
 import 'package:meep/features/chat/presentation/chat_thread_view.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_confirm_dialogs.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_input_bar.dart';
@@ -27,8 +25,10 @@ class ChatScreen extends ConsumerWidget {
         .firstOrNull;
 
     final myUid = ref.watch(currentChatUidProvider);
-    final profiles = ref.watch(chatUserProfilesProvider);
-    final peer = _resolvePeer(conversation, myUid, profiles);
+    final peerUid =
+        conversation?.participantIds.where((id) => id != myUid).firstOrNull;
+    final peerAsync = ref.watch(chatUserProfileProvider(peerUid ?? ''));
+    final peer = peerAsync.valueOrNull;
 
     final messagesAsync = ref.watch(messagesProvider(conversationId));
     final sendStatus = ref.watch(chatControllerProvider);
@@ -84,17 +84,6 @@ class ChatScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  UserProfile? _resolvePeer(
-    Conversation? conversation,
-    String myUid,
-    Map<String, UserProfile> profiles,
-  ) {
-    if (conversation == null) return null;
-    final otherUid =
-        conversation.participantIds.where((id) => id != myUid).firstOrNull;
-    return otherUid == null ? null : profiles[otherUid];
   }
 
   Future<void> _onMenu(BuildContext context, WidgetRef ref, String name) async {

@@ -27,7 +27,6 @@ class SpaceMembersSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final members = ref.watch(chatSpaceMembersProvider(spaceId));
-    final profiles = ref.watch(chatUserProfilesProvider);
     final myUid = ref.watch(currentChatUidProvider);
 
     // Tall sheet (~75% screen) per Figma `564:8865`, not a half-height sheet.
@@ -61,7 +60,9 @@ class SpaceMembersSheet extends ConsumerWidget {
                     itemCount: members.length,
                     itemBuilder: (context, index) {
                       final member = members[index];
-                      final profile = profiles[member.uid];
+                      final profileAsync =
+                          ref.watch(chatUserProfileProvider(member.uid));
+                      final profile = profileAsync.valueOrNull;
                       final isMe = member.uid == myUid;
                       return _MemberRow(
                         name: isMe

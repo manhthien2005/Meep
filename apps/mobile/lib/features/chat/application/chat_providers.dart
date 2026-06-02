@@ -51,10 +51,16 @@ Stream<List<Message>> messages(Ref ref, String conversationId) {
 @riverpod
 Map<String, int> unreadCounts(Ref ref) => ChatSeed.seedUnreadCounts();
 
-/// User profiles keyed by uid, for resolving 1-1 conversation display info.
-/// TODO(C/wire): replace seed lookup with `userRepository` reads.
+/// Resolve a single [UserProfile] by [uid] for display in chat tiles,
+/// headers, and member lists.
+///
+/// Uses [UserRepository.getProfile] (auth module). Riverpod auto-deduplicates
+/// when multiple widgets watch the same uid — only one Firestore read per uid.
 @riverpod
-Map<String, UserProfile> chatUserProfiles(Ref ref) => ChatSeed.usersByUid;
+Future<UserProfile?> chatUserProfile(Ref ref, String uid) async {
+  if (uid.isEmpty) return null;
+  return ref.watch(userRepositoryProvider).getProfile(uid);
+}
 
 /// The single demo space backing group chat.
 /// TODO(C/wire): replace with `spaceRepository.watchSpace(spaceId)`.

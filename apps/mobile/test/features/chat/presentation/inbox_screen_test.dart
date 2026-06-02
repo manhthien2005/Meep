@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/auth/data/firebase_user_repository.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/chat/data/chat_seed_data.dart';
-import 'package:meep/features/chat/data/conversation_repository.dart';
 import 'package:meep/features/chat/data/firebase_conversation_repository.dart';
 import 'package:meep/features/chat/presentation/inbox_screen.dart';
 import 'package:meep/features/chat/presentation/widgets/conversation_tile.dart';
@@ -20,11 +21,22 @@ void main() {
             c.toJson(),
           );
     }
+    // Also seed user profiles so chatUserProfileProvider can resolve them.
+    for (final entry in ChatSeed.usersByUid.entries) {
+      await firestore.collection('users').doc(entry.key).set(
+            entry.value.toJson(),
+          );
+    }
   }
 
-  Widget wrap(ConversationRepository repo) => ProviderScope(
+  Widget wrap(FakeFirebaseFirestore firestore) => ProviderScope(
         overrides: [
-          conversationRepositoryProvider.overrideWithValue(repo),
+          conversationRepositoryProvider.overrideWithValue(
+            FirebaseConversationRepository(firestore),
+          ),
+          userRepositoryProvider.overrideWithValue(
+            FirebaseUserRepository(firestore: firestore),
+          ),
           currentChatUidProvider.overrideWith((ref) => ChatSeed.currentUid),
         ],
         child: const MaterialApp(home: InboxScreen()),
@@ -34,7 +46,7 @@ void main() {
     final firestore = FakeFirebaseFirestore();
     await seedSeedData(firestore);
 
-    await tester.pumpWidget(wrap(FirebaseConversationRepository(firestore)));
+    await tester.pumpWidget(wrap(firestore));
     await tester.pumpAndSettle();
 
     expect(find.text('Tin nhắn'), findsOneWidget);
@@ -45,7 +57,7 @@ void main() {
     final firestore = FakeFirebaseFirestore();
     await seedSeedData(firestore);
 
-    await tester.pumpWidget(wrap(FirebaseConversationRepository(firestore)));
+    await tester.pumpWidget(wrap(firestore));
     await tester.pumpAndSettle();
 
     expect(find.text('Talaki'), findsOneWidget); // direct
@@ -56,7 +68,7 @@ void main() {
     // Don't seed — Firestore starts empty.
     final firestore = FakeFirebaseFirestore();
 
-    await tester.pumpWidget(wrap(FirebaseConversationRepository(firestore)));
+    await tester.pumpWidget(wrap(firestore));
     await tester.pumpAndSettle();
 
     expect(
