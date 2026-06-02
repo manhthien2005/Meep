@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
@@ -27,16 +28,25 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
-  // Cache stream 1 lần để setState (tap chọn friend) không re-subscribe
-  // → không reload toàn bộ list.
-  late final Stream<List<UserProfile>> _friendsStream;
+  // Cache stream 1 lần khi uid available để setState (tap chọn friend)
+  // không re-subscribe → không reload toàn bộ list.
+  //
+  // KHÔNG init ở `initState` vì `currentUidProvider` là StreamProvider —
+  // emit AsyncLoading lúc mount. `.valueOrNull` ở initState sẽ trả null
+  // dù user đã signin → empty stream. Đợi `build` chạy lại khi stream
+  // emit value lần đầu rồi mới cache.
+  Stream<List<UserProfile>>? _friendsStream;
+  String? _cachedUid;
 
-  @override
-  void initState() {
-    super.initState();
-    // TODO(SP/T3.2): get current user uid from auth
-    _friendsStream =
-        ref.read(friendRepositoryProvider).watchFriends('current-uid-mock');
+  Stream<List<UserProfile>> _ensureStream(String? uid) {
+    if (uid == _cachedUid && _friendsStream != null) return _friendsStream!;
+    _cachedUid = uid;
+    if (uid == null) {
+      _friendsStream = Stream.value(const <UserProfile>[]);
+    } else {
+      _friendsStream = ref.read(friendRepositoryProvider).watchFriends(uid);
+    }
+    return _friendsStream!;
   }
 
   @override
@@ -59,6 +69,12 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch để rebuild khi auth state emit lần đầu (initState quá sớm cho
+    // StreamProvider). `_ensureStream` cache theo uid — không re-subscribe
+    // khi setState do tap chọn friend.
+    final uid = ref.watch(currentUidProvider).valueOrNull;
+    final friendsStream = _ensureStream(uid);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Column(
@@ -150,7 +166,7 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
           // Friend list
           Expanded(
             child: StreamBuilder<List<UserProfile>>(
-              stream: _friendsStream,
+              stream: friendsStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
