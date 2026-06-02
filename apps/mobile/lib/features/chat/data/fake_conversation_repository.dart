@@ -126,6 +126,24 @@ class FakeConversationRepository implements ConversationRepository {
     _conversationsCtrl.add(_conversations);
   }
 
+  @override
+  Future<void> markAsRead({
+    required String conversationId,
+    required String uid,
+  }) async {
+    if (uid.isEmpty) return;
+    final idx = _conversations.indexWhere(
+      (c) => c.conversationId == conversationId,
+    );
+    if (idx == -1) return;
+    final conv = _conversations[idx];
+    final newMap = Map<String, DateTime>.from(conv.lastReadAt)
+      ..[uid] = DateTime.now();
+    _conversations = [..._conversations]..[idx] =
+        conv.copyWith(lastReadAt: newMap);
+    _conversationsCtrl.add(_conversations);
+  }
+
   // --- Helpers -----------------------------------------------------------
 
   List<Message> _messagesOf(String id) => _messages[id] ?? const [];

@@ -31,4 +31,14 @@ abstract class ConversationRepository {
     String conversationId, {
     int limit = 50,
   });
+
+  /// Mark [conversationId] as read up to now for [uid].
+  ///
+  /// Update `lastReadAt[uid] = serverTimestamp()` trên conversation doc.
+  /// Caller bắt buộc verify [uid] là participant — repo KHÔNG check (rule
+  /// Firestore enforce).
+  Future<void> markAsRead({
+    required String conversationId,
+    required String uid,
+  });
 }
