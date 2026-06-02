@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/data/friend_repository.dart';
@@ -54,6 +55,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            currentUidProvider
+                .overrideWith((ref) => Stream.value('current-uid-test')),
             friendRepositoryProvider.overrideWithValue(
               FakeFriendRepository(mockFriends.take(3).toList()),
             ),
@@ -78,6 +81,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            currentUidProvider
+                .overrideWith((ref) => Stream.value('current-uid-test')),
             friendRepositoryProvider.overrideWithValue(
               FakeFriendRepository(mockFriends.take(3).toList()),
             ),
@@ -106,6 +111,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            currentUidProvider
+                .overrideWith((ref) => Stream.value('current-uid-test')),
             friendRepositoryProvider.overrideWithValue(
               FakeFriendRepository(tenFriends),
             ),
@@ -136,6 +143,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            currentUidProvider
+                .overrideWith((ref) => Stream.value('current-uid-test')),
             friendRepositoryProvider.overrideWithValue(
               FakeFriendRepository(mockFriends.take(5).toList()),
             ),
