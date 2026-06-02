@@ -11,6 +11,27 @@ import 'package:meep/features/chat/data/chat_seed_data.dart';
 import 'package:meep/features/chat/data/firebase_conversation_repository.dart';
 import 'package:meep/features/chat/presentation/inbox_screen.dart';
 import 'package:meep/features/chat/presentation/widgets/conversation_tile.dart';
+import 'package:meep/features/space/application/space_controller.dart';
+import 'package:meep/features/space/data/space.dart';
+import 'package:meep/features/space/data/space_member.dart';
+import 'package:meep/features/space/data/space_repository.dart';
+
+/// Minimal in-memory SpaceRepository — chỉ implement 2 method chat dùng.
+/// Các method khác throw `UnimplementedError` (mutations CF không test tới).
+class _FakeSpaceRepository implements SpaceRepository {
+  @override
+  Stream<Space?> watchSpace(String spaceId) =>
+      Stream<Space?>.value(ChatSeed.seedSpace());
+
+  @override
+  Stream<List<SpaceMember>> watchMembers(String spaceId) =>
+      Stream<List<SpaceMember>>.value(ChatSeed.seedMembers());
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError(
+        '_FakeSpaceRepository: ${invocation.memberName} not implemented',
+      );
+}
 
 void main() {
   /// Seed ChatSeed conversations into fake Firestore so the inbox renders
@@ -37,6 +58,7 @@ void main() {
           userRepositoryProvider.overrideWithValue(
             FirebaseUserRepository(firestore: firestore),
           ),
+          spaceRepositoryProvider.overrideWithValue(_FakeSpaceRepository()),
           currentChatUidProvider.overrideWith((ref) => ChatSeed.currentUid),
         ],
         child: const MaterialApp(home: InboxScreen()),

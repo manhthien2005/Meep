@@ -26,7 +26,8 @@ class SpaceMembersSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final members = ref.watch(chatSpaceMembersProvider(spaceId));
+    final membersAsync = ref.watch(chatSpaceMembersProvider(spaceId));
+    final members = membersAsync.valueOrNull ?? const [];
     final myUid = ref.watch(currentChatUidProvider);
 
     // Tall sheet (~75% screen) per Figma `564:8865`, not a half-height sheet.

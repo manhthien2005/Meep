@@ -8,6 +8,26 @@ import 'package:meep/features/auth/data/firebase_user_repository.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/chat/data/chat_seed_data.dart';
 import 'package:meep/features/chat/presentation/widgets/space_members_sheet.dart';
+import 'package:meep/features/space/application/space_controller.dart';
+import 'package:meep/features/space/data/space.dart';
+import 'package:meep/features/space/data/space_member.dart';
+import 'package:meep/features/space/data/space_repository.dart';
+
+/// Minimal in-memory SpaceRepository — chỉ implement watchMembers cho test.
+class _FakeSpaceRepository implements SpaceRepository {
+  @override
+  Stream<List<SpaceMember>> watchMembers(String spaceId) =>
+      Stream<List<SpaceMember>>.value(ChatSeed.seedMembers());
+
+  @override
+  Stream<Space?> watchSpace(String spaceId) =>
+      Stream<Space?>.value(ChatSeed.seedSpace());
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError(
+        '_FakeSpaceRepository: ${invocation.memberName} not implemented',
+      );
+}
 
 void main() {
   Future<FakeFirebaseFirestore> seededFirestore() async {
@@ -26,6 +46,7 @@ void main() {
           userRepositoryProvider.overrideWithValue(
             FirebaseUserRepository(firestore: firestore),
           ),
+          spaceRepositoryProvider.overrideWithValue(_FakeSpaceRepository()),
           currentChatUidProvider.overrideWith((ref) => ChatSeed.currentUid),
         ],
         child: MaterialApp(home: Scaffold(body: child)),

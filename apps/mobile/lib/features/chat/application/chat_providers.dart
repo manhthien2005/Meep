@@ -8,6 +8,7 @@ import 'package:meep/features/chat/data/chat_seed_data.dart';
 import 'package:meep/features/chat/data/conversation.dart';
 import 'package:meep/features/chat/data/message.dart';
 import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/space.dart';
 import 'package:meep/features/space/data/space_member.dart';
 
@@ -62,16 +63,24 @@ Future<UserProfile?> chatUserProfile(Ref ref, String uid) async {
   return ref.watch(userRepositoryProvider).getProfile(uid);
 }
 
-/// The single demo space backing group chat.
-/// TODO(C/wire): replace with `spaceRepository.watchSpace(spaceId)`.
+/// Live Space document for a group conversation header / tile.
+///
+/// Delegates to [SpaceRepository.watchSpace] (space module). Empty spaceId →
+/// emits null without hitting Firestore (defensive cho conversation 1-1).
 @riverpod
-Space chatSpace(Ref ref, String spaceId) => ChatSeed.seedSpace();
+Stream<Space?> chatSpace(Ref ref, String spaceId) {
+  if (spaceId.isEmpty) return Stream.value(null);
+  return ref.watch(spaceRepositoryProvider).watchSpace(spaceId);
+}
 
-/// Members of the demo space.
-/// TODO(C/wire): replace with `spaceRepository.watchMembers(spaceId)`.
+/// Live member list for [SpaceMembersSheet].
+///
+/// Delegates to [SpaceRepository.watchMembers] (space module).
 @riverpod
-List<SpaceMember> chatSpaceMembers(Ref ref, String spaceId) =>
-    ChatSeed.seedMembers();
+Stream<List<SpaceMember>> chatSpaceMembers(Ref ref, String spaceId) {
+  if (spaceId.isEmpty) return Stream.value(const []);
+  return ref.watch(spaceRepositoryProvider).watchMembers(spaceId);
+}
 
 /// The post that a 1-1 conversation was started from (quoted photo header).
 /// Returns null when the conversation has no originating post.
