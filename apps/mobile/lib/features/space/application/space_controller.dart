@@ -147,6 +147,14 @@ class SpaceController extends _$SpaceController {
       state = state.copyWith(errorMessage: 'Tên Space tối đa 30 ký tự');
       return;
     }
+    // Min 2 friends + 1 creator = 3 thành viên — Space mới có nghĩa nếu
+    // ≥ 3 người. Server CF cũng enforce, client chỉ fail-fast UX.
+    if (friendUids.length < 2) {
+      state = state.copyWith(
+        errorMessage: 'Space cần tối thiểu 3 thành viên (chọn ít nhất 2 bạn)',
+      );
+      return;
+    }
     if (friendUids.length > 9) {
       state = state.copyWith(
         errorMessage: 'Space tối đa 10 người (bao gồm bạn)',

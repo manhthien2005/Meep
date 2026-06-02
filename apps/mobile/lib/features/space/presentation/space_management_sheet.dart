@@ -7,10 +7,33 @@ import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/space.dart';
+import 'package:meep/features/space/data/space_member.dart';
 import 'package:meep/features/space/presentation/widgets/delete_space_dialog.dart';
 import 'package:meep/features/space/presentation/widgets/kick_member_dialog.dart';
 import 'package:meep/features/space/presentation/widgets/leave_space_dialog.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
+
+/// Load `displayName` + `avatarUrl` cho list members qua `userRepository`.
+///
+/// N+1 reads chấp nhận được vì memberCount ≤ 10 (spec hard cap). Nếu cần
+/// optimize sau, xem xét denormalize vào `/space_members/{spaceId}/members/{uid}`
+/// hoặc batched `whereIn` query (max 10 elements — vừa fit).
+Future<({Map<String, String> names, Map<String, String?> avatars})>
+    _loadMemberProfiles(WidgetRef ref, List<SpaceMember> members) async {
+  final userRepo = ref.read(userRepositoryProvider);
+  final profiles = await Future.wait(
+    members.map((m) => userRepo.getProfile(m.uid)),
+  );
+  final names = <String, String>{};
+  final avatars = <String, String?>{};
+  for (var i = 0; i < members.length; i++) {
+    final profile = profiles[i];
+    if (profile == null) continue;
+    names[members[i].uid] = profile.displayName;
+    avatars[members[i].uid] = profile.avatarUrl;
+  }
+  return (names: names, avatars: avatars);
+}
 
 /// Bottom sheet quản lý Space — hiện theo role:
 /// - Member thường: chỉ "Rời khỏi Space"
@@ -92,12 +115,14 @@ class _Body extends ConsumerWidget {
     // Creator: chọn member mới làm creator trước → transfer → leave.
     final members = ref.read(spaceMembersProvider(space.spaceId)).valueOrNull;
     if (members == null) return;
+    final profiles = await _loadMemberProfiles(ref, members);
+    if (!context.mounted) return;
     final picked = await showCreatorLeaveDialog(
       context,
       space: space,
       members: members,
-      displayNames: const {}, // TODO(SP/T10b/ThienPDM): inject userRepository lookup khi wire end-to-end
-      avatarUrls: const {},
+      displayNames: profiles.names,
+      avatarUrls: profiles.avatars,
     );
     if (picked == null || !context.mounted) return;
 
@@ -136,12 +161,14 @@ class _Body extends ConsumerWidget {
   Future<void> _handleKick(BuildContext context, WidgetRef ref) async {
     final members = ref.read(spaceMembersProvider(space.spaceId)).valueOrNull;
     if (members == null) return;
+    final profiles = await _loadMemberProfiles(ref, members);
+    if (!context.mounted) return;
     final picked = await showKickMemberDialog(
       context,
       space: space,
       members: members,
-      displayNames: const {}, // TODO(SP/T10b/ThienPDM): inject userRepository lookup khi wire end-to-end
-      avatarUrls: const {},
+      displayNames: profiles.names,
+      avatarUrls: profiles.avatars,
     );
     if (picked == null || !context.mounted) return;
     await ref

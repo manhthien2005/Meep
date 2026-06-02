@@ -150,6 +150,34 @@ void main() {
       );
     });
 
+    test('sets errorMessage when friendUids < 2 (min 3 thành viên)', () async {
+      final container = _makeContainer(repo: repo, currentUid: 'user1');
+      addTearDown(container.dispose);
+      container.listen(spaceControllerProvider('user1'), (_, __) {});
+
+      await container
+          .read(spaceControllerProvider('user1').notifier)
+          .createSpace(
+        name: 'Family',
+        iconEmoji: '👥',
+        colorHex: '#00DEEE',
+        friendUids: ['friend1'], // 1 friend → 2 thành viên < 3
+      );
+
+      expect(
+        container.read(spaceControllerProvider('user1')).errorMessage,
+        contains('tối thiểu 3 thành viên'),
+      );
+      verifyNever(
+        () => repo.createSpace(
+          name: any(named: 'name'),
+          iconEmoji: any(named: 'iconEmoji'),
+          colorHex: any(named: 'colorHex'),
+          friendUids: any(named: 'friendUids'),
+        ),
+      );
+    });
+
     test('sets errorMessage when friendUids exceeds 9', () async {
       final container = _makeContainer(repo: repo, currentUid: 'user1');
       addTearDown(container.dispose);
@@ -234,7 +262,8 @@ void main() {
         name: 'Family',
         iconEmoji: '👥',
         colorHex: '#00DEEE',
-        friendUids: ['friend1'],
+        // min 2 friends để pass client guard → trigger repo throw path.
+        friendUids: ['friend1', 'friend2'],
       );
 
       final state = container.read(spaceControllerProvider('user1'));
