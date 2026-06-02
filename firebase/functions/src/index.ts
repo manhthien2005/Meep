@@ -8,6 +8,9 @@ import { z } from 'zod';
 export { onPostCreated } from './feed/onPostCreated.js';
 export { onPostDeleted } from './feed/onPostDeleted.js';
 
+// Settings module
+export { blockUser } from './settings/blockUser.js';
+
 initializeApp();
 
 setGlobalOptions({
@@ -64,48 +67,19 @@ export { onFriendshipDeleted } from './friend/onFriendshipDeleted.js';
 
 // ===== Settings module stubs =====
 
-/**
- * Block a user: create /blocks doc + remove friendship + update conversation status.
- *
- * TODO(SE/impl):
- *   - verify target exists + caller != target
- *   - create /blocks/{blockerUid}_{targetUid}
- *   - delete /friendships/{pairId} if exists
- *   - update /conversations/{pairId}.status = 'blocked' if exists
- */
-export const blockUser = onCall((request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
-  // TODO(SE/impl): see comment above.
-  return { ok: true };
-});
-
-/**
- * Unblock a user: delete /blocks doc + delete /friendships/{pairId} if exists.
- * Atomic via Admin SDK batch — client cannot write /blocks directly.
- *
- * TODO(SE/impl):
- *   - verify caller != target
- *   - delete /blocks/{blockerUid}_{targetUid} if exists
- *   - delete /friendships/{pairId} if exists
- */
-export const unblockUser = onCall((request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
-  // TODO(SE/impl): see comment above.
-  return { ok: true };
-});
+// blockUser — implemented in ./settings/blockUser.ts (exported above).
+// unblockUser stub gỡ bỏ: T1 đã quyết unblock = client-side delete
+// `/blocks/{blockerUid}_{targetUid}` (OQ5 resolved trong #116). CF không cần.
 
 /**
  * Delete account: re-authenticate, then cascade-delete all user data.
  *
- * TODO(SE/impl):
- *   - delete /users/{uid} + subcollections
- *   - delete /posts by uid from Storage + Firestore
- *   - delete /friendships where uid is member
- *   - delete Firebase Auth account
+ * TODO(SE/T7 #119): implement cascade Storage → Firestore subcollections →
+ *   docs → admin.auth().deleteUser (Auth xóa cuối, idempotent, retry-safe).
  */
 export const deleteAccount = onCall((request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
-  // TODO(SE/impl): see comment above.
+  // TODO(SE/T7 #119): see comment above.
   return { ok: true };
 });
 
