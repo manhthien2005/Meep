@@ -10,6 +10,7 @@ import 'package:meep/features/chat/presentation/chat_thread_view.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_confirm_dialogs.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_input_bar.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_menu_sheet.dart';
+import 'package:meep/features/chat/presentation/widgets/mark_as_read_listener.dart';
 import 'package:meep/features/chat/presentation/widgets/space_members_sheet.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
@@ -40,6 +41,9 @@ class GroupChatScreen extends ConsumerWidget {
       body: SafeArea(
         child: Column(
           children: [
+            // Side-effect listener (no render) — auto markAsRead on mount +
+            // mỗi khi messages stream emit msg mới. Debounce 500ms.
+            MarkAsReadListener(conversationId: conversationId),
             _GroupHeader(
               title: space?.name ?? 'Space',
               emoji: space?.iconEmoji ?? '👥',

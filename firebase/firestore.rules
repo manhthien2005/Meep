@@ -251,7 +251,7 @@ service cloud.firestore {
         && request.resource.data.participantIds.hasAll([request.auth.uid]);
       allow update: if isParticipant(conversationId)
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId']);
+             .hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'lastReadAt']);
       allow delete: if false;
 
       match /messages/{messageId} {

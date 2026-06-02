@@ -165,6 +165,24 @@ class FirebaseConversationRepository implements ConversationRepository {
     }
   }
 
+  @override
+  Future<void> markAsRead({
+    required String conversationId,
+    required String uid,
+  }) async {
+    if (uid.isEmpty) return;
+    try {
+      // Dot-notation update: chỉ ghi `lastReadAt.{uid}`, KHÔNG overwrite cả map.
+      // Firestore merge field này vào doc — các uid khác giữ nguyên timestamp.
+      await _firestore
+          .collection(_conversationsCol)
+          .doc(conversationId)
+          .update({'lastReadAt.$uid': FieldValue.serverTimestamp()});
+    } on FirebaseException catch (e) {
+      throw _mapFirestoreException(e, 'cập nhật trạng thái đã đọc');
+    }
+  }
+
   // --- Error mapping -------------------------------------------------------
 
   /// Map [FirebaseException] (Firestore) sang [AppError] tương ứng.

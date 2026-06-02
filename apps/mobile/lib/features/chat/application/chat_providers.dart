@@ -46,11 +46,33 @@ Stream<List<Message>> messages(Ref ref, String conversationId) {
       .watchMessages(conversationId, limit: limit);
 }
 
-/// Unread counts per conversation — NOT in [Conversation] model yet
-/// (contract-pending, see plan). FE renders the inbox badge from this.
-/// TODO(C/wire): derive from `lastReadAt` once the field lands on the model.
+/// Per-conversation unread indicator (1 = có unread, 0 = không).
+///
+/// Đếm "1" thay vì exact message count — không cần subcollection query phụ.
+/// Badge taskbar = số conversations đang có unread (fold sum). UX hiện tại
+/// chỉ cần "có chấm đỏ hay không", chưa cần con số chính xác.
+///
+/// Rule unread:
+/// 1. `lastSenderId == uid` → mình là người gửi cuối → KHÔNG unread.
+/// 2. `lastReadAt[uid] == null` → chưa từng đọc → unread nếu có msg
+///    (lastMessageAt > createdAt).
+/// 3. Có `lastReadAt[uid]` → unread khi `lastMessageAt > lastReadAt[uid]`.
 @riverpod
-Map<String, int> unreadCounts(Ref ref) => ChatSeed.seedUnreadCounts();
+Map<String, int> unreadCounts(Ref ref) {
+  final uid = ref.watch(currentChatUidProvider);
+  if (uid.isEmpty) return const <String, int>{};
+  final convs = ref.watch(conversationsProvider).valueOrNull ?? const [];
+  final result = <String, int>{};
+  for (final c in convs) {
+    if (c.lastSenderId == uid) continue; // mình gửi → không unread
+    final lastRead = c.lastReadAt[uid];
+    final hasUnread = lastRead == null
+        ? c.lastMessageAt.isAfter(c.createdAt)
+        : c.lastMessageAt.isAfter(lastRead);
+    if (hasUnread) result[c.conversationId] = 1;
+  }
+  return result;
+}
 
 /// Resolve a single [UserProfile] by [uid] for display in chat tiles,
 /// headers, and member lists.

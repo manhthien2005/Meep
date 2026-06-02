@@ -267,4 +267,39 @@ describe('/conversations/{conversationId}', () => {
         }),
     );
   });
+
+  // --- markAsRead (lastReadAt field) ----------------------------------------
+
+  test('participant can update lastReadAt for self (markAsRead)', async () => {
+    await seedConversation();
+    // Dot-notation field update: lastReadAt.{uid} — pattern client dùng.
+    await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}`)
+        .update({ [`lastReadAt.${alice}`]: new Date() }),
+    );
+  });
+
+  test('non-participant cannot update lastReadAt', async () => {
+    await seedConversation();
+    await assertFails(
+      authed(stranger)
+        .firestore()
+        .doc(`conversations/${CONV_ID}`)
+        .update({ [`lastReadAt.${stranger}`]: new Date() }),
+    );
+  });
+
+  test('participant cannot sneak non-whitelisted field via update', async () => {
+    await seedConversation();
+    // Update whitelist allow: lastMessage, lastMessageAt, lastSenderId, lastReadAt.
+    // Cố tình đổi participantIds → fail.
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}`)
+        .update({ participantIds: [alice] }),
+    );
+  });
 });
