@@ -66,7 +66,11 @@ class _PrivacyDataPageState extends State<PrivacyDataPage> {
               value: _isSearchable,
               onChanged: (v) {
                 setState(() => _isSearchable = v);
-                // TODO(T4/NganTNK): write isSearchable to Firestore
+                // TODO(SE/Profile/ThienPDM): wire isSearchable persist
+                // Firestore. Block bởi UserRepository thiếu method
+                // updatePrivacyFields. Rule firestore.rules đã cho phép
+                // update field này (không trong blocklist). State hiện tại:
+                // toggle UI work nhưng KHÔNG persist Firestore.
               },
               activeThumbColor: Colors.white,
               activeTrackColor: AppColors.turquoise500,

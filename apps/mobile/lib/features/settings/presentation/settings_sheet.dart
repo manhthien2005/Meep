@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,7 +8,6 @@ import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/settings/application/settings_controller.dart';
-import 'package:meep/features/settings/presentation/_mock_data.dart';
 import 'package:meep/features/settings/presentation/blocked_accounts_page.dart';
 import 'package:meep/features/settings/presentation/delete_account_dialog.dart';
 import 'package:meep/features/settings/presentation/logout_confirm_dialog.dart';
@@ -19,6 +20,7 @@ import 'package:meep/features/settings/presentation/widgets/settings_nav_row.dar
 import 'package:meep/features/settings/presentation/widgets/settings_quick_actions.dart';
 import 'package:meep/features/settings/presentation/widgets/space_quick_row.dart';
 import 'package:meep/features/space/application/space_controller.dart';
+import 'package:meep/shared/widgets/app_bottom_sheet.dart';
 import 'package:meep/features/space/data/space.dart';
 import 'package:meep/features/space/presentation/space_create_sheet.dart';
 import 'package:meep/features/space/presentation/space_edit_sheet.dart';
@@ -42,151 +44,138 @@ class SettingsSheet extends ConsumerWidget {
           spaceControllerProvider(uid).select((s) => s.isLoading),
         );
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.bw800,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 12),
-          _dragHandle(),
-          const SizedBox(height: AppSpacing.xl),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.screenHorizontal,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SettingsHeader(username: SettingsMockData.username),
-                  const SizedBox(height: AppSpacing.xl),
-                  const SettingsQuickActions(
-                    friendCount: SettingsMockData.friendCount,
-                    username: SettingsMockData.username,
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  SpaceQuickRow(
-                    spaces: spaces,
-                    isLoading: isLoadingSpaces,
-                    onCreateSpace: () => _openCreateSheet(context),
-                    // Permission filter: chỉ creator được edit. Non-creator
-                    // tap card → snackbar info, không mở SpaceEditSheet.
-                    // CF + rules là final boundary, đây là UI hint layer 1.
-                    onEditSpace: (space) {
-                      if (uid == null) return;
-                      if (space.creatorId != uid) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Chỉ creator có quyền chỉnh sửa Space',
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-                      _openEditSheet(context, space.spaceId);
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _divider(),
-                  const SizedBox(height: AppSpacing.xl),
-                  _sectionLabel('Setup'),
-                  const SizedBox(height: AppSpacing.md),
-                  SettingsNavRow(
-                    icon: Icons.widgets_outlined,
-                    label: 'Thêm tiện ích',
-                    onTap: () => showModalBottomSheet<void>(
-                      context: context,
-                      isScrollControlled: false,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => const WidgetConfirmSheet(),
+    return AppBottomSheet(
+      heightFactor: 0.95,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.screenHorizontal,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: AppSpacing.xl),
+            const SettingsHeader(),
+            const SizedBox(height: AppSpacing.xl),
+            const SettingsQuickActions(),
+            const SizedBox(height: AppSpacing.xl),
+            SpaceQuickRow(
+              spaces: spaces,
+              isLoading: isLoadingSpaces,
+              onCreateSpace: () => _openCreateSheet(context),
+              // Permission filter: chỉ creator được edit. Non-creator tap
+              // card → snackbar info, không mở SpaceEditSheet. CF + rules
+              // là final boundary, đây là UI hint layer 1.
+              onEditSpace: (space) {
+                if (uid == null) return;
+                if (space.creatorId != uid) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Chỉ creator có quyền chỉnh sửa Space'),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _divider(),
-                  const SizedBox(height: AppSpacing.xl),
-                  _sectionLabel('Riêng tư & Bảo mật'),
-                  const SizedBox(height: AppSpacing.md),
-                  SettingsNavRow(
-                    icon: Icons.block_outlined,
-                    label: 'Tài khoản đã chặn',
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const BlockedAccountsPage(),
-                      ),
-                    ),
-                  ),
-                  SettingsNavRow(
-                    icon: Icons.lock_outline,
-                    label: 'Quyền riêng tư và dữ liệu',
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const PrivacyDataPage(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _divider(),
-                  const SizedBox(height: AppSpacing.xl),
-                  _sectionLabel('Giới thiệu'),
-                  const SizedBox(height: AppSpacing.md),
-                  SettingsNavRow(
-                    icon: Icons.description_outlined,
-                    label: 'Điều khoản dịch vụ',
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const TermsPage(),
-                      ),
-                    ),
-                  ),
-                  SettingsNavRow(
-                    icon: Icons.shield_outlined,
-                    label: 'Chính sách quyền riêng tư',
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const PrivacyPolicyPage(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _divider(),
-                  const SizedBox(height: AppSpacing.xl),
-                  _sectionLabel('Tài khoản'),
-                  const SizedBox(height: AppSpacing.md),
-                  SettingsNavRow(
-                    icon: Icons.logout,
-                    label: 'Đăng xuất',
-                    onTap: () async {
-                      final confirmed = await LogoutConfirmDialog.show(context);
-                      if (confirmed != true) return;
-                      if (context.mounted) Navigator.of(context).pop();
-                      // Router auth listener tự redirect /intro khi uid → null.
-                      await ref
-                          .read(settingsControllerProvider.notifier)
-                          .logout();
-                    },
-                  ),
-                  SettingsNavRow(
-                    icon: Icons.delete_outline,
-                    label: 'Xoá tài khoản',
-                    isDestructive: true,
-                    onTap: () async {
-                      final confirmed = await DeleteAccountDialog.show(context);
-                      if (confirmed == true && context.mounted) {
-                        Navigator.of(context).pop();
-                        // TODO(T6/NganTNK): SettingsController.deleteAccount()
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 40),
-                ],
+                  );
+                  return;
+                }
+                _openEditSheet(context, space.spaceId);
+              },
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            _divider(),
+            const SizedBox(height: AppSpacing.xl),
+            _sectionLabel('Setup'),
+            const SizedBox(height: AppSpacing.md),
+            SettingsNavRow(
+              icon: Icons.widgets_outlined,
+              label: 'Thêm tiện ích',
+              onTap: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: false,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const WidgetConfirmSheet(),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.xl),
+            _divider(),
+            const SizedBox(height: AppSpacing.xl),
+            _sectionLabel('Riêng tư & Bảo mật'),
+            const SizedBox(height: AppSpacing.md),
+            SettingsNavRow(
+              icon: Icons.block_outlined,
+              label: 'Tài khoản đã chặn',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const BlockedAccountsPage(),
+                ),
+              ),
+            ),
+            SettingsNavRow(
+              icon: Icons.lock_outline,
+              label: 'Quyền riêng tư và dữ liệu',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const PrivacyDataPage(),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            _divider(),
+            const SizedBox(height: AppSpacing.xl),
+            _sectionLabel('Giới thiệu'),
+            const SizedBox(height: AppSpacing.md),
+            SettingsNavRow(
+              icon: Icons.description_outlined,
+              label: 'Điều khoản dịch vụ',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const TermsPage(),
+                ),
+              ),
+            ),
+            SettingsNavRow(
+              icon: Icons.shield_outlined,
+              label: 'Chính sách quyền riêng tư',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const PrivacyPolicyPage(),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            _divider(),
+            const SizedBox(height: AppSpacing.xl),
+            _sectionLabel('Tài khoản'),
+            const SizedBox(height: AppSpacing.md),
+            SettingsNavRow(
+              icon: Icons.logout,
+              label: 'Đăng xuất',
+              onTap: () async {
+                final confirmed = await LogoutConfirmDialog.show(context);
+                if (confirmed != true) return;
+                if (context.mounted) Navigator.of(context).pop();
+                // Router auth listener tự redirect /intro khi uid → null.
+                await ref.read(settingsControllerProvider.notifier).logout();
+              },
+            ),
+            SettingsNavRow(
+              icon: Icons.delete_outline,
+              label: 'Xoá tài khoản',
+              isDestructive: true,
+              onTap: () async {
+                final confirmed = await DeleteAccountDialog.show(context);
+                if (confirmed != true) return;
+                if (!context.mounted) return;
+                // Pop sheet ngay → CF cascade chạy background (1-2 phút).
+                // Auth listener detect uid null sau CF deleteUser → router
+                // auto navigate /intro. UX: user không bị stuck nhìn sheet
+                // trong khi CF chạy.
+                Navigator.of(context).pop();
+                unawaited(
+                  ref.read(settingsControllerProvider.notifier).deleteAccount(),
+                );
+              },
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
     );
   }
@@ -226,17 +215,6 @@ class SettingsSheet extends ConsumerWidget {
       );
     });
   }
-
-  Widget _dragHandle() => Center(
-        child: Container(
-          width: 36,
-          height: 4,
-          decoration: BoxDecoration(
-            color: AppColors.bw600,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      );
 
   Widget _divider() =>
       Container(height: 1, color: Colors.white.withValues(alpha: 0.5));

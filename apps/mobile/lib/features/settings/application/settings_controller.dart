@@ -80,6 +80,11 @@ class SettingsController extends _$SettingsController {
     final uid = auth.currentUid;
     if (uid != null) {
       try {
+        // TODO(N/T1/KhoaLND): notificationRepositoryProvider throws
+        // UnimplementedError. Settings swallow lỗi nhưng FCM token KHÔNG bị
+        // xóa → user vẫn nhận push sau logout. Notification module = empty
+        // scaffold. KhoaLND build N/T1 FirestoreNotificationRepository +
+        // impl deleteFcmToken khi đến scope Notification.
         await ref.read(notificationRepositoryProvider).deleteFcmToken(uid);
       } catch (_) {
         // Swallow: FCM cleanup là best-effort, không block logout.
@@ -115,6 +120,9 @@ class SettingsController extends _$SettingsController {
       return;
     }
     try {
+      // TODO(N/T1/KhoaLND): notificationRepositoryProvider throws
+      // UnimplementedError. Settings swallow lỗi nhưng FCM token KHÔNG bị
+      // xóa → user vẫn nhận push sau delete account. Same gap như logout.
       await ref.read(notificationRepositoryProvider).deleteFcmToken(uid);
     } catch (_) {
       // Swallow: FCM cleanup là best-effort, không block delete.

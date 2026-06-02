@@ -1,25 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/friend/presentation/friend_sheet.dart';
 import 'package:meep/features/settings/presentation/share_profile_sheet.dart';
 
 /// Hàng 2 nút nhanh trong SettingsSheet: [Bạn bè] mở FriendSheet,
-/// [Chia sẻ] mở ShareProfileSheet.
-class SettingsQuickActions extends StatelessWidget {
-  const SettingsQuickActions({
-    super.key,
-    required this.friendCount,
-    required this.username,
-  });
-
-  final int friendCount;
-  final String username;
+/// [Chia sẻ] mở ShareProfileSheet. Đọc [currentUserProfileProvider] cho
+/// friendCount + username real-time.
+class SettingsQuickActions extends ConsumerWidget {
+  const SettingsQuickActions({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(currentUserProfileProvider).valueOrNull;
+    final friendCount = profile?.friendCount ?? 0;
+    final username = profile?.username ?? '';
+
     return Row(
       children: [
         Expanded(

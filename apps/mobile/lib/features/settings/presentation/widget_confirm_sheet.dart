@@ -1,16 +1,21 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
 
-class WidgetConfirmSheet extends StatelessWidget {
+class WidgetConfirmSheet extends ConsumerWidget {
   const WidgetConfirmSheet({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final friendCount =
+        ref.watch(currentUserProfileProvider).valueOrNull?.friendCount ?? 0;
     return AppBottomSheet(
       child: SingleChildScrollView(
         child: Padding(
@@ -35,7 +40,7 @@ class WidgetConfirmSheet extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.md),
-              _buildWidgetPreview(),
+              _buildWidgetPreview(friendCount: friendCount),
               const SizedBox(height: AppSpacing.md),
               _buildButton(
                 label: 'Thêm',
@@ -43,7 +48,11 @@ class WidgetConfirmSheet extends StatelessWidget {
                 textColor: AppColors.turquoise900,
                 onTap: () {
                   Navigator.of(context).pop();
-                  // TODO(T4/NganTNK): requestPinAppWidget() Android intent
+                  // TODO(W/KhoaLND): requestPinAppWidget() Android intent.
+                  // Widget module = empty scaffold (apps/widget/ chưa tồn
+                  // tại). Button "Thêm" hiện no-op + hiện toast giả →
+                  // KhoaLND bind native Android intent khi build Widget
+                  // module.
                   _showSuccessToast(context);
                 },
               ),
@@ -93,7 +102,7 @@ class WidgetConfirmSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildWidgetPreview() {
+  Widget _buildWidgetPreview({required int friendCount}) {
     return Center(
       child: Container(
         width: 160,
@@ -128,7 +137,7 @@ class WidgetConfirmSheet extends StatelessWidget {
                       _buildOverlappingAvatars(),
                       const SizedBox(height: 4),
                       Text(
-                        '15 người bạn',
+                        '$friendCount người bạn',
                         style: AppTextStyles.xsRegular.copyWith(
                           color: AppColors.bw200,
                           fontWeight: FontWeight.w700,
