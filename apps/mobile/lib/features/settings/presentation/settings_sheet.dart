@@ -17,6 +17,7 @@ import 'package:meep/features/settings/presentation/widgets/settings_header.dart
 import 'package:meep/features/settings/presentation/widgets/settings_nav_row.dart';
 import 'package:meep/features/settings/presentation/widgets/settings_quick_actions.dart';
 import 'package:meep/features/settings/presentation/widgets/space_quick_row.dart';
+import 'package:meep/features/space/presentation/space_create_sheet.dart';
 
 /// Bottom sheet cài đặt — trigger từ avatar topbar homepage (Figma 572:4183).
 class SettingsSheet extends ConsumerWidget {
@@ -50,9 +51,30 @@ class SettingsSheet extends ConsumerWidget {
                     username: SettingsMockData.username,
                   ),
                   const SizedBox(height: AppSpacing.xl),
-                  const SpaceQuickRow(
+                  SpaceQuickRow(
                     spaceNames: SettingsMockData.mockSpaces,
-                    // TODO(T2/NganTNK): navigate Space edit/create (Space module)
+                    // T2/NganTNK gate: thêm hook `onCreateSpace` để Space module
+                    // wire. Em (ThienPDM) wire tạm vào `SpaceCreateSheet` để
+                    // unblock manual test Space — capture rootContext trước pop
+                    // SettingsSheet vì sheet context unmount sau pop, không show
+                    // được modal mới với context cũ.
+                    onCreateSpace: () {
+                      final rootContext =
+                          Navigator.of(context, rootNavigator: true).context;
+                      Navigator.of(context).pop();
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!rootContext.mounted) return;
+                        showModalBottomSheet<void>(
+                          context: rootContext,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => const FractionallySizedBox(
+                            heightFactor: 0.9,
+                            child: SpaceCreateSheet(),
+                          ),
+                        );
+                      });
+                    },
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _divider(),
