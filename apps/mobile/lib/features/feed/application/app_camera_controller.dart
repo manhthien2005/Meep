@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -70,10 +72,27 @@ class AppCameraController extends _$AppCameraController {
     );
     await ctrl.initialize();
     _cameraCtrl = ctrl;
+    final minZoom = await ctrl.getMinZoomLevel();
+    final maxZoom = await ctrl.getMaxZoomLevel();
     state = state.copyWith(
       isInitialized: true,
       error: null,
+      minZoom: minZoom,
+      maxZoom: maxZoom,
+      zoomLevel: 1.0,
     );
+    await _applyFlashForActiveLens(direction);
+  }
+
+  /// Apply the user's flashEnabled preference to the live controller, but only
+  /// if the active lens is back — front-facing capture doesn't trigger the
+  /// physical flash, so we keep that lens at FlashMode.off regardless.
+  Future<void> _applyFlashForActiveLens(CameraLensDirection direction) async {
+    final ctrl = _cameraCtrl;
+    if (ctrl == null || !ctrl.value.isInitialized) return;
+    final wantFlash =
+        state.flashEnabled && direction == CameraLensDirection.back;
+    await ctrl.setFlashMode(wantFlash ? FlashMode.always : FlashMode.off);
   }
 
   /// Returns local file path on success, null on failure or double-tap.
@@ -197,18 +216,52 @@ class AppCameraController extends _$AppCameraController {
     if (state.mode != CameraMode.single) return;
     final wasInit = state.isInitialized;
     await _disposeController();
+    final flippingToFront = !state.isFrontCamera;
     state = state.copyWith(
-      isFrontCamera: !state.isFrontCamera,
+      isFrontCamera: flippingToFront,
       isInitialized: false,
+      // Flash is a back-lens-only feature; flipping to front turns it off so
+      // the UI button reflects what the next capture will actually do.
+      flashEnabled: flippingToFront ? false : state.flashEnabled,
     );
     if (wasInit) await initialize();
   }
 
-  void toggleFlash() {
-    if (_cameraCtrl == null || !_cameraCtrl!.value.isInitialized) return;
+  /// Toggle flash for back-lens capture. Front lens is always FlashMode.off —
+  /// see [_applyFlashForActiveLens]. State always tracks user intent so the
+  /// preference is restored when switching back to a back lens.
+  Future<void> toggleFlash() async {
     final next = !state.flashEnabled;
-    _cameraCtrl!.setFlashMode(next ? FlashMode.torch : FlashMode.off);
     state = state.copyWith(flashEnabled: next);
+    final ctrl = _cameraCtrl;
+    if (ctrl == null || !ctrl.value.isInitialized) return;
+    final activeDirection = ctrl.description.lensDirection;
+    await _applyFlashForActiveLens(activeDirection);
+  }
+
+  /// Pinch-to-zoom entry point. Clamps to the live lens's reported range so
+  /// callers can multiply by a raw scale delta without bothering with bounds.
+  /// State updates synchronously and the native zoom call is fire-and-forget —
+  /// awaiting it would queue per-frame onScaleUpdate callbacks behind the
+  /// platform channel and make the pinch feel laggy.
+  void setZoom(double level) {
+    final ctrl = _cameraCtrl;
+    if (ctrl == null || !ctrl.value.isInitialized) return;
+    final clamped = level.clamp(state.minZoom, state.maxZoom);
+    if (clamped == state.zoomLevel) return;
+    state = state.copyWith(zoomLevel: clamped);
+    unawaited(ctrl.setZoomLevel(clamped));
+  }
+
+  /// Drop the frozen back/front photos kept on the dual viewfinder after a
+  /// successful capture. Called once we've pushed the preview route so the
+  /// camera screen is clean if the user navigates back.
+  Future<void> clearDualPhotos() async {
+    if (state.mode != CameraMode.dual) return;
+    state = state.copyWith(backPhotoPath: null, frontPhotoPath: null);
+    if (state.activeLens != CameraLens.back) {
+      await _switchToLens(CameraLens.back);
+    }
   }
 
   void stopPreview() => _cameraCtrl?.pausePreview();

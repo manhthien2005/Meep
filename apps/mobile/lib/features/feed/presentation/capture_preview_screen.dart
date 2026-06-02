@@ -39,6 +39,10 @@ class _CapturePreviewScreenState extends ConsumerState<CapturePreviewScreen> {
   bool _savedToGallery = false;
   bool _primaryIsFront = false;
 
+  // Direction of the most recent caption swipe; 1 = next (slide in from right),
+  // -1 = prev (slide in from left). Drives the slide transition direction.
+  int _lastCaptionDir = 1;
+
   @override
   void initState() {
     super.initState();
@@ -57,12 +61,17 @@ class _CapturePreviewScreenState extends ConsumerState<CapturePreviewScreen> {
     _primaryIsFront = widget.args.activePrimaryLensIsFront;
   }
 
-  void _swipeCaptionLeft() =>
-      _changeCaptionIndex((_captionIndex + 1) % _captionTypes.length);
+  void _swipeCaptionLeft() {
+    _lastCaptionDir = 1;
+    _changeCaptionIndex((_captionIndex + 1) % _captionTypes.length);
+  }
 
-  void _swipeCaptionRight() => _changeCaptionIndex(
-        (_captionIndex - 1 + _captionTypes.length) % _captionTypes.length,
-      );
+  void _swipeCaptionRight() {
+    _lastCaptionDir = -1;
+    _changeCaptionIndex(
+      (_captionIndex - 1 + _captionTypes.length) % _captionTypes.length,
+    );
+  }
 
   void _changeCaptionIndex(int idx) {
     setState(() => _captionIndex = idx);
@@ -141,11 +150,39 @@ class _CapturePreviewScreenState extends ConsumerState<CapturePreviewScreen> {
                     padding: EdgeInsets.only(
                       bottom: AppProportions.pillBottomInPhoto(photoSize),
                     ),
-                    child: AppNotePill(
-                      text: postState.caption ?? '',
-                      onChanged: (t) => ref
-                          .read(postControllerProvider.notifier)
-                          .setCaption(t),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeIn,
+                      transitionBuilder: (child, animation) {
+                        // Rebuild a Tween per child so the incoming pill slides
+                        // in from the swipe direction and the outgoing one
+                        // slides out the opposite way — keeps the gesture and
+                        // the visual motion aligned.
+                        final captionKey =
+                            ValueKey(_captionTypes[_captionIndex]);
+                        final isIncoming = child.key == captionKey;
+                        final beginX = isIncoming
+                            ? _lastCaptionDir.toDouble()
+                            : -_lastCaptionDir.toDouble();
+                        return SlideTransition(
+                          position: Tween<Offset>(
+                            begin: Offset(beginX, 0),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: AppNotePill(
+                        key: ValueKey(_captionTypes[_captionIndex]),
+                        text: postState.caption ?? '',
+                        onChanged: (t) => ref
+                            .read(postControllerProvider.notifier)
+                            .setCaption(t),
+                      ),
                     ),
                   ),
                   child: widget.args.isDual
@@ -281,6 +318,8 @@ class _AudienceRow extends ConsumerWidget {
     final avatarSize = AppProportions.audienceAvatarSize(screenW);
     final labelSize = avatarSize * 0.43; // keep below overflow threshold
     final isAll = audienceType == AudienceType.all;
+    const tileGap = 12.0;
+    const tileLabelWidth = 8.0; // _FriendAudienceTile pads label width by 8
 
     final currentUid = ref.watch(currentUidProvider).valueOrNull;
     // Avoid throwing UnimplementedError when auth not ready — just render
@@ -291,31 +330,61 @@ class _AudienceRow extends ConsumerWidget {
             friendControllerProvider(currentUid).select((s) => s.friends),
           );
 
+    final tiles = <Widget>[
+      _AllAudienceTile(
+        isSelected: isAll,
+        avatarSize: avatarSize,
+        labelSize: labelSize,
+        onTap: () => onAudienceChanged(AudienceType.all, const []),
+      ),
+      for (final friend in friends) ...[
+        const SizedBox(width: tileGap),
+        _FriendAudienceTile(
+          friend: friend,
+          isSelected: selectedUids.contains(friend.uid),
+          avatarSize: avatarSize,
+          labelSize: labelSize,
+          onTap: () => _toggleFriend(friend.uid),
+        ),
+      ],
+    ];
+
+    // Total horizontal space the tiles + their gaps occupy. Used to decide
+    // whether the list fits without scrolling (so the leading "Tất cả" tile
+    // stays anchored at center) or needs to scroll (in which case we revert
+    // to the Figma leading padding of 73/412 so it reads consistently).
+    final estimatedContentWidth =
+        avatarSize + friends.length * (avatarSize + tileLabelWidth + tileGap);
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: SizedBox(
         height: avatarSize + 4 + labelSize * 1.35 + 2,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.only(left: leftPad, right: 20),
-          children: [
-            _AllAudienceTile(
-              isSelected: isAll,
-              avatarSize: avatarSize,
-              labelSize: labelSize,
-              onTap: () => onAudienceChanged(AudienceType.all, const []),
-            ),
-            for (final friend in friends) ...[
-              const SizedBox(width: 12),
-              _FriendAudienceTile(
-                friend: friend,
-                isSelected: selectedUids.contains(friend.uid),
-                avatarSize: avatarSize,
-                labelSize: labelSize,
-                onTap: () => _toggleFriend(friend.uid),
-              ),
-            ],
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Anchor the first tile ("Tất cả") at the horizontal center of the
+            // row. We pad by (viewport - allTileWidth)/2 so the avatar itself
+            // sits on the centerline, and the friend tiles fan out to the right
+            // of it. When the full list fits without overflow, this also means
+            // the row is centered visually; when it overflows, the user can
+            // scroll the friends in from the right while "Tất cả" stays at its
+            // initial centered position.
+            final centerLeadingPad = (constraints.maxWidth - avatarSize) / 2;
+            final fits = estimatedContentWidth + centerLeadingPad + 20 <=
+                constraints.maxWidth;
+            // Once the friends list grows past the visible area, switch to the
+            // Figma leading padding so the start-of-list edge matches what was
+            // already shipped.
+            final leadingPad = fits ? centerLeadingPad : leftPad;
+            return ListView(
+              scrollDirection: Axis.horizontal,
+              physics: fits
+                  ? const NeverScrollableScrollPhysics()
+                  : const ClampingScrollPhysics(),
+              padding: EdgeInsets.only(left: leadingPad, right: 20),
+              children: tiles,
+            );
+          },
         ),
       ),
     );

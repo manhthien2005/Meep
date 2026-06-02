@@ -28,7 +28,13 @@ void main() {
       expect(field.textAlign, TextAlign.center);
     });
 
-    testWidgets('width grows with text length (hug content)', (tester) async {
+    testWidgets('editable pill width is fixed at 40% of screen', (tester) async {
+      // Screen is 412 in wrap(), so the editable pill (which has horizontal
+      // padding around the 40% TextField) should be ≥ 0.40 * 412 ≈ 164.8 px
+      // regardless of content length — the pill no longer hugs typed text.
+      const screenW = 412.0;
+      const expectedInner = screenW * AppNotePill.editableWidthRatio;
+
       await tester.pumpWidget(wrap(const AppNotePill(text: '')));
       await tester.pump();
       final emptyW = pillSize(tester).width;
@@ -39,7 +45,8 @@ void main() {
       await tester.pump();
       final longW = pillSize(tester).width;
 
-      expect(longW, greaterThan(emptyW));
+      expect(emptyW, closeTo(longW, 0.5));
+      expect(emptyW, greaterThanOrEqualTo(expectedInner));
     });
 
     testWidgets('enforces 30-char maxLength', (tester) async {
