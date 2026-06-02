@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:meep/core/theme/app_colors.dart';
 
-/// Confirmation dialog hiện khi user tap [←] back trong Canvas create mode
-/// (có thay đổi chưa lưu).
+/// Confirmation dialog xác nhận xóa nhật ký.
 ///
-/// Figma pattern: theo Delete Dialog `769:5575` — popup card trắng,
-/// 2 buttons pill. Spec: "Bỏ nhật ký này?" + [Bỏ] / [Tiếp tục viết].
+/// Figma `769:5575` (Xóa nhật ký - Nhật ký). Card trắng cornerRadius 30,
+/// title + message + 2 pill buttons. "Lưu" (cancel) / "Xoá" (destructive
+/// Error/800 text).
 ///
-/// `Navigator.pop` trả `true` = user xác nhận bỏ; `false`/`null` = tiếp tục.
-class DiscardChangesDialog extends StatelessWidget {
-  const DiscardChangesDialog({super.key});
+/// `Navigator.pop(true)` = user xác nhận xóa; `false`/`null` = giữ lại.
+class DeleteDiaryDialog extends StatelessWidget {
+  const DeleteDiaryDialog({super.key});
 
-  /// Hiện dialog, trả `true` nếu user chọn [Bỏ] (discard).
+  /// Hiện dialog, trả `true` nếu user chọn [Xoá].
   static Future<bool?> show(BuildContext context) => showDialog<bool>(
         context: context,
-        barrierColor: const Color(0x80DEE5E6), // BW300 với alpha — Figma scrim
-        builder: (_) => const DiscardChangesDialog(),
+        barrierColor: const Color(0x80DEE5E6), // BW300 alpha — Figma scrim
+        builder: (_) => const DeleteDiaryDialog(),
       );
 
   @override
@@ -38,7 +38,7 @@ class DiscardChangesDialog extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Bỏ nhật ký này?',
+                  'Xóa nhật ký của bạn?',
                   style: TextStyle(
                     fontFamily: 'Nunito',
                     fontSize: 16,
@@ -49,7 +49,8 @@ class DiscardChangesDialog extends StatelessWidget {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  'Nội dung bạn đã viết sẽ không được lưu lại.',
+                  'Nhật ký sẽ bị xóa hoàn toàn khỏi danh sách nhật ký hiện '
+                  'tại của bạn',
                   style: TextStyle(
                     fontFamily: 'Nunito',
                     fontSize: 14,
@@ -62,12 +63,12 @@ class DiscardChangesDialog extends StatelessWidget {
             ),
             const SizedBox(height: 14),
 
-            // 2 actions: Tiếp tục viết (default) / Bỏ (destructive)
+            // 2 actions: Lưu (cancel) / Xoá (destructive)
             Row(
               children: [
                 Expanded(
                   child: _PillButton(
-                    label: 'Tiếp tục viết',
+                    label: 'Lưu',
                     textColor: AppColors.bw800, // #252627
                     onTap: () => Navigator.of(context).pop(false),
                   ),
@@ -75,7 +76,7 @@ class DiscardChangesDialog extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _PillButton(
-                    label: 'Bỏ',
+                    label: 'Xoá',
                     textColor: AppColors.error800, // #E43700
                     onTap: () => Navigator.of(context).pop(true),
                   ),
