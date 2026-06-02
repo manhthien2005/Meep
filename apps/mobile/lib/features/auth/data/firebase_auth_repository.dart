@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:meep/core/config/app_config.dart';
@@ -9,11 +10,18 @@ import 'package:meep/features/auth/data/auth_repository.dart';
 class FirebaseAuthRepository implements AuthRepository {
   FirebaseAuthRepository({
     required FirebaseAuth auth,
+    FirebaseFunctions? functions,
     GoogleSignIn? googleSignIn,
   })  : _auth = auth,
+        _functions = functions,
         _googleSignIn = googleSignIn ?? GoogleSignIn();
 
   final FirebaseAuth _auth;
+
+  /// Optional — chỉ [deleteAccountCascade] cần. Existing tests construct
+  /// FirebaseAuthRepository chỉ với `auth:` nên giữ optional, throw rõ ràng
+  /// nếu method dùng tới mà chưa wire.
+  final FirebaseFunctions? _functions;
   final GoogleSignIn _googleSignIn;
 
   @override
@@ -185,14 +193,84 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Future<void> reauthenticateWithCredential(AuthCredential credential) async {
-    // TODO(A/T7/ThienPDM): implement — needed by Profile/Settings for sensitive ops
-    throw UnimplementedError('reauthenticateWithCredential — implement at T7');
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw const UnauthenticatedError(
+        message: 'Bạn cần đăng nhập để thực hiện thao tác này',
+      );
+    }
+    try {
+      await user.reauthenticateWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      throw _mapReauthError(e);
+    }
+  }
+
+  @override
+  Future<void> reauthenticateWithPassword(String password) async {
+    final user = _auth.currentUser;
+    final email = user?.email;
+    if (user == null || email == null) {
+      throw const UnauthenticatedError(
+        message: 'Bạn cần đăng nhập với email để xác thực lại',
+      );
+    }
+    final credential = EmailAuthProvider.credential(
+      email: email,
+      password: password,
+    );
+    await reauthenticateWithCredential(credential);
+  }
+
+  @override
+  Future<void> reauthenticateWithGoogle() async {
+    final googleUser = await _googleSignIn.signIn();
+    if (googleUser == null) {
+      // User dismissed picker — silent no-op upstream (match signInWithGoogle).
+      throw const OperationCancelledError();
+    }
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+    await reauthenticateWithCredential(credential);
+  }
+
+  @override
+  String? get currentProviderId {
+    final user = _auth.currentUser;
+    if (user == null || user.providerData.isEmpty) return null;
+    return user.providerData[0].providerId;
   }
 
   @override
   Future<void> updateEmail(String newEmail) async {
     // TODO(A/T7/ThienPDM): implement — needed by Profile for email change
     throw UnimplementedError('updateEmail — implement at T7');
+  }
+
+  @override
+  Future<void> deleteAccountCascade() async {
+    final functions = _functions;
+    if (functions == null) {
+      // Misconfiguration: main.dart phải pass `functions:` vào constructor.
+      throw const UnexpectedError(
+        message:
+            'FirebaseFunctions chưa wire — kiểm tra FirebaseAuthRepository init trong main.dart',
+      );
+    }
+    if (_auth.currentUser == null) {
+      throw const UnauthenticatedError(
+        message: 'Bạn cần đăng nhập để xóa tài khoản',
+      );
+    }
+    try {
+      final callable = functions.httpsCallable('deleteAccount');
+      await callable.call<void>();
+    } on FirebaseFunctionsException catch (e) {
+      throw _mapDeleteAccountError(e);
+    }
   }
 
   // ── Error mapping ─────────────────────────────────────────────────────────
@@ -230,6 +308,55 @@ class FirebaseAuthRepository implements AuthRepository {
         'network-request-failed' =>
           const NetworkError(message: 'Không có kết nối mạng'),
         _ => UnexpectedError(message: e.message ?? e.code, cause: e),
+      };
+
+  /// Reauth có thể fail vì credential sai (wrong-password), provider mismatch
+  /// (user-mismatch khi GoogleAuthProvider credential nhưng account email),
+  /// hoặc session quá cũ (requires-recent-login — extremely rare ở reauth path
+  /// nhưng giữ để safety).
+  AppError _mapReauthError(FirebaseAuthException e) => switch (e.code) {
+        'wrong-password' ||
+        'invalid-credential' =>
+          const UnauthenticatedError(message: 'Mật khẩu không đúng'),
+        'user-mismatch' => const UnauthenticatedError(
+            message: 'Thông tin xác thực không khớp tài khoản hiện tại',
+          ),
+        'user-not-found' => const UnauthenticatedError(
+            message: 'Không tìm thấy tài khoản',
+          ),
+        'too-many-requests' => const UnauthenticatedError(
+            message: 'Quá nhiều lần thử. Vui lòng thử lại sau',
+          ),
+        'requires-recent-login' => UnauthenticatedError(
+            message: 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại',
+            code: e.code,
+            cause: e,
+          ),
+        'network-request-failed' =>
+          const NetworkError(message: 'Không có kết nối mạng'),
+        _ => UnexpectedError(message: e.message ?? e.code, cause: e),
+      };
+
+  /// CF `deleteAccount` có thể fail: unauthenticated (token expired giữa
+  /// reauth và call), unavailable (CF cold start timeout), default
+  /// (cascade partial fail — retry-safe theo CF impl, surface lỗi UI).
+  AppError _mapDeleteAccountError(FirebaseFunctionsException e) =>
+      switch (e.code) {
+        'unauthenticated' => UnauthenticatedError(
+            message: e.message ?? 'Cần đăng nhập để xóa tài khoản',
+            code: e.code,
+            cause: e,
+          ),
+        'unavailable' || 'deadline-exceeded' => NetworkError(
+            message: e.message ?? 'Mất kết nối khi xóa tài khoản. Thử lại sau.',
+            code: e.code,
+            cause: e,
+          ),
+        _ => UnexpectedError(
+            message: e.message ?? 'Không thể xóa tài khoản. Thử lại sau.',
+            code: e.code,
+            cause: e,
+          ),
       };
 
   static bool _isSessionPermanentlyInvalid(String code) =>

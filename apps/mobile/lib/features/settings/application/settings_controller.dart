@@ -93,9 +93,38 @@ class SettingsController extends _$SettingsController {
     }
   }
 
+  /// Cascade-delete account flow:
+  /// 1. Best-effort `deleteFcmToken(uid)` — match logout pattern (#103 OPEN
+  ///    có thể chưa wire / offline → swallow, vẫn tiếp tục).
+  /// 2. `AuthRepository.deleteAccountCascade()` — CF xóa Storage + Firestore
+  ///    + Auth (T7). Khi server xóa Auth, client local session tự invalidate
+  ///    qua `watchUid` → router auth listener redirect `/intro`.
+  ///
+  /// Pre-condition: caller (DeleteAccountDialog) phải reauthenticate trước
+  /// (xem `AuthRepository.reauthenticateWithCredential`). Controller giả
+  /// định identity đã được verify — không tự gọi reauth.
   Future<void> deleteAccount() async {
-    // TODO(T6/NganTNK): implement deleteAccount (re-auth + cascade) — scope #119
-    throw UnimplementedError('deleteAccount — TODO T6 #119');
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    final auth = ref.read(authRepositoryProvider);
+    final uid = auth.currentUid;
+    if (uid == null) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Bạn cần đăng nhập để xóa tài khoản',
+      );
+      return;
+    }
+    try {
+      await ref.read(notificationRepositoryProvider).deleteFcmToken(uid);
+    } catch (_) {
+      // Swallow: FCM cleanup là best-effort, không block delete.
+    }
+    try {
+      await auth.deleteAccountCascade();
+      state = state.copyWith(isLoading: false);
+    } catch (e) {
+      state = _afterFailure(e);
+    }
   }
 
   /// Reset isLoading + map error to message (null for [OperationCancelledError]).

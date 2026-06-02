@@ -74,8 +74,51 @@ abstract class AuthRepository {
   Future<void> deleteCurrentUser();
 
   /// Re-authenticate before sensitive operations (email change, delete account).
+  ///
+  /// Implementations must wrap Firebase errors:
+  /// - `wrong-password` / `invalid-credential` → [UnauthenticatedError] ("Mật khẩu không đúng")
+  /// - `user-mismatch` → [UnauthenticatedError] ("Thông tin xác thực không khớp tài khoản")
+  /// - `requires-recent-login` → [UnauthenticatedError] với `code: 'requires-recent-login'`
+  /// - `network-request-failed` → [NetworkError]
   Future<void> reauthenticateWithCredential(AuthCredential credential);
+
+  /// Helper: reauthenticate current email/password user.
+  ///
+  /// Widgets/controllers KHÔNG được tự build [EmailAuthProvider.credential]
+  /// (layering rule — không touch Firebase types). Method này wrap construction
+  /// + reauth.
+  ///
+  /// Throws [UnauthenticatedError] nếu user chưa login hoặc không có email.
+  Future<void> reauthenticateWithPassword(String password);
+
+  /// Helper: reauthenticate current Google user.
+  ///
+  /// Trigger Google account picker → lấy credential → reauth. Throws
+  /// [OperationCancelledError] nếu user dismiss picker (silent no-op upstream,
+  /// match `signInWithGoogle`).
+  Future<void> reauthenticateWithGoogle();
+
+  /// Returns the primary provider ID của user hiện tại — 'password',
+  /// 'google.com', etc. Returns null nếu chưa login hoặc providerData rỗng.
+  ///
+  /// MVP Meep chỉ hỗ trợ 1 provider per account (không link). Tương lai có
+  /// thể return list providers.
+  String? get currentProviderId;
 
   /// Update the email address of the current user.
   Future<void> updateEmail(String newEmail);
+
+  /// Cascade-delete user account qua Cloud Function `deleteAccount`.
+  ///
+  /// Server (Admin SDK) xóa Storage prefixes + Firestore subcollections +
+  /// documents + Firebase Auth account theo thứ tự đảm bảo retry-safe (xem
+  /// `firebase/functions/src/settings/deleteAccount.ts`).
+  ///
+  /// Khi server xóa Auth thành công, client local session tự invalidate qua
+  /// [watchUid] → router auth listener redirect về `/intro`.
+  ///
+  /// Pre-condition: caller (DeleteAccountDialog) phải gọi
+  /// [reauthenticateWithCredential] trước để xác nhận identity. CF dùng Admin
+  /// SDK bypass token freshness, nhưng UX yêu cầu reauth.
+  Future<void> deleteAccountCascade();
 }

@@ -222,4 +222,77 @@ void main() {
       expect(state.errorMessage, contains('không thể đăng xuất'));
     });
   });
+
+  group('deleteAccount', () {
+    late MockAuthRepository auth;
+    late MockNotificationRepository notif;
+    late ProviderContainer container;
+
+    setUp(() {
+      auth = MockAuthRepository();
+      notif = MockNotificationRepository();
+      when(() => auth.currentUid).thenReturn('me');
+      when(() => auth.deleteAccountCascade()).thenAnswer((_) async {});
+      when(() => notif.deleteFcmToken(any())).thenAnswer((_) async {});
+
+      container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(auth),
+          notificationRepositoryProvider.overrideWithValue(notif),
+        ],
+      );
+    });
+
+    tearDown(() => container.dispose());
+
+    test('gọi deleteFcmToken(uid) → deleteAccountCascade() theo đúng thứ tự',
+        () async {
+      await container.read(settingsControllerProvider.notifier).deleteAccount();
+
+      verifyInOrder([
+        () => notif.deleteFcmToken('me'),
+        () => auth.deleteAccountCascade(),
+      ]);
+      expect(container.read(settingsControllerProvider).isLoading, isFalse);
+      expect(container.read(settingsControllerProvider).errorMessage, isNull);
+    });
+
+    test('chưa login (uid null) → errorMessage set, KHÔNG gọi cascade',
+        () async {
+      when(() => auth.currentUid).thenReturn(null);
+
+      await container.read(settingsControllerProvider.notifier).deleteAccount();
+
+      verifyNever(() => notif.deleteFcmToken(any()));
+      verifyNever(() => auth.deleteAccountCascade());
+      final state = container.read(settingsControllerProvider);
+      expect(state.errorMessage, isNotNull);
+      expect(state.isLoading, isFalse);
+    });
+
+    test('deleteFcmToken throw → vẫn gọi cascade (best-effort cleanup)',
+        () async {
+      when(() => notif.deleteFcmToken(any()))
+          .thenThrow(const NetworkError(message: 'offline'));
+
+      await container.read(settingsControllerProvider.notifier).deleteAccount();
+
+      verify(() => auth.deleteAccountCascade()).called(1);
+      // errorMessage null vì FCM cleanup KHÔNG block cascade.
+      expect(container.read(settingsControllerProvider).errorMessage, isNull);
+    });
+
+    test('cascade throw AppError → errorMessage set, isLoading reset',
+        () async {
+      when(() => auth.deleteAccountCascade()).thenThrow(
+        const NetworkError(message: 'không thể xóa tài khoản'),
+      );
+
+      await container.read(settingsControllerProvider.notifier).deleteAccount();
+
+      final state = container.read(settingsControllerProvider);
+      expect(state.isLoading, isFalse);
+      expect(state.errorMessage, contains('không thể xóa tài khoản'));
+    });
+  });
 }
