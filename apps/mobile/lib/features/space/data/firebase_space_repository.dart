@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 
 import 'package:meep/core/error/app_error.dart';
 import 'package:meep/features/space/data/space.dart';
+import 'package:meep/features/space/data/space_member.dart';
 import 'package:meep/features/space/data/space_repository.dart';
 
 class FirebaseSpaceRepository implements SpaceRepository {
@@ -29,6 +30,35 @@ class FirebaseSpaceRepository implements SpaceRepository {
       return snapshot.docs
           .map((doc) => Space.fromJson({...doc.data(), 'spaceId': doc.id}))
           .where((space) => space.deletedAt == null)
+          .toList();
+    });
+  }
+
+  @override
+  Stream<Space?> watchSpace(String spaceId) {
+    return _firestore
+        .collection(_spacesCollection)
+        .doc(spaceId)
+        .snapshots()
+        .map((doc) {
+      if (!doc.exists) return null;
+      final space = Space.fromJson({...doc.data()!, 'spaceId': doc.id});
+      // Mirror getSpace logic — soft-deleted treated as not exists.
+      if (space.deletedAt != null) return null;
+      return space;
+    });
+  }
+
+  @override
+  Stream<List<SpaceMember>> watchMembers(String spaceId) {
+    return _firestore
+        .collection(_spacesCollection)
+        .doc(spaceId)
+        .collection('members')
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => SpaceMember.fromJson({...doc.data(), 'uid': doc.id}))
           .toList();
     });
   }

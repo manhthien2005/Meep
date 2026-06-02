@@ -16,6 +16,7 @@ import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/presentation/friend_sheet.dart';
 import 'package:meep/features/settings/presentation/settings_sheet.dart';
 import 'package:meep/features/space/presentation/space_context_bottom_sheet.dart';
+import 'package:meep/features/space/presentation/space_management_sheet.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 
@@ -184,6 +185,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               isFeedMode: _currentPage >= 1,
               selectedLabel: _selectedLabel,
               onFilterSelected: _onFilterSelected,
+              spaceId: widget.spaceId,
             ),
             Expanded(
               child: feedAsync.when(
@@ -241,6 +243,7 @@ class _HomeTopBar extends ConsumerWidget {
     required this.isFeedMode,
     required this.selectedLabel,
     required this.onFilterSelected,
+    this.spaceId,
   });
 
   /// true = viewing feed → show "Mọi người ▾" filter dropdown.
@@ -252,6 +255,12 @@ class _HomeTopBar extends ConsumerWidget {
 
   /// Called with (authorUid, label). authorUid null = "Mọi người".
   final void Function(String? authorUid, String label) onFilterSelected;
+
+  /// Non-null khi HomeScreen mở qua deeplink `/space/:spaceId`. Topbar
+  /// thay slot avatar bằng "..." icon mở [SpaceManagementSheet] (T10b).
+  /// Trong Space view, Settings không access trực tiếp từ topbar — user
+  /// vẫn vào được qua Profile tab.
+  final String? spaceId;
 
   void _openFriendSheet(BuildContext context) {
     // Modal sheet đồng bộ với các sheet khác (kéo xuống để đóng, tap barrier
@@ -303,22 +312,45 @@ class _HomeTopBar extends ConsumerWidget {
           else
             _buildFriendCountPill(context, friendCount),
           const Spacer(),
-          Semantics(
-            button: true,
-            label: 'Cài đặt',
-            child: GestureDetector(
-              onTap: () => showModalBottomSheet<void>(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (_) => const SettingsSheet(),
+          if (spaceId != null)
+            Semantics(
+              button: true,
+              label: 'Quản lý Space',
+              child: GestureDetector(
+                onTap: () => SpaceManagementSheet.show(context, spaceId!),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.bw700.withValues(alpha: 0.4),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.more_horiz,
+                    color: AppColors.bw100,
+                    size: 22,
+                  ),
+                ),
               ),
-              child: AppAvatar(
-                imageUrl: avatarUrl,
-                size: 40,
+            )
+          else
+            Semantics(
+              button: true,
+              label: 'Cài đặt',
+              child: GestureDetector(
+                onTap: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => const SettingsSheet(),
+                ),
+                child: AppAvatar(
+                  imageUrl: avatarUrl,
+                  size: 40,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

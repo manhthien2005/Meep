@@ -7,6 +7,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:meep/core/error/app_error.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/space/data/space.dart';
+import 'package:meep/features/space/data/space_member.dart';
 import 'package:meep/features/space/data/space_repository.dart';
 
 part 'space_controller.freezed.dart';
@@ -46,6 +47,25 @@ class CurrentSpace extends _$CurrentSpace {
   void select(Space? space) => state = space;
 
   void clear() => state = null;
+}
+
+/// Watch single Space realtime. Emits null khi không tồn tại hoặc đã
+/// soft-deleted. Family arg `spaceId` — instance per Space.
+///
+/// Dùng cho `SpaceManagementSheet` deeplink (`/space/:spaceId`) cần
+/// space data trước khi user mở Camera (chưa load `watchMySpaces`).
+@riverpod
+Stream<Space?> spaceById(Ref ref, String spaceId) {
+  return ref.watch(spaceRepositoryProvider).watchSpace(spaceId);
+}
+
+/// Watch members của Space realtime. Family arg `spaceId`.
+///
+/// Dùng cho `SpaceManagementSheet` kick picker + creator-leave transfer
+/// picker.
+@riverpod
+Stream<List<SpaceMember>> spaceMembers(Ref ref, String spaceId) {
+  return ref.watch(spaceRepositoryProvider).watchMembers(spaceId);
 }
 
 /// Family controller — instance per uid. Sheet/screen lấy uid từ
