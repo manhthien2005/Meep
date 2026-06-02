@@ -8,6 +8,8 @@ import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/chat/data/conversation.dart';
 import 'package:meep/features/chat/presentation/widgets/conversation_tile.dart';
+import 'package:meep/features/settings/presentation/settings_sheet.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 
 /// Inbox — list of all conversations (1-1 + group), newest first.
@@ -90,13 +92,16 @@ class InboxScreen extends ConsumerWidget {
   }
 }
 
-/// Topbar: centered title + trailing avatar slot.
-/// TODO(C/HanDHG): thay bằng shared home-feed topbar khi Khoa implement.
-class _InboxTopbar extends StatelessWidget {
+/// Topbar: centered title + trailing avatar (tap → SettingsSheet). Match
+/// home topbar pattern (`home_screen.dart`) — `AppAvatar` shared widget,
+/// no ring decoration, real user avatar từ `currentUserProfileProvider`.
+class _InboxTopbar extends ConsumerWidget {
   const _InboxTopbar();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final avatarUrl =
+        ref.watch(currentUserProfileProvider).valueOrNull?.avatarUrl;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Row(
@@ -109,12 +114,17 @@ class _InboxTopbar extends StatelessWidget {
               style: AppTextStyles.baseBold,
             ),
           ),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.bw700,
+          Semantics(
+            button: true,
+            label: 'Cài đặt',
+            child: GestureDetector(
+              onTap: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const SettingsSheet(),
+              ),
+              child: AppAvatar(imageUrl: avatarUrl, size: 40),
             ),
           ),
         ],
