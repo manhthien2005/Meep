@@ -6,9 +6,9 @@ import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/chat/data/message.dart';
 import 'package:meep/features/chat/presentation/chat_time_format.dart';
-import 'package:meep/features/chat/presentation/widgets/chat_avatar.dart';
 import 'package:meep/features/chat/presentation/widgets/message_bubble.dart';
 import 'package:meep/features/chat/presentation/widgets/quoted_photo_block.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 
 /// Scrollable message list for a thread (shared by 1-1 + group).
 ///
@@ -95,7 +95,7 @@ class _ChatThreadViewState extends ConsumerState<ChatThreadView>
       children: [
         if (quoted != null)
           QuotedPhotoBlock(
-            imageUrl: quoted.imageUrl,
+            imageUrl: quoted.coverImageUrl,
             caption: quoted.caption,
             createdAt: quoted.createdAt,
           ),
@@ -155,7 +155,7 @@ class _EmptyThread extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ChatAvatar(
+            AppAvatar(
               imageUrl: peerAvatarUrl,
               size: 95,
               ringColor: AppColors.bw600,

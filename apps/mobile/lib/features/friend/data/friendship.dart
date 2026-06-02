@@ -21,11 +21,14 @@ class Friendship with _$Friendship {
       _$FriendshipFromJson(json);
 }
 
-class TimestampConverter implements JsonConverter<DateTime, Object> {
+/// Converts Firestore [Timestamp] ↔ [DateTime].
+/// Object? để xử lý pending serverTimestamp — xem friend_request.dart.
+class TimestampConverter implements JsonConverter<DateTime, Object?> {
   const TimestampConverter();
 
   @override
-  DateTime fromJson(Object json) {
+  DateTime fromJson(Object? json) {
+    if (json == null) return DateTime.now();
     if (json is Timestamp) return json.toDate();
     if (json is String) return DateTime.parse(json);
     return DateTime.fromMillisecondsSinceEpoch(json as int);

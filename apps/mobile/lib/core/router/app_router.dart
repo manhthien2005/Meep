@@ -21,13 +21,14 @@ import 'package:meep/dev/widget_catalog_page.dart';
 import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
 import 'package:meep/features/diary/presentation/diary_create_screen.dart';
 import 'package:meep/features/diary/presentation/diary_list_screen.dart';
+import 'package:meep/features/feed/presentation/capture_preview_args.dart';
+import 'package:meep/features/feed/presentation/capture_preview_screen.dart';
 import 'package:meep/features/feed/presentation/home_screen.dart';
 import 'package:meep/features/home/presentation/home_page.dart';
 import 'package:meep/features/profile/presentation/edit_profile_screen.dart';
 import 'package:meep/features/profile/presentation/friend_profile_screen.dart';
 import 'package:meep/features/profile/presentation/photo_detail_screen.dart';
 import 'package:meep/features/profile/presentation/profile_screen.dart';
-import 'package:meep/features/space/presentation/space_context_bottom_sheet.dart';
 import 'package:meep/features/space/presentation/space_create_sheet.dart';
 import 'package:meep/features/streak/presentation/streak_photo_detail_screen.dart';
 import 'package:meep/features/streak/presentation/streak_screen.dart';
@@ -124,7 +125,9 @@ class _RouterNotifier extends ChangeNotifier {
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
   // ── Cold start: process deep link TRƯỚC khi tạo GoRouter ─────────────────
-  String initialLocation = '/dev/widgets'; // DEV: khởi động vào widget catalog
+  // Cold start mặc định vào /intro để chạy luồng auth thật → /home (feed).
+  // Deep link (nếu có) sẽ override bên dưới.
+  String initialLocation = '/intro';
   try {
     final rawRoute =
         WidgetsBinding.instance.platformDispatcher.defaultRouteName;
@@ -141,7 +144,7 @@ GoRouter appRouter(Ref ref) {
         initialLocation = rawRoute;
       }
     }
-  } catch (_) {/* keep /intro */}
+  } catch (_) {/* giữ initialLocation mặc định */}
 
   final notifier = _RouterNotifier(ref);
 
@@ -286,7 +289,8 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: '/capture-preview',
-        builder: (_, __) => const HomeScreen(),
+        builder: (_, state) =>
+            CapturePreviewScreen(args: state.extra as CapturePreviewArgs),
       ),
       GoRoute(
         path: '/caption-modal',
@@ -340,9 +344,13 @@ GoRouter appRouter(Ref ref) {
         path: '/space/create',
         builder: (_, __) => const SpaceCreateSheet(),
       ),
+      // Deeplink target — vd: tap Widget Android sẽ deeplink `/space/:spaceId`
+      // để mở Home với Space context active. SpaceContextBottomSheet KHÔNG
+      // map sang route (chỉ mở qua showModalBottomSheet từ long-press
+      // FriendsButton).
       GoRoute(
         path: '/space/:spaceId',
-        builder: (_, state) => SpaceContextBottomSheet(
+        builder: (_, state) => HomeScreen(
           spaceId: state.pathParameters['spaceId'] ?? '',
         ),
       ),

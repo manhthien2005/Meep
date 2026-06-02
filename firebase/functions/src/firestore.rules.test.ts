@@ -409,10 +409,10 @@ describe('/friend_requests/{requestId}', () => {
     );
   });
 
-  test('nobody can update (server-side only)', async () => {
+  test('nobody can delete (server-side only)', async () => {
     await seedRequest();
     await assertFails(
-      authed(bob).firestore().doc(`friend_requests/${REQ_ID}`).update({ status: 'accepted' }),
+      authed(bob).firestore().doc(`friend_requests/${REQ_ID}`).delete(),
     );
   });
 });
@@ -640,6 +640,106 @@ describe('/conversations/{conversationId}', () => {
           text: 'A'.repeat(501),
           createdAt: new Date(),
         }),
+    );
+  });
+
+  // --- Query / list operations (regression: hasAll bug on list eval) ---
+
+  test('participant can query conversations by participantIds', async () => {
+    await seedConversation();
+    await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .collection('conversations')
+        .where('participantIds', 'array-contains', alice)
+        .get(),
+    );
+  });
+
+  test('non-participant query returns empty (rule filter)', async () => {
+    await seedConversation();
+    const snap = await assertSucceeds(
+      authed(stranger)
+        .firestore()
+        .collection('conversations')
+        .where('participantIds', 'array-contains', stranger)
+        .get(),
+    );
+    // Firestore rules silently filter out docs the user can't read
+    expect(snap.empty).toBe(true);
+  });
+
+  test('participant can query messages subcollection', async () => {
+    await seedConversation();
+    await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .collection(`conversations/${CONV_ID}/messages`)
+        .orderBy('createdAt')
+        .get(),
+    );
+  });
+
+  test('participant cannot send message when conversation is blocked', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`conversations/${CONV_ID}`).update({
+        status: 'blocked',
+      });
+    });
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}/messages/msg-blocked`)
+        .set({
+          messageId: 'msg-blocked',
+          senderId: alice,
+          text: 'Should be blocked',
+          createdAt: new Date(),
+        }),
+    );
+  });
+
+  test('message edit is denied', async () => {
+    await seedConversation();
+    // First create a message (as alice)
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx
+        .firestore()
+        .doc(`conversations/${CONV_ID}/messages/msg-edit`)
+        .set({
+          messageId: 'msg-edit',
+          senderId: alice,
+          text: 'Original',
+          createdAt: new Date(),
+        });
+    });
+    // Now try to update it with rules enabled
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}/messages/msg-edit`)
+        .update({ text: 'Edited' }),
+    );
+  });
+
+  test('message delete is denied', async () => {
+    await seedConversation();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx
+        .firestore()
+        .doc(`conversations/${CONV_ID}/messages/msg-del`)
+        .set({
+          messageId: 'msg-del',
+          senderId: alice,
+          text: 'To delete',
+          createdAt: new Date(),
+        });
+    });
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}/messages/msg-del`)
+        .delete(),
     );
   });
 });

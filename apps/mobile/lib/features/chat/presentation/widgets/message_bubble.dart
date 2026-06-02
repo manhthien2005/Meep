@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
-import 'package:meep/features/chat/presentation/widgets/chat_avatar.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 
 /// A single chat message bubble.
 ///
@@ -46,7 +46,7 @@ class MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMine) ...[
-            ChatAvatar(imageUrl: avatarUrl, size: 40),
+            AppAvatar(imageUrl: avatarUrl, size: 40),
             const SizedBox(width: 6),
           ],
           Flexible(child: bubble),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/chat/data/conversation.dart';
 import 'package:meep/features/chat/presentation/widgets/conversation_tile.dart';
@@ -17,6 +18,9 @@ class InboxScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final conversationsAsync = ref.watch(conversationsProvider);
+    final unreadCounts = ref.watch(unreadCountsProvider);
+    final totalUnread =
+        unreadCounts.values.fold<int>(0, (sum, val) => sum + val);
 
     return Scaffold(
       backgroundColor: AppColors.bw900,
@@ -53,12 +57,28 @@ class InboxScreen extends ConsumerWidget {
             Align(
               alignment: Alignment.bottomCenter,
               child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).size.height * 0.045,
+                ),
                 child: AppTaskbar(
                   activeTab: TaskbarTab.chat,
-                  chatBadgeCount: 2,
+                  chatBadgeCount: totalUnread,
                   onTabSelected: (tab) {
-                    if (tab != TaskbarTab.chat) Navigator.maybePop(context);
+                    switch (tab) {
+                      case TaskbarTab.streak:
+                        context.go('/streak');
+                      case TaskbarTab.diary:
+                        context.go('/diary');
+                      case TaskbarTab.home:
+                        context.go('/home');
+                      case TaskbarTab.chat:
+                        context.go('/inbox');
+                      case TaskbarTab.profile:
+                        context.go(
+                          '/profile',
+                          extra: ref.read(currentUidProvider).valueOrNull,
+                        );
+                    }
                   },
                 ),
               ),
@@ -110,7 +130,6 @@ class _ConversationList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profiles = ref.watch(chatUserProfilesProvider);
     final unread = ref.watch(unreadCountsProvider);
     final myUid = ref.watch(currentChatUidProvider);
 
@@ -122,11 +141,12 @@ class _ConversationList extends ConsumerWidget {
         final isUnread = (unread[conv.conversationId] ?? 0) > 0;
 
         if (conv.type == ConversationType.space) {
-          final space = ref.watch(chatSpaceProvider(conv.spaceId ?? ''));
+          final spaceAsync = ref.watch(chatSpaceProvider(conv.spaceId ?? ''));
+          final space = spaceAsync.valueOrNull;
           return ConversationTile.group(
-            spaceName: space.name,
-            emoji: space.iconEmoji,
-            colorHex: space.colorHex,
+            spaceName: space?.name ?? 'Space',
+            emoji: space?.iconEmoji ?? '👥',
+            colorHex: space?.colorHex ?? '#00DEEE',
             conversation: conv,
             isUnread: isUnread,
             onTap: () => context.push('/group-chat/${conv.conversationId}'),
@@ -137,7 +157,8 @@ class _ConversationList extends ConsumerWidget {
           (id) => id != myUid,
           orElse: () => myUid,
         );
-        final other = profiles[otherUid];
+        final otherAsync = ref.watch(chatUserProfileProvider(otherUid));
+        final other = otherAsync.valueOrNull;
         return ConversationTile.direct(
           displayName: other?.displayName ?? 'Người dùng',
           avatarUrl: other?.avatarUrl,

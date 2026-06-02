@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/chat/presentation/chat_thread_view.dart';
-import 'package:meep/features/chat/presentation/widgets/chat_avatar.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_confirm_dialogs.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_input_bar.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_menu_sheet.dart';
 import 'package:meep/features/chat/presentation/widgets/space_members_sheet.dart';
+import 'package:meep/features/space/application/space_controller.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 
 /// Space group chat thread. Figma `564:8603` (+ menu `564:8733`).
 class GroupChatScreen extends ConsumerWidget {
@@ -26,7 +28,8 @@ class GroupChatScreen extends ConsumerWidget {
         ?.where((c) => c.conversationId == conversationId)
         .firstOrNull;
     final spaceId = conversation?.spaceId ?? '';
-    final space = ref.watch(chatSpaceProvider(spaceId));
+    final spaceAsync = ref.watch(chatSpaceProvider(spaceId));
+    final space = spaceAsync.valueOrNull;
 
     final myUid = ref.watch(currentChatUidProvider);
     final messagesAsync = ref.watch(messagesProvider(conversationId));
@@ -38,9 +41,9 @@ class GroupChatScreen extends ConsumerWidget {
         child: Column(
           children: [
             _GroupHeader(
-              title: space.name,
-              emoji: space.iconEmoji,
-              colorHex: space.colorHex,
+              title: space?.name ?? 'Space',
+              emoji: space?.iconEmoji ?? '👥',
+              colorHex: space?.colorHex ?? '#00DEEE',
               onMenu: () => _onMenu(context, ref, spaceId),
             ),
             Expanded(
@@ -55,7 +58,7 @@ class GroupChatScreen extends ConsumerWidget {
                 data: (messages) => ChatThreadView(
                   messages: messages,
                   myUid: myUid,
-                  peerName: space.name,
+                  peerName: space?.name ?? '',
                 ),
               ),
             ),
@@ -101,14 +104,23 @@ class GroupChatScreen extends ConsumerWidget {
 
     switch (action) {
       case GroupMenuAction.editTheme:
-        // TODO(C/wire): open Space theme editor (Space module).
+        // TODO(C/HanDHG): open Space theme editor (Space module #137).
         break;
       case GroupMenuAction.viewMembers:
         await SpaceMembersSheet.show(context, spaceId);
       case GroupMenuAction.leaveSpace:
         final confirmed = await showLeaveSpaceDialog(context);
-        if (confirmed) {
-          // TODO(C/wire): ref.read(spaceControllerProvider.notifier).leaveSpace(spaceId)
+        if (!confirmed || !context.mounted) return;
+        // SpaceController là family on myUid — đọc từ currentChatUidProvider.
+        final myUid = ref.read(currentChatUidProvider);
+        await ref
+            .read(spaceControllerProvider(myUid).notifier)
+            .leaveSpace(spaceId);
+        if (!context.mounted) return;
+        // Controller catch error → errorMessage trong state. Chỉ navigate khi sạch.
+        final leaveErr = ref.read(spaceControllerProvider(myUid)).errorMessage;
+        if (leaveErr == null) {
+          context.go('/inbox');
         }
     }
   }
@@ -148,7 +160,7 @@ class _GroupHeader extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SpaceAvatar(emoji: emoji, colorHex: colorHex, size: 30),
+                AppSpaceAvatar(emoji: emoji, colorHex: colorHex, size: 30),
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(

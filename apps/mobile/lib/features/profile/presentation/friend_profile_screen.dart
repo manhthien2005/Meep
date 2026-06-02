@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/profile/presentation/widgets/diary_tab_content.dart';
 import 'package:meep/features/profile/presentation/widgets/photo_grid.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
@@ -26,20 +28,25 @@ const _cButtonText = Color(0xFFDDDDDD);
 const _cAvatarRing = Color(0xFFD9D9D9);
 const _cInactiveIcon = Color(0xFF949494);
 
-class FriendProfileScreen extends StatefulWidget {
+class FriendProfileScreen extends ConsumerStatefulWidget {
   const FriendProfileScreen({super.key, required this.uid});
 
   final String uid;
 
   @override
-  State<FriendProfileScreen> createState() => _FriendProfileScreenState();
+  ConsumerState<FriendProfileScreen> createState() =>
+      _FriendProfileScreenState();
 }
 
-class _FriendProfileScreenState extends State<FriendProfileScreen> {
+class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
   int _activeTab = 0;
 
   @override
   Widget build(BuildContext context) {
+    final unreadCounts = ref.watch(unreadCountsProvider);
+    final totalUnread =
+        unreadCounts.values.fold<int>(0, (sum, val) => sum + val);
+
     return Scaffold(
       backgroundColor: _cBg,
       body: SafeArea(
@@ -138,9 +145,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             Align(
               alignment: Alignment.bottomCenter,
               child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).size.height * 0.045,
+                ),
                 child: AppTaskbar(
                   activeTab: TaskbarTab.profile,
+                  chatBadgeCount: totalUnread,
                   onTabSelected: (tab) {
                     switch (tab) {
                       case TaskbarTab.streak:

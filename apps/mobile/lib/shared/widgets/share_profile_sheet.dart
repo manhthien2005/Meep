@@ -20,21 +20,21 @@ class ShareProfileSheet extends StatelessWidget {
   const ShareProfileSheet({
     super.key,
     required this.uid,
-    required this.username,
+    this.username,
     this.title,
   });
 
   final String uid;
-  final String username;
+  final String? username;
   final String? title;
 
   static Future<void> show(
     BuildContext context, {
     required String uid,
-    required String username,
+    String? username,
     String? title,
   }) {
-    return showModalBottomSheet(
+    return showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
@@ -45,7 +45,7 @@ class ShareProfileSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final profileLink = 'meep://profile/$username';
+    final profileLink = 'meep://profile/${username ?? uid}';
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Container(

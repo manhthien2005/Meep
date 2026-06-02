@@ -5,7 +5,15 @@ abstract class PostRepository {
   Future<Post> createPost(Post post);
 
   /// Stream of paginated feed for [uid], newest first.
-  Stream<List<Post>> watchFeed(String uid);
+  ///
+  /// Khi [spaceId] null (default): feed chung — posts của user + friends,
+  /// loại bỏ posts đăng vào Space (post.spaceId != null).
+  ///
+  /// Khi [spaceId] != null: chỉ posts đăng vào Space đó (post.spaceId ==
+  /// [spaceId]). Rule `/posts` read pass cho Space member qua nhánh
+  /// `exists(/users/{uid}/feed/{postId})` — server CF spacePostFanOut đã
+  /// fan-out feed entry cho mọi Space member.
+  Stream<List<Post>> watchFeed(String uid, {String? spaceId});
 
   /// Delete a post and its Storage assets.
   Future<void> deletePost(String postId);

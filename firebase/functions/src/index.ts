@@ -1,8 +1,16 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { initializeApp } from 'firebase-admin/app';
 import { z } from 'zod';
+
+// Feed module
+export { onPostCreated } from './feed/onPostCreated.js';
+export { onPostDeleted } from './feed/onPostDeleted.js';
+
+// Settings module
+export { blockUser } from './settings/blockUser.js';
+export { deleteAccount } from './settings/deleteAccount.js';
 
 initializeApp();
 
@@ -51,118 +59,21 @@ export const sendFriendRequest = onCall((request) => {
 
 // ===== Firestore triggers =====
 
-/**
- * Fan out a notification to all friends of the post author.
- *
- * TODO(impl):
- *   - read the post doc
- *   - look up friend uids in /friendships
- *   - load FCM tokens from /users/{uid}/private/fcm
- *   - call messaging.sendEachForMulticast(...)
- */
-export const onPostCreated = onDocumentCreated(
-  { document: 'posts/{postId}', region: 'asia-southeast1' },
-  (event) => {
-    const post = event.data?.data();
-    if (!post) return;
-    // TODO(impl): see comment above.
-    console.warn(`onPostCreated fired for ${event.params.postId} — TODO: fan out`);
-  },
-);
+// onPostCreated — implemented in ./feed/onPostCreated.ts
 
-// ===== Friend module stubs =====
+// ===== Friend module =====
 
-/**
- * Accept a pending friend request and create the friendship doc.
- *
- * TODO(F/impl):
- *   - verify request exists + status == 'pending'
- *   - verify request.auth.uid == receiverId
- *   - create /friendships/{pairId} doc
- *   - update request status to 'accepted'
- *   - send FCM notification to sender
- */
-export const acceptFriendRequest = onCall((request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
-  // TODO(F/impl): see comment above.
-  return { ok: true };
-});
-
-/**
- * Clean up friend-related data when a friendship is deleted.
- *
- * TODO(F/impl):
- *   - remove each member from the other's cached friend list
- */
-export const onFriendshipDeleted = onDocumentDeleted(
-  { document: 'friendships/{pairId}', region: 'asia-southeast1' },
-  (_event) => {
-    // TODO(F/impl): see comment above.
-  },
-);
+export { acceptFriendRequest } from './friend/acceptFriendRequest.js';
+export { onFriendshipDeleted } from './friend/onFriendshipDeleted.js';
 
 // ===== Settings module stubs =====
 
-/**
- * Block a user: create /blocks doc + remove friendship + update conversation status.
- *
- * TODO(SE/impl):
- *   - verify target exists + caller != target
- *   - create /blocks/{blockerUid}_{targetUid}
- *   - delete /friendships/{pairId} if exists
- *   - update /conversations/{pairId}.status = 'blocked' if exists
- */
-export const blockUser = onCall((request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
-  // TODO(SE/impl): see comment above.
-  return { ok: true };
-});
+// blockUser — implemented in ./settings/blockUser.ts (exported above).
+// unblockUser stub gỡ bỏ: T1 đã quyết unblock = client-side delete
+// `/blocks/{blockerUid}_{targetUid}` (OQ5 resolved trong #116). CF không cần.
+// deleteAccount — implemented in ./settings/deleteAccount.ts (exported above).
 
-/**
- * Unblock a user: delete /blocks doc + delete /friendships/{pairId} if exists.
- * Atomic via Admin SDK batch — client cannot write /blocks directly.
- *
- * TODO(SE/impl):
- *   - verify caller != target
- *   - delete /blocks/{blockerUid}_{targetUid} if exists
- *   - delete /friendships/{pairId} if exists
- */
-export const unblockUser = onCall((request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
-  // TODO(SE/impl): see comment above.
-  return { ok: true };
-});
-
-/**
- * Delete account: re-authenticate, then cascade-delete all user data.
- *
- * TODO(SE/impl):
- *   - delete /users/{uid} + subcollections
- *   - delete /posts by uid from Storage + Firestore
- *   - delete /friendships where uid is member
- *   - delete Firebase Auth account
- */
-export const deleteAccount = onCall((request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
-  // TODO(SE/impl): see comment above.
-  return { ok: true };
-});
-
-// ===== Feed module stubs =====
-
-/**
- * Clean up Storage assets when a post is deleted.
- *
- * TODO(FE/impl):
- *   - delete posts/{uid}/{postId}/photo.jpg from Storage
- *   - remove fan-out feed entries in /users/{uid}/feed/{postId}
- */
-export const onPostDeleted = onDocumentDeleted(
-  { document: 'posts/{postId}', region: 'asia-southeast1' },
-  (_event) => {
-    // TODO(FE/impl): see comment above.
-  },
-);
+// onPostCreated + onPostDeleted implemented in ./feed/ — exported above
 
 // ===== Notification module stubs =====
 
@@ -184,38 +95,15 @@ export const onReactionCreated = onDocumentCreated(
   (_event) => { /* TODO(N/impl) */ },
 );
 
-// ===== Space module stubs =====
+// ===== Space module =====
 
-export const createSpace = onCall((req) => {
-  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
-  return { ok: true }; // TODO(SP/impl)
-});
-export const leaveSpace = onCall((req) => {
-  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
-  return { ok: true }; // TODO(SP/impl)
-});
-export const kickMember = onCall((req) => {
-  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
-  return { ok: true }; // TODO(SP/impl)
-});
-export const transferOwnership = onCall((req) => {
-  if (!req.auth) throw new HttpsError('unauthenticated', 'Login required');
-  return { ok: true }; // TODO(SP/impl)
-});
-
-export const onSpaceMemberAdded = onDocumentCreated(
-  { document: 'spaces/{spaceId}/members/{uid}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(SP/impl) */ },
-);
-export const onSpaceMemberRemoved = onDocumentDeleted(
-  { document: 'spaces/{spaceId}/members/{uid}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(SP/impl) */ },
-);
-export const onSpacePostCreated = onDocumentCreated(
-  { document: 'posts/{postId}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(SP/impl) — only processes posts where data.spaceId != null */ },
-);
-export const onSpaceDeleted = onDocumentUpdated(
-  { document: 'spaces/{spaceId}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(SP/impl) — fires when deletedAt field is set (soft delete) */ },
-);
+export { createSpace } from './space/createSpace.js';
+export { updateSpace } from './space/updateSpace.js';
+export { leaveSpace } from './space/leaveSpace.js';
+export { kickMember } from './space/kickMember.js';
+export { transferOwnership } from './space/transferOwnership.js';
+export { onSpaceMemberAdded } from './space/onSpaceMemberAdded.js';
+export { onSpaceMemberRemoved } from './space/onSpaceMemberRemoved.js';
+export { onSpaceDeleted } from './space/onSpaceDeleted.js';
+// onSpacePostCreated — KHÔNG export per Option A: spacePostFanOut là
+// helper gọi từ feed/onPostCreated khi post.spaceId != null (đã wire).

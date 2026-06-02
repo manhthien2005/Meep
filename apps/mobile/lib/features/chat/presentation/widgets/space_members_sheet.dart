@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
-import 'package:meep/features/chat/presentation/widgets/chat_avatar.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
 
 /// Bottom sheet listing the members of a Space. Figma `564:8865`.
@@ -26,8 +26,8 @@ class SpaceMembersSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final members = ref.watch(chatSpaceMembersProvider(spaceId));
-    final profiles = ref.watch(chatUserProfilesProvider);
+    final membersAsync = ref.watch(chatSpaceMembersProvider(spaceId));
+    final members = membersAsync.valueOrNull ?? const [];
     final myUid = ref.watch(currentChatUidProvider);
 
     // Tall sheet (~75% screen) per Figma `564:8865`, not a half-height sheet.
@@ -61,7 +61,9 @@ class SpaceMembersSheet extends ConsumerWidget {
                     itemCount: members.length,
                     itemBuilder: (context, index) {
                       final member = members[index];
-                      final profile = profiles[member.uid];
+                      final profileAsync =
+                          ref.watch(chatUserProfileProvider(member.uid));
+                      final profile = profileAsync.valueOrNull;
                       final isMe = member.uid == myUid;
                       return _MemberRow(
                         name: isMe
@@ -93,7 +95,7 @@ class _MemberRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          ChatAvatar(imageUrl: avatarUrl, size: 44),
+          AppAvatar(imageUrl: avatarUrl, size: 44),
           const SizedBox(width: 14),
           Text(
             name,

@@ -21,11 +21,17 @@ class FriendRequest with _$FriendRequest {
       _$FriendRequestFromJson(json);
 }
 
-class TimestampConverter implements JsonConverter<DateTime, Object> {
+/// Converts Firestore [Timestamp] ↔ [DateTime].
+/// Object? (nullable) để xử lý pending serverTimestamp: khi Firestore client
+/// emit snapshot trước server confirm, trường createdAt/updatedAt có thể là null.
+/// Fallback: DateTime.now() — chỉ ảnh hưởng snapshot tạm thời 0.3-0.5s,
+/// emit tiếp theo sẽ có giá trị thật từ server.
+class TimestampConverter implements JsonConverter<DateTime, Object?> {
   const TimestampConverter();
 
   @override
-  DateTime fromJson(Object json) {
+  DateTime fromJson(Object? json) {
+    if (json == null) return DateTime.now();
     if (json is Timestamp) return json.toDate();
     if (json is String) return DateTime.parse(json);
     return DateTime.fromMillisecondsSinceEpoch(json as int);

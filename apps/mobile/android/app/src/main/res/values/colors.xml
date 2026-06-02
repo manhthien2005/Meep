@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#050f10</color>
+
+    <!-- Widget colors (per Figma 693:2617) -->
+    <color name="widget_background">#050F10</color>
+    <color name="widget_count_badge">#00C9E3</color>
+    <color name="widget_count_text">#FFFFFFFF</color>
+    <color name="widget_caption_pill_bg">#80000000</color>
+    <color name="widget_caption_text">#FFFFFFFF</color>
+    <color name="widget_placeholder_text">#C7F7FB</color>
+    <color name="widget_default_avatar_bg">#1F2D2F</color>
+    <color name="widget_default_avatar_fg">#C7F7FB</color>
 </resources>

@@ -36,7 +36,7 @@ abstract final class ChatSeed {
     email: 'talaki@meep.app',
     displayName: 'Talaki',
     username: 'talaki',
-    avatarUrl: 'https://i.pravatar.cc/150?img=12',
+    avatarUrl: null, // Null for tests - TestWidgetsFlutterBinding blocks HTTP
     createdAt: _now,
     updatedAt: _now,
   );
@@ -46,7 +46,7 @@ abstract final class ChatSeed {
     email: 'minh@meep.app',
     displayName: 'Minh Anh',
     username: 'minhanh',
-    avatarUrl: 'https://i.pravatar.cc/150?img=32',
+    avatarUrl: null, // Null for tests - TestWidgetsFlutterBinding blocks HTTP
     createdAt: _now,
     updatedAt: _now,
   );
@@ -56,7 +56,7 @@ abstract final class ChatSeed {
     email: 'linh@meep.app',
     displayName: 'Linh',
     username: 'linh',
-    avatarUrl: 'https://i.pravatar.cc/150?img=45',
+    avatarUrl: null, // Null for tests - TestWidgetsFlutterBinding blocks HTTP
     createdAt: _now,
     updatedAt: _now,
   );

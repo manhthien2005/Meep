@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_label">Meep</string>
+    <string name="widget_description">Ảnh mới nhất từ bạn bè trên màn hình chính</string>
+    <string name="widget_placeholder_text">Mở Meep để bắt đầu</string>
+    <string name="widget_avatar_content_description">Ảnh đại diện tác giả</string>
+    <string name="widget_photo_content_description">Ảnh mới nhất từ bạn bè</string>
+</resources>

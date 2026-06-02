@@ -1,23 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/data/chat_seed_data.dart';
 import 'package:meep/features/chat/data/conversation.dart';
-import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/data/message.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/space.dart';
 import 'package:meep/features/space/data/space_member.dart';
 
 part 'chat_providers.g.dart';
 
 /// Current logged-in uid for the Chat module.
-///
-/// FE-first round returns a mock uid (matches [ChatSeed.currentUid]).
-/// TODO(C/wire): read from `currentUidProvider` (auth) once integrated.
 @riverpod
-String currentChatUid(Ref ref) => ChatSeed.currentUid;
+String currentChatUid(Ref ref) {
+  return ref.watch(currentUidProvider).valueOrNull ?? '';
+}
 
 /// Live conversations for the inbox, sorted by lastMessageAt DESC.
 @riverpod
@@ -51,21 +52,35 @@ Stream<List<Message>> messages(Ref ref, String conversationId) {
 @riverpod
 Map<String, int> unreadCounts(Ref ref) => ChatSeed.seedUnreadCounts();
 
-/// User profiles keyed by uid, for resolving 1-1 conversation display info.
-/// TODO(C/wire): replace seed lookup with `userRepository` reads.
+/// Resolve a single [UserProfile] by [uid] for display in chat tiles,
+/// headers, and member lists.
+///
+/// Uses [UserRepository.getProfile] (auth module). Riverpod auto-deduplicates
+/// when multiple widgets watch the same uid — only one Firestore read per uid.
 @riverpod
-Map<String, UserProfile> chatUserProfiles(Ref ref) => ChatSeed.usersByUid;
+Future<UserProfile?> chatUserProfile(Ref ref, String uid) async {
+  if (uid.isEmpty) return null;
+  return ref.watch(userRepositoryProvider).getProfile(uid);
+}
 
-/// The single demo space backing group chat.
-/// TODO(C/wire): replace with `spaceRepository.watchSpace(spaceId)`.
+/// Live Space document for a group conversation header / tile.
+///
+/// Delegates to [SpaceRepository.watchSpace] (space module). Empty spaceId →
+/// emits null without hitting Firestore (defensive cho conversation 1-1).
 @riverpod
-Space chatSpace(Ref ref, String spaceId) => ChatSeed.seedSpace();
+Stream<Space?> chatSpace(Ref ref, String spaceId) {
+  if (spaceId.isEmpty) return Stream.value(null);
+  return ref.watch(spaceRepositoryProvider).watchSpace(spaceId);
+}
 
-/// Members of the demo space.
-/// TODO(C/wire): replace with `spaceRepository.watchMembers(spaceId)`.
+/// Live member list for [SpaceMembersSheet].
+///
+/// Delegates to [SpaceRepository.watchMembers] (space module).
 @riverpod
-List<SpaceMember> chatSpaceMembers(Ref ref, String spaceId) =>
-    ChatSeed.seedMembers();
+Stream<List<SpaceMember>> chatSpaceMembers(Ref ref, String spaceId) {
+  if (spaceId.isEmpty) return Stream.value(const []);
+  return ref.watch(spaceRepositoryProvider).watchMembers(spaceId);
+}
 
 /// The post that a 1-1 conversation was started from (quoted photo header).
 /// Returns null when the conversation has no originating post.

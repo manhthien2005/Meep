@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/profile/presentation/widgets/diary_tab_content.dart';
 import 'package:meep/features/profile/presentation/widgets/photo_grid.dart';
 import 'package:meep/features/profile/presentation/widgets/profile_tab_bar.dart';
@@ -31,20 +33,24 @@ const _cButtonFill = Color(0xFF363636);
 const _cButtonText = Color(0xFFDDDDDD);
 const _cAvatarRing = Color(0xFFD9D9D9);
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key, required this.uid});
 
   final String uid;
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   int _activeTab = 0;
 
   @override
   Widget build(BuildContext context) {
+    final unreadCounts = ref.watch(unreadCountsProvider);
+    final totalUnread =
+        unreadCounts.values.fold<int>(0, (sum, val) => sum + val);
+
     return Scaffold(
       backgroundColor: _cBg,
       body: SafeArea(
@@ -139,9 +145,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Align(
               alignment: Alignment.bottomCenter,
               child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).size.height * 0.045,
+                ),
                 child: AppTaskbar(
                   activeTab: TaskbarTab.profile,
+                  chatBadgeCount: totalUnread,
                   onTabSelected: (tab) {
                     switch (tab) {
                       case TaskbarTab.streak:

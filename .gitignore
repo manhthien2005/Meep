@@ -122,3 +122,7 @@ ui-debug.log
 *.bak
 *.swp
 *.orig
+
+# Local scratch artifacts (Figma screenshot exports, ad-hoc analysis notes)
+.figma-exports/
+.temp-*.md

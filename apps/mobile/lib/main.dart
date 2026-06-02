@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -17,7 +18,14 @@ import 'package:meep/features/auth/data/firebase_auth_repository.dart';
 import 'package:meep/features/auth/data/firebase_user_repository.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
-import 'package:meep/features/chat/data/fake_conversation_repository.dart';
+import 'package:meep/features/chat/data/firebase_conversation_repository.dart';
+import 'package:meep/features/friend/application/friend_controller.dart';
+import 'package:meep/features/friend/data/firebase_friend_repository.dart';
+import 'package:meep/features/friend/data/firebase_friend_request_repository.dart';
+import 'package:meep/features/settings/application/settings_controller.dart';
+import 'package:meep/features/settings/data/firebase_block_repository.dart';
+import 'package:meep/features/space/application/space_controller.dart';
+import 'package:meep/features/space/data/firebase_space_repository.dart';
 import 'package:meep/firebase_options.dart';
 
 // Pass --dart-define=USE_EMULATOR=true khi dev local để trỏ vào Firebase Emulator Suite.
@@ -37,6 +45,7 @@ void main() async {
 
   final authRepo = FirebaseAuthRepository(
     auth: FirebaseAuth.instance,
+    functions: FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
     googleSignIn: GoogleSignIn(
       serverClientId: AppConfig.googleServerClientId,
     ),
@@ -53,10 +62,30 @@ void main() async {
         userRepositoryProvider.overrideWithValue(
           FirebaseUserRepository(firestore: FirebaseFirestore.instance),
         ),
-        // TODO(C/wire): swap for FirestoreConversationRepository once the chat
-        // backend (Friend #88 / Settings #115 / Space) is wired. FE-first only.
-        conversationRepositoryProvider
-            .overrideWithValue(FakeConversationRepository()),
+        friendRepositoryProvider.overrideWithValue(
+          FirebaseFriendRepository(FirebaseFirestore.instance),
+        ),
+        friendRequestRepositoryProvider.overrideWithValue(
+          FirebaseFriendRequestRepository(
+            FirebaseFirestore.instance,
+            FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
+          ),
+        ),
+        spaceRepositoryProvider.overrideWithValue(
+          FirebaseSpaceRepository(
+            FirebaseFirestore.instance,
+            FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
+          ),
+        ),
+        blockRepositoryProvider.overrideWithValue(
+          FirebaseBlockRepository(
+            FirebaseFirestore.instance,
+            FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
+          ),
+        ),
+        conversationRepositoryProvider.overrideWithValue(
+          FirebaseConversationRepository(FirebaseFirestore.instance),
+        ),
       ],
       child: const MeepApp(),
     ),
