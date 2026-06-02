@@ -242,7 +242,9 @@ class _FriendSheetState extends ConsumerState<FriendSheet> {
           ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AppColors.turquoise500),
+      ),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
