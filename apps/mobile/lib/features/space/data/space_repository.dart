@@ -53,6 +53,18 @@ abstract class SpaceRepository {
     required List<String> friendUids,
   });
 
+  /// Calls CF `updateSpace`. Creator-only (server-enforced + rules
+  /// whitelist). Partial update — chỉ field non-null được apply.
+  ///
+  /// Throws [ValidationError] (name/colorHex format), [ForbiddenError]
+  /// (non-creator), [NotFoundError] (space deleted/missing).
+  Future<void> updateSpace({
+    required String spaceId,
+    String? name,
+    String? iconEmoji,
+    String? colorHex,
+  });
+
   /// Calls CF `leaveSpace`. Server enforces creator phải `transferOwnership`
   /// trước khi leave — throw [ValidationError] nếu vi phạm.
   Future<void> leaveSpace(String spaceId);

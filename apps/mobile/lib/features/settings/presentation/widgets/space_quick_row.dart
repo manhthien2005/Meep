@@ -3,19 +3,38 @@ import 'package:flutter/material.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/core/theme/hex_color.dart';
+import 'package:meep/features/space/data/space.dart';
 
 /// Hàng cuộn ngang quick-access các Space trong SettingsSheet.
-/// Pre-M3: nhận danh sách tên Space (mock); logic tạo/sửa thuộc Space module.
+///
+/// Render real Space data — iconEmoji + colorHex từ Space model. Tap card
+/// → `onEditSpace(space)` để leader/creator chỉnh sửa. Card cuối là
+/// `_CreateSpaceCard` luôn hiển thị → `onCreateSpace`.
+///
+/// Permission filter cho edit thực hiện ở caller (SettingsSheet) —
+/// SpaceQuickRow chỉ là dumb widget render list.
 class SpaceQuickRow extends StatelessWidget {
   const SpaceQuickRow({
     super.key,
-    required this.spaceNames,
+    required this.spaces,
+    this.isLoading = false,
     this.onEditSpace,
     this.onCreateSpace,
   });
 
-  final List<String> spaceNames;
-  final ValueChanged<String>? onEditSpace;
+  /// Danh sách Space user thuộc về — từ `spaceControllerProvider(uid).spaces`.
+  final List<Space> spaces;
+
+  /// True khi controller chưa emit lần đầu — render shimmer placeholder.
+  final bool isLoading;
+
+  /// Tap card Space → callback với Space model. Caller filter creator-only
+  /// trước khi mở SpaceEditSheet.
+  final ValueChanged<Space>? onEditSpace;
+
+  /// Tap card "Tạo" → callback. Hiện wire qua rootContext pattern ở
+  /// SettingsSheet để mở SpaceCreateSheet.
   final VoidCallback? onCreateSpace;
 
   @override
@@ -39,10 +58,16 @@ class SpaceQuickRow extends StatelessWidget {
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: [
-              for (final name in spaceNames) ...[
+              if (isLoading && spaces.isEmpty) ...[
+                const _SpaceCardShimmer(),
+                const SizedBox(width: AppSpacing.md),
+                const _SpaceCardShimmer(),
+                const SizedBox(width: AppSpacing.md),
+              ],
+              for (final space in spaces) ...[
                 _SpaceCard(
-                  name: name,
-                  onEdit: () => onEditSpace?.call(name),
+                  space: space,
+                  onTap: () => onEditSpace?.call(space),
                 ),
                 const SizedBox(width: AppSpacing.md),
               ],
@@ -56,21 +81,21 @@ class SpaceQuickRow extends StatelessWidget {
 }
 
 class _SpaceCard extends StatelessWidget {
-  const _SpaceCard({required this.name, required this.onEdit});
+  const _SpaceCard({required this.space, required this.onTap});
 
-  final String name;
-  final VoidCallback onEdit;
+  final Space space;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     // Toàn card tappable: pill "Sửa" thuần visual indicator. Card 115x115 đã
-    // vượt yêu cầu touch target 48x48, nhỏ hơn sẽ không vừa avatar + name + pill.
+    // vượt yêu cầu touch target 48x48.
     return Semantics(
       button: true,
-      label: 'Sửa Space $name',
+      label: 'Sửa Space ${space.name}',
       excludeSemantics: true,
       child: GestureDetector(
-        onTap: onEdit,
+        onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: Container(
           width: 115,
@@ -87,17 +112,22 @@ class _SpaceCard extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              // Icon circle theo colorHex + iconEmoji thực tế của Space.
               Container(
                 width: 43,
                 height: 43,
                 decoration: BoxDecoration(
-                  color: AppColors.bw600,
-                  borderRadius: BorderRadius.circular(21.5),
-                  border: Border.all(color: AppColors.bw500, width: 2),
+                  color: hexToColor(space.colorHex),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  space.iconEmoji,
+                  style: const TextStyle(fontSize: 22),
                 ),
               ),
               Text(
-                name,
+                space.name,
                 style: AppTextStyles.xsSemiBold.copyWith(color: Colors.white),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -120,6 +150,56 @@ class _SpaceCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SpaceCardShimmer extends StatelessWidget {
+  const _SpaceCardShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 115,
+      height: 115,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.bw700,
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(
+          color: AppColors.bw600.withValues(alpha: 0.5),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            width: 43,
+            height: 43,
+            decoration: BoxDecoration(
+              color: AppColors.bw600,
+              borderRadius: BorderRadius.circular(21.5),
+            ),
+          ),
+          Container(
+            width: 60,
+            height: 12,
+            decoration: BoxDecoration(
+              color: AppColors.bw600,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          Container(
+            width: 36,
+            height: 16,
+            decoration: BoxDecoration(
+              color: AppColors.bw600,
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+        ],
       ),
     );
   }

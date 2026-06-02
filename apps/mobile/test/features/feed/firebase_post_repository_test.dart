@@ -140,6 +140,56 @@ void main() {
       final posts = await repo.watchFeed('uid1').first;
       expect(posts, isEmpty);
     });
+
+    test('feed chung (spaceId null) loại posts có spaceId', () async {
+      // Own post chung + own post Space → feed chung chỉ thấy post chung.
+      final pChung = _makePost(postId: 'p1', authorId: 'uid1');
+      final pSpace = Post(
+        postId: 'p2',
+        authorId: 'uid1',
+        authorName: 'Test User',
+        imageUrl: 'https://example.com/photo.jpg',
+        audienceType: AudienceType.all,
+        spaceId: 's1', // gửi vào Space — KHÔNG nên xuất hiện feed chung
+        createdAt: DateTime(2026, 5, 27),
+      );
+      await db.collection('posts').doc('p1').set(pChung.toJson());
+      await db.collection('posts').doc('p2').set(pSpace.toJson());
+
+      final posts = await repo.watchFeed('uid1').first;
+      expect(posts.map((p) => p.postId), contains('p1'));
+      expect(posts.map((p) => p.postId), isNot(contains('p2')));
+    });
+
+    test('spaceId != null trả về chỉ posts của Space đó', () async {
+      // Hỗn hợp: 1 post chung của user, 1 post Space s1 của user, 1 post
+      // Space s2 của user. watchFeed(uid, spaceId: 's1') chỉ trả p_s1.
+      final pChung = _makePost(postId: 'p_chung', authorId: 'uid1');
+      final pS1 = Post(
+        postId: 'p_s1',
+        authorId: 'uid1',
+        authorName: 'Test User',
+        imageUrl: 'https://example.com/photo.jpg',
+        audienceType: AudienceType.all,
+        spaceId: 's1',
+        createdAt: DateTime(2026, 5, 27),
+      );
+      final pS2 = Post(
+        postId: 'p_s2',
+        authorId: 'uid1',
+        authorName: 'Test User',
+        imageUrl: 'https://example.com/photo.jpg',
+        audienceType: AudienceType.all,
+        spaceId: 's2',
+        createdAt: DateTime(2026, 5, 27),
+      );
+      await db.collection('posts').doc('p_chung').set(pChung.toJson());
+      await db.collection('posts').doc('p_s1').set(pS1.toJson());
+      await db.collection('posts').doc('p_s2').set(pS2.toJson());
+
+      final posts = await repo.watchFeed('uid1', spaceId: 's1').first;
+      expect(posts.map((p) => p.postId), ['p_s1']);
+    });
   });
 
   group('deletePost', () {

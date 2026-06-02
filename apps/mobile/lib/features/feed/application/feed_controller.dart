@@ -53,15 +53,26 @@ class FeedController extends _$FeedController {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     final repo = ref.read(postRepositoryProvider);
 
+    // Pass spaceId xuống repo khi filter là Space — repo branch sang
+    // _watchSpaceFeed query thẳng /posts where spaceId == X. Khi filter
+    // là all/person, spaceId truyền null → repo trả feed chung (đã loại
+    // Space posts).
+    final repoSpaceId = filter == FeedFilter.space ? filterSpaceId : null;
+
     // Live stream so posts appear once the CF fan-out writes the feed doc —
     // no manual refresh needed. A single subscription drives both the initial
     // future (first emission) and subsequent state updates.
     final completer = Completer<FeedState>();
-    final sub = repo.watchFeed(uid).listen(
+    final sub = repo.watchFeed(uid, spaceId: repoSpaceId).listen(
       (posts) {
-        final filtered = filter == FeedFilter.person && filterUid != null
-            ? posts.where((p) => p.authorId == filterUid).toList()
-            : posts;
+        // FeedFilter.space: repo đã filter sẵn theo spaceId → posts pass through.
+        // FeedFilter.person: client-side filter theo authorId.
+        // FeedFilter.all: posts từ feed chung (đã loại Space posts ở repo).
+        final filtered = switch (filter) {
+          FeedFilter.person when filterUid != null =>
+            posts.where((p) => p.authorId == filterUid).toList(),
+          _ => posts,
+        };
         final feedState = FeedState(posts: filtered, hasMore: false);
         if (completer.isCompleted) {
           state = AsyncData(feedState);

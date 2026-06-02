@@ -465,4 +465,258 @@ void main() {
       ).called(1);
     });
   });
+
+  group('updateSpace — client-side validation + creator guard', () {
+    test('sets errorMessage when not signed in', () async {
+      final container = _makeContainer(repo: repo, currentUid: null);
+      addTearDown(container.dispose);
+      container.listen(spaceControllerProvider('user1'), (_, __) {});
+
+      await container
+          .read(spaceControllerProvider('user1').notifier)
+          .updateSpace(spaceId: 's1', name: 'Renamed');
+
+      expect(
+        container.read(spaceControllerProvider('user1')).errorMessage,
+        'Chưa đăng nhập',
+      );
+      verifyNever(
+        () => repo.updateSpace(
+          spaceId: any(named: 'spaceId'),
+          name: any(named: 'name'),
+          iconEmoji: any(named: 'iconEmoji'),
+          colorHex: any(named: 'colorHex'),
+        ),
+      );
+    });
+
+    test('blocks non-creator with ForbiddenError message', () async {
+      when(() => repo.watchMySpaces('user2')).thenAnswer(
+        (_) => Stream.value([
+          _spaceFixture(
+            spaceId: 's1',
+            creatorId: 'user1',
+            memberIds: ['user1', 'user2'],
+          ),
+        ]),
+      );
+
+      final container = _makeContainer(repo: repo, currentUid: 'user2');
+      addTearDown(container.dispose);
+      container.listen(spaceControllerProvider('user2'), (_, __) {});
+      container.listen(currentUidProvider, (_, __) {});
+      await container.read(currentUidProvider.future);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(spaceControllerProvider('user2').notifier)
+          .updateSpace(spaceId: 's1', name: 'Renamed');
+
+      expect(
+        container.read(spaceControllerProvider('user2')).errorMessage,
+        contains('Chỉ creator'),
+      );
+      verifyNever(
+        () => repo.updateSpace(
+          spaceId: any(named: 'spaceId'),
+          name: any(named: 'name'),
+          iconEmoji: any(named: 'iconEmoji'),
+          colorHex: any(named: 'colorHex'),
+        ),
+      );
+    });
+
+    test('sets errorMessage when all fields null (empty patch)', () async {
+      final container = _makeContainer(repo: repo, currentUid: 'user1');
+      addTearDown(container.dispose);
+      container.listen(spaceControllerProvider('user1'), (_, __) {});
+      container.listen(currentUidProvider, (_, __) {});
+      // currentUidProvider là StreamProvider — đợi emit lần đầu để
+      // updateSpace guard "Chưa đăng nhập" không trigger trước validation.
+      await container.read(currentUidProvider.future);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(spaceControllerProvider('user1').notifier)
+          .updateSpace(spaceId: 's1');
+
+      expect(
+        container.read(spaceControllerProvider('user1')).errorMessage,
+        contains('ít nhất một thay đổi'),
+      );
+      verifyNever(
+        () => repo.updateSpace(
+          spaceId: any(named: 'spaceId'),
+          name: any(named: 'name'),
+          iconEmoji: any(named: 'iconEmoji'),
+          colorHex: any(named: 'colorHex'),
+        ),
+      );
+    });
+
+    test('sets errorMessage when name trimmed to empty', () async {
+      final container = _makeContainer(repo: repo, currentUid: 'user1');
+      addTearDown(container.dispose);
+      container.listen(spaceControllerProvider('user1'), (_, __) {});
+      container.listen(currentUidProvider, (_, __) {});
+      await container.read(currentUidProvider.future);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(spaceControllerProvider('user1').notifier)
+          .updateSpace(spaceId: 's1', name: '   ');
+
+      expect(
+        container.read(spaceControllerProvider('user1')).errorMessage,
+        'Tên Space không được trống',
+      );
+    });
+
+    test('sets errorMessage when name > 30 chars', () async {
+      final container = _makeContainer(repo: repo, currentUid: 'user1');
+      addTearDown(container.dispose);
+      container.listen(spaceControllerProvider('user1'), (_, __) {});
+      container.listen(currentUidProvider, (_, __) {});
+      await container.read(currentUidProvider.future);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(spaceControllerProvider('user1').notifier)
+          .updateSpace(spaceId: 's1', name: 'a' * 31);
+
+      expect(
+        container.read(spaceControllerProvider('user1')).errorMessage,
+        'Tên Space tối đa 30 ký tự',
+      );
+    });
+
+    test('sets errorMessage when colorHex invalid format', () async {
+      final container = _makeContainer(repo: repo, currentUid: 'user1');
+      addTearDown(container.dispose);
+      container.listen(spaceControllerProvider('user1'), (_, __) {});
+      container.listen(currentUidProvider, (_, __) {});
+      await container.read(currentUidProvider.future);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(spaceControllerProvider('user1').notifier)
+          .updateSpace(spaceId: 's1', colorHex: 'red');
+
+      expect(
+        container.read(spaceControllerProvider('user1')).errorMessage,
+        contains('#RRGGBB'),
+      );
+    });
+
+    test('delegates to repo with trimmed name on partial update', () async {
+      when(() => repo.watchMySpaces('user1')).thenAnswer(
+        (_) => Stream.value([
+          _spaceFixture(spaceId: 's1', creatorId: 'user1'),
+        ]),
+      );
+      when(
+        () => repo.updateSpace(
+          spaceId: any(named: 'spaceId'),
+          name: any(named: 'name'),
+          iconEmoji: any(named: 'iconEmoji'),
+          colorHex: any(named: 'colorHex'),
+        ),
+      ).thenAnswer((_) async {});
+
+      final container = _makeContainer(repo: repo, currentUid: 'user1');
+      addTearDown(container.dispose);
+      container.listen(spaceControllerProvider('user1'), (_, __) {});
+      container.listen(currentUidProvider, (_, __) {});
+      await container.read(currentUidProvider.future);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(spaceControllerProvider('user1').notifier)
+          .updateSpace(spaceId: 's1', name: '  Renamed  ');
+
+      verify(
+        () => repo.updateSpace(
+          spaceId: 's1',
+          name: 'Renamed',
+          iconEmoji: null,
+          colorHex: null,
+        ),
+      ).called(1);
+      final state = container.read(spaceControllerProvider('user1'));
+      expect(state.isLoading, isFalse);
+      expect(state.errorMessage, isNull);
+    });
+
+    test('delegates to repo with all 3 fields on full update', () async {
+      when(() => repo.watchMySpaces('user1')).thenAnswer(
+        (_) => Stream.value([
+          _spaceFixture(spaceId: 's1', creatorId: 'user1'),
+        ]),
+      );
+      when(
+        () => repo.updateSpace(
+          spaceId: any(named: 'spaceId'),
+          name: any(named: 'name'),
+          iconEmoji: any(named: 'iconEmoji'),
+          colorHex: any(named: 'colorHex'),
+        ),
+      ).thenAnswer((_) async {});
+
+      final container = _makeContainer(repo: repo, currentUid: 'user1');
+      addTearDown(container.dispose);
+      container.listen(spaceControllerProvider('user1'), (_, __) {});
+      container.listen(currentUidProvider, (_, __) {});
+      await container.read(currentUidProvider.future);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(spaceControllerProvider('user1').notifier)
+          .updateSpace(
+            spaceId: 's1',
+            name: 'Renamed',
+            iconEmoji: '🎉',
+            colorHex: '#FF6B6B',
+          );
+
+      verify(
+        () => repo.updateSpace(
+          spaceId: 's1',
+          name: 'Renamed',
+          iconEmoji: '🎉',
+          colorHex: '#FF6B6B',
+        ),
+      ).called(1);
+    });
+
+    test('sets errorMessage when repo throws AppError', () async {
+      when(() => repo.watchMySpaces('user1')).thenAnswer(
+        (_) => Stream.value([
+          _spaceFixture(spaceId: 's1', creatorId: 'user1'),
+        ]),
+      );
+      when(
+        () => repo.updateSpace(
+          spaceId: any(named: 'spaceId'),
+          name: any(named: 'name'),
+          iconEmoji: any(named: 'iconEmoji'),
+          colorHex: any(named: 'colorHex'),
+        ),
+      ).thenThrow(const ValidationError(message: 'Server: name invalid'));
+
+      final container = _makeContainer(repo: repo, currentUid: 'user1');
+      addTearDown(container.dispose);
+      container.listen(spaceControllerProvider('user1'), (_, __) {});
+      container.listen(currentUidProvider, (_, __) {});
+      await container.read(currentUidProvider.future);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(spaceControllerProvider('user1').notifier)
+          .updateSpace(spaceId: 's1', name: 'Renamed');
+
+      final state = container.read(spaceControllerProvider('user1'));
+      expect(state.isLoading, isFalse);
+      expect(state.errorMessage, 'Server: name invalid');
+    });
+  });
 }

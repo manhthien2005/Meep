@@ -134,6 +134,7 @@ export const onReactionCreated = onDocumentCreated(
 // ===== Space module =====
 
 export { createSpace } from './space/createSpace.js';
+export { updateSpace } from './space/updateSpace.js';
 export { leaveSpace } from './space/leaveSpace.js';
 export { kickMember } from './space/kickMember.js';
 export { transferOwnership } from './space/transferOwnership.js';

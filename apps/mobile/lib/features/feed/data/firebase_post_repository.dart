@@ -32,9 +32,48 @@ class FirebasePostRepository implements PostRepository {
   }
 
   @override
-  Stream<List<Post>> watchFeed(String uid) {
-    // Direct-read approach: separate queries for own posts + each friend's posts,
-    // then merge streams. Works with Firestore Rules that check resource.data.authorId.
+  Stream<List<Post>> watchFeed(String uid, {String? spaceId}) {
+    // Branch theo Space context.
+    if (spaceId != null) {
+      return _watchSpaceFeed(spaceId);
+    }
+    return _watchFriendsFeed(uid);
+  }
+
+  /// Feed Space — query thẳng `/posts where spaceId == X`. Cần compound
+  /// index `(spaceId asc, createdAt desc)` ở firestore.indexes.json.
+  ///
+  /// Rule `/posts` read pass cho Space member qua nhánh
+  /// `exists(/users/{uid}/feed/{postId})` (CF spacePostFanOut tạo entry
+  /// khi post.spaceId != null) — không cần Space member phải là friend
+  /// của author.
+  Stream<List<Post>> _watchSpaceFeed(String spaceId) {
+    return _db
+        .collection(_posts)
+        .where('spaceId', isEqualTo: spaceId)
+        .orderBy('createdAt', descending: true)
+        .limit(10)
+        .snapshots()
+        .map(
+          (snap) => snap.docs.map((doc) => Post.fromJson(doc.data())).toList(),
+        );
+  }
+
+  /// Feed chung — own posts + friends posts, loại Space posts.
+  ///
+  /// Filter `p.spaceId == null` client-side sau merge: Firestore không
+  /// index null mặc định, query `where('spaceId', '==', null)` chỉ match
+  /// docs có explicit null field, miss docs không có field (posts cũ
+  /// pre-spaceId). Client-side an toàn hơn — vẫn loại đúng Space posts.
+  ///
+  /// Per-author query limit = 20 (buffer 2x): nếu user gần đây post nhiều
+  /// vào Space, page đầu có thể full Space posts → take(10) sau filter sẽ
+  /// thiếu post non-Space. Buffer 20 đủ rộng cho MVP (≤ 30 authors × 20
+  /// posts = 600 docs reads/min worst case). Khi Tier 1 thêm cursor pagi,
+  /// đổi sang server-side filter compound query.
+  static const _perAuthorBuffer = 20;
+
+  Stream<List<Post>> _watchFriendsFeed(String uid) {
     return _getFriendUids(uid).asStream().asyncExpand((friendUids) {
       final authorIds = [uid, ...friendUids];
 
@@ -42,14 +81,12 @@ class FirebasePostRepository implements PostRepository {
         return Stream.value(<Post>[]);
       }
 
-      // Query each author separately, then merge + sort client-side.
-      // Firestore Rules allow read when resource.data.authorId matches or isFriend().
       final streams = authorIds.take(30).map((authorId) {
         return _db
             .collection(_posts)
             .where('authorId', isEqualTo: authorId)
             .orderBy('createdAt', descending: true)
-            .limit(10)
+            .limit(_perAuthorBuffer)
             .snapshots()
             .map(
               (snap) =>
@@ -57,10 +94,11 @@ class FirebasePostRepository implements PostRepository {
             );
       }).toList();
 
-      // Merge all streams, flatten, sort by createdAt desc, take top 10.
       return _mergeStreams(streams).map((allPosts) {
         allPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        return allPosts.take(10).toList();
+        // Loại Space posts khỏi feed chung — chỉ post.spaceId == null
+        // xuất hiện ở "Mọi người" / "Bạn" / "Friend X" filter.
+        return allPosts.where((p) => p.spaceId == null).take(10).toList();
       });
     });
   }

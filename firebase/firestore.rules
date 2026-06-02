@@ -194,9 +194,47 @@ service cloud.firestore {
 
     // ===== /spaces/{spaceId} =====
     match /spaces/{spaceId} {
-      allow read: if isMember(spaceId);
+      // Read pass khi caller có trong memberIds denormalized array của doc.
+      //
+      // KHÔNG dùng `isMember(spaceId)` (helper check subcollection
+      // /space_members) vì pattern `exists()` cross-collection KHÔNG work
+      // cho collection query — Firestore rules engine không verify được
+      // mỗi doc match query đều thoả rule mà phải lookup external →
+      // reject toàn bộ query với PERMISSION_DENIED. Single doc get() vẫn
+      // pass nhưng `watchMySpaces` (where memberIds arrayContains uid)
+      // fail.
+      //
+      // memberIds denormalized sync với /space_members trong cùng CF batch
+      // (createSpace/kickMember/leaveSpace). Client KHÔNG được update
+      // memberIds trực tiếp — rule update whitelist chặn (xem dưới). Vậy
+      // memberIds = source of truth tin cậy cho read permission.
+      allow read: if isAuthed() && request.auth.uid in resource.data.memberIds;
       allow create: if false; // CF createSpace (Admin SDK) only
-      allow update: if isCreator(spaceId);
+      // Creator update — field whitelist + type validation.
+      // Whitelist: name/iconEmoji/colorHex (edit cosmetic qua CF updateSpace
+      // hoặc client direct), deletedAt (soft-delete), updatedAt (timestamp).
+      // BAN: creatorId/memberIds/memberCount/createdAt/spaceId — các thao
+      // tác structural đi qua CF rieng (transferOwnership, kickMember, ...).
+      //
+      // Pattern type validation: `!affectedKeys().hasAny(['name'])` skip
+      // check khi field KHÔNG có trong diff (request.resource.data.name
+      // bằng value cũ → an toàn). Khi field trong diff thì enforce type +
+      // size. CF updateSpace.ts cũng zod validate cùng rule — defense in
+      // depth (rules là final boundary chống client bypass CF qua SDK).
+      allow update: if isCreator(spaceId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name', 'iconEmoji', 'colorHex', 'deletedAt', 'updatedAt'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['name'])
+            || (request.resource.data.name is string
+                && request.resource.data.name.size() >= 1
+                && request.resource.data.name.size() <= 30))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['iconEmoji'])
+            || (request.resource.data.iconEmoji is string
+                && request.resource.data.iconEmoji.size() >= 1
+                && request.resource.data.iconEmoji.size() <= 32))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['colorHex'])
+            || (request.resource.data.colorHex is string
+                && request.resource.data.colorHex.matches('^#[0-9A-Fa-f]{6}$')));
       allow delete: if false; // soft-delete via update deletedAt
     }
 
