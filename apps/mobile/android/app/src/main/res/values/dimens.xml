@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Widget root -->
+    <dimen name="widget_corner_radius">24dp</dimen>
+    <dimen name="widget_inner_padding">12dp</dimen>
+
+    <!-- Avatar (bottom-left, circular) -->
+    <dimen name="widget_avatar_size">40dp</dimen>
+
+    <!-- Caption pill -->
+    <dimen name="widget_caption_pill_radius">14dp</dimen>
+    <dimen name="widget_caption_pill_padding_h">10dp</dimen>
+    <dimen name="widget_caption_pill_padding_v">6dp</dimen>
+    <dimen name="widget_caption_text_size">14sp</dimen>
+    <dimen name="widget_caption_gap">8dp</dimen>
+
+    <!-- Unread count badge (top-right, circular) -->
+    <dimen name="widget_count_badge_min_size">24dp</dimen>
+    <dimen name="widget_count_badge_padding_h">8dp</dimen>
+    <dimen name="widget_count_text_size">12sp</dimen>
+
+    <!-- Placeholder (no-data state) -->
+    <dimen name="widget_placeholder_logo_size">48dp</dimen>
+    <dimen name="widget_placeholder_gap">8dp</dimen>
+    <dimen name="widget_placeholder_text_size">14sp</dimen>
+</resources>

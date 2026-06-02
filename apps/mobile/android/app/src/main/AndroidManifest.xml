@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- WidgetSyncWorker (T3) reaches Firestore/Storage over network -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:label="Meep"
         android:name="${applicationName}"
@@ -48,6 +51,7 @@
         <!-- MeepWidget — home-screen AppWidget -->
         <receiver
             android:name=".MeepWidget"
+            android:label="@string/widget_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

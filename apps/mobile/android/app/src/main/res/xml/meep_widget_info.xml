@@ -1,8 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Meep AppWidget metadata.
+
+  Sizing: 2x2 on the default home grid (~250dp x 250dp).
+  Update period: Android enforces a 30-minute minimum for updatePeriodMillis.
+  Real-time updates come from WidgetSyncWorker (WorkManager, 15-min cadence).
+-->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="250dp"
     android:minHeight="250dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/meep_widget"
-    android:resizeMode="horizontal|vertical"
+    android:previewLayout="@layout/meep_widget"
+    android:previewImage="@drawable/ic_widget_preview"
+    android:description="@string/widget_description"
+    android:resizeMode="none"
     android:widgetCategory="home_screen" />

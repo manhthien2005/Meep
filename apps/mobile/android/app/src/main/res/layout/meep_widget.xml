@@ -1,17 +1,121 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- TODO(W/T3/TBD): implement full widget layout — photo + author name overlay -->
+<!--
+  Meep Widget 2x2 — RemoteViews layout.
+
+  Zones (per Figma 693:2617):
+    widget_photo       — fullscreen photo, centerCrop, rounded via widget_background
+    widget_count       — unread count badge, top-right circle
+    widget_avatar      — author avatar 40dp circle, bottom-left
+    widget_caption     — caption Note pill, bottom-left next to avatar
+    widget_placeholder — no-data state, centered (logo + "Mở Meep để bắt đầu")
+
+  Visibility states (toggled by MeepWidget.kt in T2):
+    No data        → widget_placeholder VISIBLE, others GONE
+    Has data       → widget_placeholder GONE, widget_photo VISIBLE
+                     widget_avatar VISIBLE (default drawable if avatarUrl null)
+                     widget_caption VISIBLE if caption != null, GONE otherwise
+                     widget_count VISIBLE if unreadCount > 0, GONE otherwise
+
+  Note: android:textFontWeight requires API 28+; on API 23-27 the system
+  falls back to the font's default weight (visual diff vs Figma is minor).
+-->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#050F10">
+    android:background="@drawable/widget_background"
+    android:clipToOutline="true">
 
+    <ImageView
+        android:id="@+id/widget_photo"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:contentDescription="@string/widget_photo_content_description"
+        android:visibility="gone" />
+
+    <!-- Bottom-left cluster: avatar + caption pill -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="@dimen/widget_inner_padding"
+        android:layout_marginBottom="@dimen/widget_inner_padding"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:id="@+id/widget_avatar"
+            android:layout_width="@dimen/widget_avatar_size"
+            android:layout_height="@dimen/widget_avatar_size"
+            android:src="@drawable/widget_default_avatar"
+            android:contentDescription="@string/widget_avatar_content_description"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/widget_caption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/widget_caption_gap"
+            android:background="@drawable/widget_caption_pill"
+            android:paddingStart="@dimen/widget_caption_pill_padding_h"
+            android:paddingEnd="@dimen/widget_caption_pill_padding_h"
+            android:paddingTop="@dimen/widget_caption_pill_padding_v"
+            android:paddingBottom="@dimen/widget_caption_pill_padding_v"
+            android:textColor="@color/widget_caption_text"
+            android:textSize="@dimen/widget_caption_text_size"
+            android:textFontWeight="600"
+            android:fontFamily="@font/nunito"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:visibility="gone"
+            tools:text="📍 Quận 1, TP.HCM" />
+    </LinearLayout>
+
+    <!-- Top-right: unread count badge -->
     <TextView
+        android:id="@+id/widget_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="@dimen/widget_inner_padding"
+        android:layout_marginEnd="@dimen/widget_inner_padding"
+        android:minWidth="@dimen/widget_count_badge_min_size"
+        android:minHeight="@dimen/widget_count_badge_min_size"
+        android:background="@drawable/widget_count_badge"
+        android:paddingStart="@dimen/widget_count_badge_padding_h"
+        android:paddingEnd="@dimen/widget_count_badge_padding_h"
+        android:gravity="center"
+        android:textColor="@color/widget_count_text"
+        android:textSize="@dimen/widget_count_text_size"
+        android:textFontWeight="700"
+        android:fontFamily="@font/nunito"
+        android:visibility="gone"
+        tools:text="9+" />
+
+    <!-- No-data placeholder (centered logo + CTA text) -->
+    <LinearLayout
         android:id="@+id/widget_placeholder"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:text="Meep"
-        android:textColor="#C7F7FB"
-        android:textSize="18sp" />
+        android:orientation="vertical"
+        android:gravity="center">
 
+        <ImageView
+            android:layout_width="@dimen/widget_placeholder_logo_size"
+            android:layout_height="@dimen/widget_placeholder_logo_size"
+            android:src="@drawable/ic_widget_logo"
+            android:contentDescription="@string/widget_label" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/widget_placeholder_gap"
+            android:text="@string/widget_placeholder_text"
+            android:textColor="@color/widget_placeholder_text"
+            android:textSize="@dimen/widget_placeholder_text_size"
+            android:textFontWeight="600"
+            android:fontFamily="@font/nunito" />
+    </LinearLayout>
 </FrameLayout>
