@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'package:meep/features/chat/application/chat_providers.dart';
+import 'package:meep/features/chat/data/chat_seed_data.dart';
 import 'package:meep/features/chat/presentation/widgets/space_members_sheet.dart';
 
 void main() {
   Widget wrap(Widget child) => ProviderScope(
+        overrides: [
+          currentChatUidProvider.overrideWith((ref) => ChatSeed.currentUid),
+        ],
         child: MaterialApp(home: Scaffold(body: child)),
       );
 

@@ -1,33 +1,69 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:meep/core/utils/pair_id.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
-import 'package:meep/features/chat/data/chat_seed_data.dart';
-import 'package:meep/features/chat/data/fake_conversation_repository.dart';
+import 'package:meep/features/chat/application/chat_providers.dart';
+import 'package:meep/features/chat/data/conversation.dart';
+import 'package:meep/features/chat/data/firebase_conversation_repository.dart';
 
 void main() {
   late ProviderContainer container;
-  late FakeConversationRepository repo;
+  late FakeFirebaseFirestore firestore;
+  late FirebaseConversationRepository repo;
+
+  const testUid = 'test-user';
+  const talakiUid = 'uid-talaki';
+  late String talakiPairId;
+
+  Future<void> seedConversation({
+    required String conversationId,
+    required List<String> participantIds,
+    String lastMessage = '',
+    ConversationStatus status = ConversationStatus.active,
+  }) async {
+    final conv = Conversation(
+      conversationId: conversationId,
+      type: ConversationType.direct,
+      participantIds: participantIds,
+      status: status,
+      lastMessage: lastMessage,
+      lastMessageAt: DateTime(2026, 6, 1),
+      lastSenderId: '',
+      createdAt: DateTime(2026, 6, 1),
+    );
+    await firestore.collection('conversations').doc(conversationId).set(
+          conv.toJson(),
+        );
+  }
 
   setUp(() {
-    repo = FakeConversationRepository();
+    firestore = FakeFirebaseFirestore();
+    repo = FirebaseConversationRepository(firestore);
+    talakiPairId = pairIdOf(testUid, talakiUid);
     container = ProviderContainer(
       overrides: [
         conversationRepositoryProvider.overrideWithValue(repo),
+        currentChatUidProvider.overrideWith((ref) => testUid),
       ],
     );
   });
-  tearDown(() {
-    container.dispose();
-    repo.dispose();
-  });
+  tearDown(() => container.dispose());
 
   ChatController controller() =>
       container.read(chatControllerProvider.notifier);
 
   group('sendMessage', () {
     test('happy path resets status (no error, not sending)', () async {
+      // Seed the conversation first
+      await seedConversation(
+        conversationId: talakiPairId,
+        participantIds: [testUid, talakiUid],
+      );
+
       await controller().sendMessage(
-        conversationId: ChatSeed.convTalaki,
+        conversationId: talakiPairId,
         text: 'Xin chào',
       );
 
@@ -37,8 +73,13 @@ void main() {
     });
 
     test('empty text surfaces ValidationError message in state', () async {
+      await seedConversation(
+        conversationId: talakiPairId,
+        participantIds: [testUid, talakiUid],
+      );
+
       await controller().sendMessage(
-        conversationId: ChatSeed.convTalaki,
+        conversationId: talakiPairId,
         text: '   ',
       );
 
@@ -79,18 +120,25 @@ void main() {
     });
 
     test('reuses existing conversation for known author', () async {
+      // Pre-seed the conversation
+      await seedConversation(
+        conversationId: talakiPairId,
+        participantIds: [testUid, talakiUid],
+      );
+
       final id = await controller().sendMessageFromFeed(
         postId: 'post-y',
-        authorId: 'uid-talaki',
+        authorId: talakiUid,
         text: 'reply',
       );
-      expect(id, ChatSeed.convTalaki);
+
+      expect(id, talakiPairId);
     });
 
     test('returns null and sets error on validation failure', () async {
       final id = await controller().sendMessageFromFeed(
         postId: 'post-z',
-        authorId: 'uid-talaki',
+        authorId: talakiUid,
         text: '',
       );
       expect(id, isNull);

@@ -50,7 +50,7 @@ service cloud.firestore {
     function isParticipant(conversationId) {
       return isAuthed() &&
         get(/databases/$(database)/documents/conversations/$(conversationId))
-          .data.participantIds.hasAll([request.auth.uid]);
+          .data.participantIds.hasAny([request.auth.uid]);
     }
 
     // ===== /users/{uid} =====

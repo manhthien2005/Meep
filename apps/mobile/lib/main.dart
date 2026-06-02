@@ -18,7 +18,7 @@ import 'package:meep/features/auth/data/firebase_auth_repository.dart';
 import 'package:meep/features/auth/data/firebase_user_repository.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
-import 'package:meep/features/chat/data/fake_conversation_repository.dart';
+import 'package:meep/features/chat/data/firebase_conversation_repository.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/data/firebase_friend_repository.dart';
 import 'package:meep/features/friend/data/firebase_friend_request_repository.dart';
@@ -82,10 +82,9 @@ void main() async {
             FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
           ),
         ),
-        // TODO(C/wire): swap for FirestoreConversationRepository once the chat
-        // backend (Friend #88 / Settings #115 / Space) is wired. FE-first only.
-        conversationRepositoryProvider
-            .overrideWithValue(FakeConversationRepository()),
+        conversationRepositoryProvider.overrideWithValue(
+          FirebaseConversationRepository(FirebaseFirestore.instance),
+        ),
       ],
       child: const MeepApp(),
     ),
