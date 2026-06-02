@@ -107,10 +107,15 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
                 TextField(
                   controller: _searchController,
                   textAlign: TextAlign.center,
+                  // Hard cap 50 chars — display name + username Meep
+                  // không vượt 32 chars, search 50 cover edge cases mà
+                  // không cho paste payload bất thường gây re-filter chậm.
+                  maxLength: 50,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
+                    counterText: '', // ẩn counter "0/50"
                   ),
                   style: AppTextStyles.baseBold.copyWith(
                     color: AppColors.bw100,
@@ -223,11 +228,13 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
             ),
           ),
           const SizedBox(height: 20),
-          // Continue button
+          // Continue button — Space cần tối thiểu 3 thành viên (creator +
+          // 2 friends). Enable khi user chọn ≥ 2 friend.
           AppPrimaryButton(
             label: 'Tiếp tục',
-            onPressed:
-                widget.selectedFriendUids.isNotEmpty ? widget.onContinue : null,
+            onPressed: widget.selectedFriendUids.length >= 2
+                ? widget.onContinue
+                : null,
           ),
           const SizedBox(height: 16),
         ],

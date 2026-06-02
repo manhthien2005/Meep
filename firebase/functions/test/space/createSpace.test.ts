@@ -7,7 +7,7 @@ const createSpaceSchema = z.object({
   name: z.string().trim().min(1).max(30),
   iconEmoji: z.string().min(1).max(32),
   colorHex: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'colorHex must be #RRGGBB'),
-  friendUids: z.array(z.string().min(1).max(128)).max(9),
+  friendUids: z.array(z.string().min(1).max(128)).min(2).max(9),
 });
 
 describe('createSpace schema', () => {
@@ -21,12 +21,32 @@ describe('createSpace schema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts empty friendUids (solo Space)', () => {
+  it('rejects empty friendUids — Space cần ≥ 3 thành viên', () => {
     const result = createSpaceSchema.safeParse({
       name: 'Solo',
       iconEmoji: '🎃',
       colorHex: '#FEEBCA',
       friendUids: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects 1 friendUid — Space cần ≥ 3 thành viên (creator + 2)', () => {
+    const result = createSpaceSchema.safeParse({
+      name: 'Duo',
+      iconEmoji: '🎃',
+      colorHex: '#FEEBCA',
+      friendUids: ['friend1'],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts 2 friendUids (min boundary = creator + 2 = 3 thành viên)', () => {
+    const result = createSpaceSchema.safeParse({
+      name: 'Trio',
+      iconEmoji: '🎃',
+      colorHex: '#FEEBCA',
+      friendUids: ['friend1', 'friend2'],
     });
     expect(result.success).toBe(true);
   });
@@ -36,7 +56,7 @@ describe('createSpace schema', () => {
       name: '',
       iconEmoji: '🎃',
       colorHex: '#FEEBCA',
-      friendUids: [],
+      friendUids: ['f1', 'f2'],
     });
     expect(result.success).toBe(false);
   });
@@ -46,7 +66,7 @@ describe('createSpace schema', () => {
       name: '   ',
       iconEmoji: '🎃',
       colorHex: '#FEEBCA',
-      friendUids: [],
+      friendUids: ['f1', 'f2'],
     });
     expect(result.success).toBe(false);
   });
@@ -56,7 +76,7 @@ describe('createSpace schema', () => {
       name: 'a'.repeat(31),
       iconEmoji: '🎃',
       colorHex: '#FEEBCA',
-      friendUids: [],
+      friendUids: ['f1', 'f2'],
     });
     expect(result.success).toBe(false);
   });
@@ -66,7 +86,7 @@ describe('createSpace schema', () => {
       name: 'Family',
       iconEmoji: '🎃',
       colorHex: 'FEEBCA',
-      friendUids: [],
+      friendUids: ['f1', 'f2'],
     });
     expect(result.success).toBe(false);
   });
@@ -76,7 +96,7 @@ describe('createSpace schema', () => {
       name: 'Family',
       iconEmoji: '🎃',
       colorHex: '#FFF',
-      friendUids: [],
+      friendUids: ['f1', 'f2'],
     });
     expect(result.success).toBe(false);
   });
@@ -86,7 +106,7 @@ describe('createSpace schema', () => {
       name: 'Family',
       iconEmoji: '🎃',
       colorHex: '#FEEBCAFF',
-      friendUids: [],
+      friendUids: ['f1', 'f2'],
     });
     expect(result.success).toBe(false);
   });
@@ -96,7 +116,7 @@ describe('createSpace schema', () => {
       name: 'Family',
       iconEmoji: '🎃',
       colorHex: '#feebca',
-      friendUids: [],
+      friendUids: ['f1', 'f2'],
     });
     expect(result.success).toBe(true);
   });
@@ -136,7 +156,7 @@ describe('createSpace schema', () => {
       name: 'Family',
       iconEmoji: '',
       colorHex: '#FEEBCA',
-      friendUids: [],
+      friendUids: ['f1', 'f2'],
     });
     expect(result.success).toBe(false);
   });

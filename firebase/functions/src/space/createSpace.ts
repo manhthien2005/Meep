@@ -17,7 +17,10 @@ const createSpaceSchema = z.object({
   // 7-char hex `#RRGGBB`. Reject malformed để Camera UI parser luôn an toàn.
   colorHex: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'colorHex must be #RRGGBB'),
   // friendUids: invited friends; creator auto-added → tổng ≤ 10 (max 9 friends).
-  friendUids: z.array(z.string().min(1).max(128)).max(9),
+  // min(2) = Space cần ≥ 3 thành viên (creator + 2 friends) — match client
+  // guard (SpaceController.createSpace) + UI button "Tiếp tục" disabled khi
+  // < 2 friend chọn.
+  friendUids: z.array(z.string().min(1).max(128)).min(2).max(9),
 });
 
 /**
