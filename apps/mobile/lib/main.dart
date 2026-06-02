@@ -45,6 +45,7 @@ void main() async {
 
   final authRepo = FirebaseAuthRepository(
     auth: FirebaseAuth.instance,
+    functions: FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
     googleSignIn: GoogleSignIn(
       serverClientId: AppConfig.googleServerClientId,
     ),
