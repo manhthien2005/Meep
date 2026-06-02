@@ -36,11 +36,14 @@ class ShareProfileSheet extends StatelessWidget {
               icon: Icons.chat_bubble_outline,
               label: 'Gửi qua Messenger',
               onTap: () async {
-                Navigator.of(context).pop();
                 // System share sheet — Messenger + nhiều app khác tự xuất hiện.
+                // Share trước, pop sau: nếu share fail / dismiss, sheet vẫn ở
+                // đó để user retry.
                 await Share.share(
                   'Kết bạn với tôi trên Meep: $profileLink',
                 );
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
               },
             ),
             _buildOption(
