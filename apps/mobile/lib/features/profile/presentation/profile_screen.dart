@@ -1,25 +1,17 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
+import 'package:meep/features/profile/application/profile_controller.dart';
+import 'package:meep/features/profile/application/profile_posts_provider.dart';
 import 'package:meep/features/profile/presentation/widgets/diary_tab_content.dart';
 import 'package:meep/features/profile/presentation/widgets/photo_grid.dart';
 import 'package:meep/features/profile/presentation/widgets/profile_tab_bar.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 import 'package:meep/shared/widgets/share_profile_sheet.dart';
-
-// ─── MOCK DATA — xoá khi wire ProfileController ──────────────────────────────
-const _kUsername = 'janakimmm';
-const _kBio = 'nhìn cái choá zì ???';
-const _kPostCount = 9;
-const _kFriendCount = 15;
-const _kSpaceCount = 2;
-final _kMockPhotos = List.generate(
-  9,
-  (i) => 'https://picsum.photos/seed/meep_mock_$i/400',
-);
 
 // ─── Missing design tokens — ping leader để add vào core/theme/ ───────────
 // #0D0804 → profileBackground  (bw900=#050F10 là gần nhất)
@@ -47,9 +39,38 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(profileControllerProvider(widget.uid));
     final unreadCounts = ref.watch(unreadCountsProvider);
     final totalUnread =
         unreadCounts.values.fold<int>(0, (sum, val) => sum + val);
+
+    if (state.isLoading && state.profile == null) {
+      return const Scaffold(
+        backgroundColor: _cBg,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.bw100),
+        ),
+      );
+    }
+
+    final profile = state.profile;
+    if (profile == null) {
+      return Scaffold(
+        backgroundColor: _cBg,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                state.errorMessage ?? 'Không tải được hồ sơ',
+                style: AppTextStyles.mdRegular.copyWith(color: AppColors.bw100),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: _cBg,
@@ -67,34 +88,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const _ProfileAvatar(username: _kUsername),
+                          _ProfileAvatar(
+                            username: profile.username,
+                            avatarUrl: profile.avatarUrl,
+                          ),
                           const SizedBox(width: 25),
                           _StatsRow(
-                            postCount: _kPostCount,
-                            friendCount: _kFriendCount,
-                            spaceCount: _kSpaceCount,
+                            postCount: profile.postCount,
+                            friendCount: profile.friendCount,
+                            spaceCount: profile.spaceCount,
                             onFriendTap: () {
-                              // TODO(T3): open FriendSheet
+                              // TODO(P/T3/HanDHG): open FriendSheet
                             },
                           ),
                         ],
                       ),
                       const SizedBox(height: 10),
-                      const Text(
-                        _kUsername,
-                        style: TextStyle(
+                      Text(
+                        profile.username,
+                        style: const TextStyle(
                           fontFamily: 'Nunito',
                           fontSize: 20,
-                          fontWeight:
-                              FontWeight.w600, // TODO: AppTextStyles.lgSemiBold
+                          // TODO: AppTextStyles.lgSemiBold
+                          fontWeight: FontWeight.w600,
                           height: 28 / 20,
                           color: AppColors.bw100,
                         ),
                       ),
-                      if (_kBio.isNotEmpty) ...[
+                      if ((profile.bio ?? '').isNotEmpty) ...[
                         const SizedBox(height: 3),
                         Text(
-                          _kBio,
+                          profile.bio!,
                           style: AppTextStyles.smRegular.copyWith(
                             color: AppColors.bw100,
                           ),
@@ -116,7 +140,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               onTap: () => ShareProfileSheet.show(
                                 context,
                                 uid: widget.uid,
-                                username: _kUsername,
+                                username: profile.username,
                               ),
                             ),
                           ),
@@ -133,11 +157,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const SizedBox(height: 10),
                 Expanded(
                   child: _activeTab == 0
-                      ? PhotoGrid(
-                          photos: _kMockPhotos,
-                          onTap: (index) => context
-                              .push('/profile/photo/mock-$index', extra: index),
-                        )
+                      ? _PhotosTab(uid: widget.uid)
                       : const DiaryTabContent(),
                 ),
               ],
@@ -175,10 +195,65 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 }
 
+// ─── Photos tab — load qua profilePostsProvider, render PhotoGrid ────────────
+
+class _PhotosTab extends ConsumerWidget {
+  const _PhotosTab({required this.uid});
+
+  final String uid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ref.watch(profilePostsProvider(uid)).when(
+          loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.bw100),
+          ),
+          error: (e, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                'Không tải được ảnh. Thử lại sau.',
+                style: AppTextStyles.smRegular.copyWith(color: AppColors.bw500),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+          data: (posts) {
+            if (posts.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    'Chưa có ảnh nào',
+                    style: AppTextStyles.smRegular
+                        .copyWith(color: AppColors.bw500),
+                  ),
+                ),
+              );
+            }
+            final photos =
+                posts.map((p) => p.coverImageUrl).toList(growable: false);
+            return PhotoGrid(
+              photos: photos,
+              onTap: (index) {
+                final post = posts[index];
+                context.push(
+                  '/profile/photo/${post.postId}',
+                  extra: <String, Object>{
+                    'posts': posts,
+                    'index': index,
+                  },
+                );
+              },
+            );
+          },
+        );
+  }
+}
+
 // ─── Avatar ──────────────────────────────────────────────────────────────────
 
 class _ProfileAvatar extends StatelessWidget {
-  // ignore: unused_element_parameter
   const _ProfileAvatar({required this.username, this.avatarUrl});
 
   final String username;
@@ -192,28 +267,37 @@ class _ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final url = avatarUrl;
     return Container(
       width: 100,
       height: 100,
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
         border: Border.fromBorderSide(
-          BorderSide(
-              color: _cAvatarRing, width: 2), // ignore: require_trailing_commas
+          BorderSide(color: _cAvatarRing, width: 2),
         ),
       ),
       padding: const EdgeInsets.all(4),
       child: ClipOval(
-        child: avatarUrl != null
-            ? Image.network(avatarUrl!, fit: BoxFit.cover)
-            : Container(
-                color: AppColors.bw700,
-                alignment: Alignment.center,
-                child: Text(
-                  _initials,
-                  style: AppTextStyles.lgBold.copyWith(color: AppColors.bw100),
-                ),
-              ),
+        child: url != null && url.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => _initialsFallback(),
+                placeholder: (_, __) => Container(color: AppColors.bw800),
+              )
+            : _initialsFallback(),
+      ),
+    );
+  }
+
+  Widget _initialsFallback() {
+    return Container(
+      color: AppColors.bw700,
+      alignment: Alignment.center,
+      child: Text(
+        _initials,
+        style: AppTextStyles.lgBold.copyWith(color: AppColors.bw100),
       ),
     );
   }
@@ -268,7 +352,8 @@ class _StatItem extends StatelessWidget {
           style: const TextStyle(
             fontFamily: 'Nunito',
             fontSize: 18,
-            fontWeight: FontWeight.w600, // TODO: AppTextStyles.baseSemiBold
+            // TODO: AppTextStyles.baseSemiBold
+            fontWeight: FontWeight.w600,
             height: 24 / 18,
             color: AppColors.bw100,
           ),
