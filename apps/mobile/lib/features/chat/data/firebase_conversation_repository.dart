@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -42,6 +43,12 @@ class FirebaseConversationRepository implements ConversationRepository {
               .toList(),
         )
         .handleError((Object e, StackTrace s) {
+      developer.log(
+        'watchConversations failed: uid=$uid err=$e',
+        name: 'chat',
+        error: e,
+        stackTrace: s,
+      );
       if (e is FirebaseException) {
         throw _mapFirestoreException(e, 'tải danh sách tin nhắn');
       }
@@ -73,6 +80,12 @@ class FirebaseConversationRepository implements ConversationRepository {
       // Reverse to chronological ASC (oldest first) for display.
       return messages.reversed.toList();
     }).handleError((Object e, StackTrace s) {
+      developer.log(
+        'watchMessages failed: convId=$conversationId err=$e',
+        name: 'chat',
+        error: e,
+        stackTrace: s,
+      );
       if (e is FirebaseException) {
         throw _mapFirestoreException(e, 'tải tin nhắn');
       }
@@ -139,6 +152,7 @@ class FirebaseConversationRepository implements ConversationRepository {
     required String senderId,
     required String text,
     String? senderDisplayName,
+    String? quotedPostId,
   }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) {
@@ -168,6 +182,8 @@ class FirebaseConversationRepository implements ConversationRepository {
         'createdAt': FieldValue.serverTimestamp(),
         if (senderDisplayName != null && senderDisplayName.isNotEmpty)
           'senderDisplayName': senderDisplayName,
+        if (quotedPostId != null && quotedPostId.isNotEmpty)
+          'quotedPostId': quotedPostId,
       });
       batch.update(conversationRef, {
         'lastMessage': trimmed,

@@ -19,6 +19,13 @@ class Message with _$Message {
     /// trước Bug #2 fix sẽ KHÔNG có field này → group chat fallback render
     /// 'Người dùng'. Rule cap 50 chars.
     String? senderDisplayName,
+
+    /// Reply-to post id. Pattern FB story reply / Locket: mỗi message reply
+    /// gắn với 1 post → ChatThreadView render mini thumbnail card phía trên
+    /// bubble cho message này (KHÔNG dùng conversation-level header). User
+    /// reply nhiều posts khác nhau trong cùng chat → mỗi reply có thumbnail
+    /// riêng.
+    String? quotedPostId,
   }) = _Message;
 
   factory Message.fromJson(Map<String, dynamic> json) =>

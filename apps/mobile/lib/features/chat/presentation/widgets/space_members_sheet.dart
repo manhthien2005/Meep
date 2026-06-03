@@ -102,7 +102,11 @@ class _MemberRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          AppAvatar(imageUrl: avatarUrl, size: 44),
+          AppAvatar(
+            imageUrl: avatarUrl,
+            size: 44,
+            fallbackText: avatarFallbackFromName(name),
+          ),
           const SizedBox(width: 14),
           Flexible(
             child: Text(

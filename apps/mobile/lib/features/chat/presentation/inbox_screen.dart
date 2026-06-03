@@ -124,7 +124,16 @@ class _InboxTopbar extends ConsumerWidget {
                 backgroundColor: Colors.transparent,
                 builder: (_) => const SettingsSheet(),
               ),
-              child: AppAvatar(imageUrl: avatarUrl, size: 40),
+              child: AppAvatar(
+                imageUrl: avatarUrl,
+                size: 40,
+                fallbackText: avatarFallbackFromName(
+                  ref
+                      .watch(currentUserProfileProvider)
+                      .valueOrNull
+                      ?.displayName,
+                ),
+              ),
             ),
           ),
         ],

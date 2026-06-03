@@ -2,6 +2,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:meep/core/utils/pair_id.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
@@ -40,17 +41,39 @@ void main() {
     tester.view.physicalSize = const Size(900, 1600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
+
+    // Minimal GoRouter cho test — FriendMessageBar._send navigate `/chat/:id`
+    // hoặc `/group-chat/:id` sau khi reply thành công. Test verify side
+    // effect (firestore write) đã đủ; routes stub render placeholder để tránh
+    // throw khi push.
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) => const Scaffold(
+            body: FriendMessageBar(postId: postId, authorId: authorUid),
+          ),
+        ),
+        GoRoute(
+          path: '/chat/:id',
+          builder: (_, __) => const Scaffold(body: SizedBox.shrink()),
+        ),
+        GoRoute(
+          path: '/group-chat/:id',
+          builder: (_, __) => const Scaffold(body: SizedBox.shrink()),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           conversationRepositoryProvider.overrideWithValue(repo),
           currentChatUidProvider.overrideWith((ref) => myUid),
         ],
-        child: const MaterialApp(
-          home: Scaffold(
-            body: FriendMessageBar(postId: postId, authorId: authorUid),
-          ),
-        ),
+        child: MaterialApp.router(routerConfig: router),
       ),
     );
   }

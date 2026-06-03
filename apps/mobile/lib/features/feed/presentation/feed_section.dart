@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
@@ -256,12 +259,12 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
     setState(() => _isSending = false);
     if (conversationId != null) {
       _collapse();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã gửi tin nhắn'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      // Pattern Locket: reply post → chuyển hướng vào chat screen với quoted
+      // photo block ở đầu thread. Group post → /group-chat, else 1-1 /chat.
+      final isSpace = widget.spaceId != null && widget.spaceId!.isNotEmpty;
+      final route =
+          isSpace ? '/group-chat/$conversationId' : '/chat/$conversationId';
+      unawaited(context.push(route));
     } else {
       // Controller đã set errorMessage trong state — read để show.
       final err = ref.read(chatControllerProvider).errorMessage;

@@ -251,16 +251,30 @@ service cloud.firestore {
       // `.where('participantIds', arrayContains: uid)` sẽ PERMISSION_DENIED
       // nếu rule chứa get(). Pattern này khớp /friendships đã hoạt động.
       //
-      // Side effect: `getOrCreateConversation` lần đầu (chưa tồn tại doc) cũng
-      // fail nếu rule eval get() → resource null. Direct read field tránh.
+      // Null guard `resource == null`: getOrCreateConversation lần đầu gọi
+      // `docRef.get()` trên doc CHƯA TỒN TẠI → Firestore SDK v25 transform
+      // sang Listen → server eval rule → `resource` null → field access
+      // returns false → PERMISSION_DENIED. Allow null resource để client check
+      // exists trước khi create. List query không bao giờ trả null resource
+      // nên không lo leak.
       allow read: if isAuthed()
-        && request.auth.uid in resource.data.participantIds;
+        && (resource == null
+            || request.auth.uid in resource.data.participantIds);
       allow create: if isAuthed()
         && request.resource.data.participantIds.hasAll([request.auth.uid]);
+      // Whitelist update fields: lastMessage/lastMessageAt/lastSenderId set
+      // bởi sendMessage; lastReadAt bởi markAsRead.
+      // (quotedPostId moved to per-MESSAGE — FB story reply pattern, không
+      // phải per-conversation nữa.)
       allow update: if isAuthed()
         && request.auth.uid in resource.data.participantIds
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'lastReadAt']);
+             .hasOnly([
+               'lastMessage',
+               'lastMessageAt',
+               'lastSenderId',
+               'lastReadAt',
+             ]);
       allow delete: if false;
 
       // Messages subcollection vẫn dùng isParticipant() — query luôn scoped
@@ -276,7 +290,11 @@ service cloud.firestore {
           && request.resource.data.text.size() <= 500
           && (!('senderDisplayName' in request.resource.data) ||
               (request.resource.data.senderDisplayName is string &&
-               request.resource.data.senderDisplayName.size() <= 50));
+               request.resource.data.senderDisplayName.size() <= 50))
+          && (!('quotedPostId' in request.resource.data) ||
+              (request.resource.data.quotedPostId is string &&
+               request.resource.data.quotedPostId.size() > 0 &&
+               request.resource.data.quotedPostId.size() <= 30));
         allow update, delete: if false;
       }
     }

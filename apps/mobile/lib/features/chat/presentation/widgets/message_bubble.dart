@@ -86,7 +86,11 @@ class MessageBubble extends StatelessWidget {
             children: [
               if (!isMine) ...[
                 if (isLastInGroup)
-                  AppAvatar(imageUrl: avatarUrl, size: 40)
+                  AppAvatar(
+                    imageUrl: avatarUrl,
+                    size: 40,
+                    fallbackText: avatarFallbackFromName(senderName),
+                  )
                 else
                   const SizedBox(width: 40),
                 const SizedBox(width: 6),

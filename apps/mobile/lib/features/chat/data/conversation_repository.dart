@@ -19,11 +19,16 @@ abstract class ConversationRepository {
   /// [senderDisplayName] denormalized lúc gửi để group chat render tên người
   /// gửi mà không cần lookup user profile (N+1 query). Optional cho 1-1 hoặc
   /// khi profile chưa load — render fallback 'Người dùng' ở UI layer.
+  ///
+  /// [quotedPostId] — gắn với post user đang reply. ChatThreadView render
+  /// mini thumbnail card phía trên message bubble (FB story reply pattern).
+  /// Null cho messages bình thường (không phải reply post).
   Future<void> sendMessage({
     required String conversationId,
     required String senderId,
     required String text,
     String? senderDisplayName,
+    String? quotedPostId,
   });
 
   /// Stream of the most recent [limit] messages for [conversationId],

@@ -134,6 +134,20 @@ describe('/conversations/{conversationId}', () => {
     );
   });
 
+  test('authed user can get non-existent conversation doc (getOrCreate flow)',
+      async () => {
+    // Reproduction case của bug Reply Post "không gửi được tin nhắn":
+    // rule mới `request.auth.uid in resource.data.participantIds` fail khi
+    // doc chưa tồn tại → resource null → PERMISSION_DENIED. Fix `resource ==
+    // null || ...` cho phép client check exists trước khi create.
+    const newConvId = [alice, uid('charlie')].sort().join('_');
+    // Doc CHƯA seed — getOrCreate cần get() đầu tiên để check.
+    const doc = await assertSucceeds(
+      authed(alice).firestore().doc(`conversations/${newConvId}`).get(),
+    );
+    expect(doc.exists).toBe(false);
+  });
+
   test('non-participant query returns empty via rule filter', async () => {
     await seedConversation();
     const snap = await assertSucceeds(

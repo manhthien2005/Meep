@@ -40,8 +40,6 @@ class ChatScreen extends ConsumerWidget {
 
     final messagesAsync = ref.watch(messagesProvider(conversationId));
     final sendStatus = ref.watch(chatControllerProvider);
-    final quotedPost =
-        ref.watch(chatQuotedPostProvider(conversation?.quotedPostId));
 
     // status-driven readonly: blocked/unfriended → input ẩn + banner hiện.
     final status = conversation?.status ?? ConversationStatus.active;
@@ -49,11 +47,19 @@ class ChatScreen extends ConsumerWidget {
 
     // No composer for a brand-new conversation with no shared Meep: the only way
     // to start is by replying to a Meep (Figma `769:3019` has no input bar).
+    // Quoted post hiện per-message → conversation cần ít nhất 1 message để
+    // compose enabled (first message luôn là reply post).
     final hasMessages = messagesAsync.valueOrNull?.isNotEmpty ?? false;
-    final canCompose = !isReadonly && (hasMessages || quotedPost != null);
+    final canCompose = !isReadonly && hasMessages;
+
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Scaffold(
       backgroundColor: AppColors.bw900,
+      // Default true nhưng explicit để rõ intent: keyboard mở → Scaffold tự
+      // shrink body height → Column compresses → ChatInputBar lift lên đúng
+      // chỗ trên bàn phím.
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Column(
           children: [
@@ -76,13 +82,18 @@ class ChatScreen extends ConsumerWidget {
                 myUid: myUid,
                 peerAvatarUrl: peer?.avatarUrl,
                 peerName: peer?.displayName ?? '',
-                quotedPostId: conversation?.quotedPostId,
               ),
             ),
             if (isReadonly) _ReadonlyBanner(status: status),
             if (canCompose)
-              Padding(
+              // AnimatedPadding lift smooth khi keyboard mở/đóng — KHÔNG dùng
+              // viewInsets.bottom làm bottom padding (Scaffold đã handle inset
+              // qua resizeToAvoidBottomInset). Animation chỉ là extra polish
+              // cho perceived smoothness.
+              AnimatedPadding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
                 child: ChatInputBar(
                   isSending: sendStatus.isSending,
                   onSend: (text) => ref
@@ -90,6 +101,9 @@ class ChatScreen extends ConsumerWidget {
                       .sendMessage(conversationId: conversationId, text: text),
                 ),
               ),
+            // Safe area gesture bar khi KHÔNG có keyboard. Khi keyboard mở,
+            // viewInsets > 0 → spacer 0 để không double-pad.
+            if (keyboardInset == 0) const SizedBox(height: 0),
           ],
         ),
       ),
@@ -176,14 +190,12 @@ class _MessageList extends StatelessWidget {
     required this.myUid,
     required this.peerName,
     this.peerAvatarUrl,
-    this.quotedPostId,
   });
 
   final AsyncValue<List<Message>> messagesAsync;
   final String myUid;
   final String peerName;
   final String? peerAvatarUrl;
-  final String? quotedPostId;
 
   @override
   Widget build(BuildContext context) {
@@ -194,7 +206,6 @@ class _MessageList extends StatelessWidget {
         myUid: myUid,
         peerAvatarUrl: peerAvatarUrl,
         peerName: peerName,
-        quotedPostId: quotedPostId,
       );
     }
     if (messagesAsync.hasError) {
@@ -262,7 +273,11 @@ class _ChatHeader extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                AppAvatar(imageUrl: avatarUrl, size: 30),
+                AppAvatar(
+                  imageUrl: avatarUrl,
+                  size: 30,
+                  fallbackText: avatarFallbackFromName(title),
+                ),
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(

@@ -90,6 +90,7 @@ class FakeConversationRepository implements ConversationRepository {
     required String senderId,
     required String text,
     String? senderDisplayName,
+    String? quotedPostId,
   }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) {
@@ -112,6 +113,7 @@ class FakeConversationRepository implements ConversationRepository {
       text: trimmed,
       createdAt: now,
       senderDisplayName: senderDisplayName,
+      quotedPostId: quotedPostId,
     );
 
     _messages = {

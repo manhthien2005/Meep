@@ -164,6 +164,7 @@ class _SpyConversationRepository implements ConversationRepository {
   Future<Conversation> getOrCreateConversation({
     required String uid,
     required String otherUid,
+    String? quotedPostId,
   }) =>
       throw UnsupportedError('getOrCreateConversation');
 
@@ -173,6 +174,7 @@ class _SpyConversationRepository implements ConversationRepository {
     required String senderId,
     required String text,
     String? senderDisplayName,
+    String? quotedPostId,
   }) =>
       throw UnsupportedError('sendMessage');
 }

@@ -1,11 +1,16 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/chat/presentation/chat_time_format.dart';
+import 'package:meep/shared/widgets/app_note_pill.dart';
 
 /// The originating post shown at the top of a 1-1 thread that started from a
 /// feed reply — square photo + caption pill + timestamp. Figma `564:6942`.
+///
+/// Caption pill dùng `AppNotePill` shared (readOnly) để khớp design system
+/// với PostCard caption — không tự viết container.
 class QuotedPhotoBlock extends StatelessWidget {
   const QuotedPhotoBlock({
     super.key,
@@ -35,12 +40,19 @@ class QuotedPhotoBlock extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(50),
-                child: Image.network(
-                  imageUrl,
+                child: CachedNetworkImage(
+                  imageUrl: imageUrl,
                   width: 301,
                   height: 301,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  // Cache hit (most cases) = instant render; cache miss =
+                  // grey placeholder thay vì spinner để giảm flicker.
+                  placeholder: (_, __) => Container(
+                    width: 301,
+                    height: 301,
+                    color: AppColors.bw700,
+                  ),
+                  errorWidget: (_, __, ___) => Container(
                     width: 301,
                     height: 301,
                     color: AppColors.bw700,
@@ -50,41 +62,13 @@ class QuotedPhotoBlock extends StatelessWidget {
               if (caption != null && caption!.isNotEmpty)
                 Positioned(
                   bottom: 15,
-                  child: _CaptionPill(caption: caption!),
+                  child: AppNotePill(text: caption!, readOnly: true),
                 ),
             ],
           ),
         ),
         const SizedBox(height: 30),
       ],
-    );
-  }
-}
-
-class _CaptionPill extends StatelessWidget {
-  const _CaptionPill({required this.caption});
-
-  final String caption;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0x66394041),
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.text_fields, size: 18, color: AppColors.bw100),
-          const SizedBox(width: 6),
-          Text(
-            caption,
-            style: AppTextStyles.smSemiBold.copyWith(color: AppColors.bw100),
-          ),
-        ],
-      ),
     );
   }
 }

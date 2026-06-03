@@ -24,9 +24,6 @@ class Conversation with _$Conversation {
     required List<String> participantIds,
     String? spaceId,
 
-    /// postId that triggered this conversation, if any.
-    String? quotedPostId,
-
     /// Preview of last message (max 50 chars).
     @Default('') String lastMessage,
     @TimestampConverter() required DateTime lastMessageAt,

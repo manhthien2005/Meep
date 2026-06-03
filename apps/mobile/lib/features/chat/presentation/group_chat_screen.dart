@@ -41,6 +41,9 @@ class GroupChatScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.bw900,
+      // Default true nhưng explicit để rõ intent: keyboard mở → Scaffold tự
+      // shrink body height → Column compresses → ChatInputBar lift lên trên.
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Column(
           children: [
@@ -60,8 +63,10 @@ class GroupChatScreen extends ConsumerWidget {
                 spaceName: space?.name ?? '',
               ),
             ),
-            Padding(
+            AnimatedPadding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
               child: ChatInputBar(
                 isSending: sendStatus.isSending,
                 onSend: (text) => ref

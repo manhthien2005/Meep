@@ -7,15 +7,15 @@ import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/chat/data/message.dart';
 import 'package:meep/features/chat/presentation/chat_time_format.dart';
 import 'package:meep/features/chat/presentation/widgets/message_bubble.dart';
-import 'package:meep/features/chat/presentation/widgets/quoted_photo_block.dart';
+import 'package:meep/features/chat/presentation/widgets/message_quoted_post.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 
 /// Scrollable message list for a thread (shared by 1-1 + group).
 ///
-/// Shows the originating quoted photo at the top when [quotedPostId] resolves,
-/// the empty-thread CTA (`769:3019`) when there are no messages, otherwise the
-/// chronological bubble list. Auto-scrolls to the newest message on open, when
-/// a message is added, and as the keyboard opens (Messenger-style).
+/// Empty thread → CTA (`769:3019`). Messages → chronological bubble list,
+/// mỗi message reply post gắn 1 mini quoted card phía trên bubble (FB story
+/// reply pattern). Auto-scrolls to the newest message on open, when a message
+/// is added, and as the keyboard opens (Messenger-style).
 class ChatThreadView extends ConsumerStatefulWidget {
   const ChatThreadView({
     super.key,
@@ -23,7 +23,6 @@ class ChatThreadView extends ConsumerStatefulWidget {
     required this.myUid,
     required this.peerName,
     this.peerAvatarUrl,
-    this.quotedPostId,
     this.isGroup = false,
   });
 
@@ -31,7 +30,6 @@ class ChatThreadView extends ConsumerStatefulWidget {
   final String myUid;
   final String peerName;
   final String? peerAvatarUrl;
-  final String? quotedPostId;
 
   /// True khi đang render group chat (Space). Khi true: hiển thị tên sender
   /// phía trên message bubble cho "theirs" để phân biệt members.
@@ -85,9 +83,7 @@ class _ChatThreadViewState extends ConsumerState<ChatThreadView>
 
   @override
   Widget build(BuildContext context) {
-    final quoted = ref.watch(chatQuotedPostProvider(widget.quotedPostId));
-
-    if (widget.messages.isEmpty && quoted == null) {
+    if (widget.messages.isEmpty) {
       return _EmptyThread(
         peerName: widget.peerName,
         peerAvatarUrl: widget.peerAvatarUrl,
@@ -98,12 +94,6 @@ class _ChatThreadViewState extends ConsumerState<ChatThreadView>
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       children: [
-        if (quoted != null)
-          QuotedPhotoBlock(
-            imageUrl: quoted.coverImageUrl,
-            caption: quoted.caption,
-            createdAt: quoted.createdAt,
-          ),
         for (var i = 0; i < widget.messages.length; i++) ...[
           if (_showSeparatorBefore(i))
             _TimeSeparator(time: widget.messages[i].createdAt),
@@ -207,13 +197,32 @@ class _ThreadMessageRow extends ConsumerWidget {
     final senderName = profile?.displayName ?? message.senderDisplayName;
     final avatarUrl = resolvePerSender ? profile?.avatarUrl : fallbackAvatarUrl;
 
-    return MessageBubble(
-      text: message.text,
-      isMine: isMine,
-      avatarUrl: avatarUrl,
-      isLastInGroup: isLastInGroup,
-      senderName: senderName,
-      showSenderName: showSenderName,
+    // FB story reply pattern: mini quoted card phía trên bubble cho message
+    // có quotedPostId. Lookup post real-time qua chatQuotedPostProvider —
+    // Riverpod dedupe per postId nếu nhiều message cùng reply 1 post.
+    final quotedPost = message.quotedPostId != null
+        ? ref.watch(chatQuotedPostProvider(message.quotedPostId)).valueOrNull
+        : null;
+
+    return Column(
+      crossAxisAlignment:
+          isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        if (quotedPost != null)
+          MessageQuotedPost(
+            imageUrl: quotedPost.coverImageUrl,
+            caption: quotedPost.caption,
+            isMine: isMine,
+          ),
+        MessageBubble(
+          text: message.text,
+          isMine: isMine,
+          avatarUrl: avatarUrl,
+          isLastInGroup: isLastInGroup,
+          senderName: senderName,
+          showSenderName: showSenderName,
+        ),
+      ],
     );
   }
 }
@@ -235,6 +244,7 @@ class _EmptyThread extends StatelessWidget {
             AppAvatar(
               imageUrl: peerAvatarUrl,
               size: 95,
+              fallbackText: avatarFallbackFromName(peerName),
             ),
             const SizedBox(height: 32),
             Text(

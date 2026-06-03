@@ -4,9 +4,9 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
-import 'package:meep/features/chat/data/chat_seed_data.dart';
 import 'package:meep/features/chat/data/conversation.dart';
 import 'package:meep/features/chat/data/message.dart';
+import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/space.dart';
@@ -105,11 +105,14 @@ Stream<List<SpaceMember>> chatSpaceMembers(Ref ref, String spaceId) {
 }
 
 /// The post that a 1-1 conversation was started from (quoted photo header).
-/// Returns null when the conversation has no originating post.
-/// TODO(C/wire): replace with `postRepository.getPost(quotedPostId)`.
+/// Returns null when the conversation has no originating post, post đã bị xóa,
+/// hoặc khi user không có quyền đọc post (rule `/posts` deny — không phải bạn
+/// + không có feed-entry).
+///
+/// Riverpod dedupe per quotedPostId — mỗi unique post chỉ 1 Firestore read
+/// dù nhiều conversation cùng reference.
 @riverpod
-Post? chatQuotedPost(Ref ref, String? quotedPostId) {
-  if (quotedPostId == null) return null;
-  final post = ChatSeed.quotedPost();
-  return post.postId == quotedPostId ? post : null;
+Future<Post?> chatQuotedPost(Ref ref, String? quotedPostId) async {
+  if (quotedPostId == null || quotedPostId.isEmpty) return null;
+  return ref.watch(postRepositoryProvider).getPost(quotedPostId);
 }

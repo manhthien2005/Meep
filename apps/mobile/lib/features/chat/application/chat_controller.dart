@@ -104,6 +104,10 @@ class ChatController extends _$ChatController {
         senderId: myUid,
         text: text,
         senderDisplayName: _resolveDisplayName(),
+        // FB story reply pattern: postId gắn vào message → ChatThreadView
+        // render mini quoted card phía trên bubble (per-message, không phải
+        // 1 header chung cho conversation).
+        quotedPostId: postId,
       );
       state = const ChatSendStatus();
       return conversationId;
