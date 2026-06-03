@@ -342,7 +342,7 @@ class _AudienceRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final avatarSize = AppProportions.audienceAvatarSize(screenW);
-    final labelSize = avatarSize * 0.5;
+    final labelSize = avatarSize * 0.45;
     final isAll = audienceType == AudienceType.all;
 
     final currentUid = ref.watch(currentUidProvider).valueOrNull ?? '';
@@ -517,7 +517,7 @@ class _AllAudienceTile extends StatelessWidget {
             style: TextStyle(
               color: accent,
               fontSize: labelSize,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               fontFamily: 'Nunito',
               height: 1.1,
             ),
@@ -637,7 +637,7 @@ class _FriendAudienceTile extends StatelessWidget {
               style: TextStyle(
                 color: accent,
                 fontSize: labelSize,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
                 fontFamily: 'Nunito',
                 height: 1.1,
               ),

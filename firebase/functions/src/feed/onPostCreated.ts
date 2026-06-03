@@ -18,17 +18,22 @@ interface PostData {
   captionType?: string;
   audienceType: 'all' | 'select';
   audienceUids: string[];
-  spaceId?: string;
+  /// Multi-Space (Branch 2+). Empty = post All-friends. Mỗi entry trong
+  /// array fan-out riêng qua spacePostFanOut.
+  spaceIds?: string[];
   createdAt: FirebaseFirestore.Timestamp;
 }
 
 /**
  * Fan-out feed + increment postCount + FCM notification.
- * Single function — do not create a separate one in notification.md (H10).
  *
- * Guard: if post.spaceId != null → skip friend fan-out + FCM
- *   (Space CF onSpacePostCreated handles Space posts).
- *   Still increments postCount for all post types.
+ * Post Space (spaceIds non-empty): loop từng Space → spacePostFanOut riêng
+ * cho từng spaceId. Mỗi spaceId fan-out feed entry + FCM cho member của
+ * Space đó. Post KHÔNG đi vào friend feed (Space post tách rời, dù author
+ * có thể là friend của user khác).
+ *
+ * Post all-friends (spaceIds rỗng/missing): fan-out feed cho author +
+ * audienceUids (select) hoặc tất cả friends (all). FCM push cho friends.
  */
 export const onPostCreated = onDocumentCreated(
   { document: 'posts/{postId}', region: 'asia-southeast1' },
@@ -38,7 +43,8 @@ export const onPostCreated = onDocumentCreated(
 
     const db = getFirestore();
     const { postId } = event.params;
-    const { authorId, audienceType, audienceUids, spaceId } = post;
+    const { authorId, audienceType, audienceUids } = post;
+    const spaceIds = post.spaceIds ?? [];
 
     // 1. Always increment postCount on author (set merge — safe if field missing)
     await db.doc(`users/${authorId}`).set(
@@ -46,16 +52,20 @@ export const onPostCreated = onDocumentCreated(
       { merge: true },
     );
 
-    // 2. Space post — delegate sang spacePostFanOut helper (Option A) thay
-    // vì fan-out tới friends. Helper đọc /space_members để xác định members.
-    if (spaceId != null && spaceId !== '') {
-      await spacePostFanOut({
-        postId,
-        authorId,
-        authorName: post.authorName,
-        spaceId,
-        createdAt: post.createdAt,
-      });
+    // 2. Space post — delegate sang spacePostFanOut helper cho TỪNG Space
+    // trong spaceIds. Mỗi Space fan-out riêng (member của Space A ≠ Space B).
+    if (spaceIds.length > 0) {
+      await Promise.all(
+        spaceIds.map((spaceId) =>
+          spacePostFanOut({
+            postId,
+            authorId,
+            authorName: post.authorName,
+            spaceId,
+            createdAt: post.createdAt,
+          }),
+        ),
+      );
       return;
     }
 
@@ -74,7 +84,7 @@ export const onPostCreated = onDocumentCreated(
     const feedDoc = {
       postId,
       authorId,
-      spaceId: spaceId ?? null,
+      spaceIds: [] as string[],
       createdAt: post.createdAt,
     };
 

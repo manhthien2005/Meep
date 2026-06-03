@@ -27,16 +27,23 @@ describe('onPostCreated logic', () => {
     expect(recipients).toEqual(['uid2', 'uid3']);
   });
 
-  it('spaceId set → skips friend fan-out', () => {
-    const spaceId: string | null = 'space-abc';
-    const shouldFanOut = !(spaceId != null && spaceId !== '');
+  it('spaceIds non-empty → skips friend fan-out', () => {
+    const spaceIds: string[] = ['space-abc'];
+    const shouldFanOut = spaceIds.length === 0;
     expect(shouldFanOut).toBe(false);
   });
 
-  it('spaceId null → performs friend fan-out', () => {
-    const spaceId: string | null = null;
-    const shouldFanOut = !(spaceId != null && spaceId !== '');
+  it('spaceIds rỗng → performs friend fan-out', () => {
+    const spaceIds: string[] = [];
+    const shouldFanOut = spaceIds.length === 0;
     expect(shouldFanOut).toBe(true);
+  });
+
+  it('multi-Space: loop từng spaceId riêng', () => {
+    const spaceIds = ['space-a', 'space-b', 'space-c'];
+    const fanOutCalls: string[] = [];
+    for (const sid of spaceIds) fanOutCalls.push(sid);
+    expect(fanOutCalls).toEqual(['space-a', 'space-b', 'space-c']);
   });
 
   it('recipients always include the author (own-feed visibility)', () => {
@@ -61,20 +68,20 @@ describe('onPostCreated logic', () => {
     expect(friendUids).not.toContain(authorId);
   });
 
-  it('feed doc includes spaceId field', () => {
+  it('feed doc (friend fan-out) includes spaceIds=[]', () => {
     const post = {
       postId: 'p1',
       authorId: 'uid1',
-      spaceId: null as string | null,
+      spaceIds: [] as string[],
       createdAt: new Date(),
     };
     const feedDoc = {
       postId: post.postId,
       authorId: post.authorId,
-      spaceId: post.spaceId ?? null,
+      spaceIds: [] as string[],
       createdAt: post.createdAt,
     };
-    expect(feedDoc).toHaveProperty('spaceId');
-    expect(feedDoc.spaceId).toBeNull();
+    expect(feedDoc).toHaveProperty('spaceIds');
+    expect(feedDoc.spaceIds).toEqual([]);
   });
 });
