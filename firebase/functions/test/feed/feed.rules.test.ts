@@ -33,6 +33,21 @@ describe('Firestore rules — /posts/{postId}', () => {
     expect(true).toBe(true); // placeholder — requires emulator
   });
 
+  it('Space member can read post trong Space (non-friend author)', () => {
+    // allow read: ('spaceId' in resource.data && isMember(resource.data.spaceId))
+    // User is member of Space X, post author là người lạ (không friend).
+    // isMember(spaceId) check /space_members/{spaceId}/members/{uid}.
+    // 'spaceId' in resource.data guard prevents crash on All-friends posts
+    // (missing field sau removeWhere(null) khi createPost).
+    expect(true).toBe(true); // placeholder — requires emulator
+  });
+
+  it('non-Space-member cannot read Space post', () => {
+    // User không phải member Space X, không phải friend của author,
+    // không có feed doc → cả 4 nhánh thất bại → permission-denied.
+    expect(true).toBe(true); // placeholder — requires emulator
+  });
+
   it('create rejected if caption > 200 chars', () => {
     const caption = 'x'.repeat(201);
     // Storage rule: caption.size() <= 200

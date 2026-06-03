@@ -32,6 +32,14 @@ class Post with _$Post {
     /// Reserved for Space module. Null = all-friends post.
     /// When set: broadcast to all Space members; audienceType/audienceUids ignored.
     String? spaceId,
+
+    /// Denormalized snapshot của Space.memberIds tại thời điểm tạo post.
+    /// Dùng cho Firestore rule check `memberIds.hasAny([uid])` ở collection
+    /// query (`WHERE spaceId == X`) — Firestore rules engine cần điều kiện
+    /// expressible từ resource.data, không dùng get()/exists() cross-doc.
+    /// Null khi post All-friends. Stale acceptable cho MVP (member rời/kick
+    /// vẫn đọc được post cũ — không phải security issue, chỉ là cosmetic).
+    @Default(<String>[]) List<String> memberIds,
     @TimestampConverter() required DateTime createdAt,
   }) = _Post;
 

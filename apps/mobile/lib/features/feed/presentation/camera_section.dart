@@ -10,14 +10,11 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_proportions.dart';
-import 'package:meep/core/utils/hex_color.dart';
 import 'package:meep/features/feed/application/app_camera_controller.dart';
 import 'package:meep/features/feed/application/camera_state.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/presentation/capture_action_bar.dart';
 import 'package:meep/features/feed/presentation/capture_preview_args.dart';
-import 'package:meep/features/space/application/space_controller.dart';
-import 'package:meep/features/space/presentation/widgets/space_context_badge.dart';
 import 'package:meep/shared/widgets/app_dots_indicator.dart';
 import 'package:meep/shared/widgets/app_photo_frame.dart';
 
@@ -121,11 +118,6 @@ class _CameraSectionState extends ConsumerState<CameraSection> {
   @override
   Widget build(BuildContext context) {
     final camState = ref.watch(appCameraControllerProvider);
-    // Watch Space context — null = "All friends" mặc định, non-null = Space
-    // context. CameraSection re-render: viền + nút chụp + badge đổi theo
-    // colorHex của Space hiện tại.
-    final currentSpace = ref.watch(currentSpaceProvider);
-    final accent = parseHexColor(currentSpace?.colorHex);
     final screenW = MediaQuery.sizeOf(context).width;
     // Mirror _AudienceRow height: avatarSize + gap(4) + labelSize(avatarSize*0.4) + bottomPad(4)
     final historyRowH = AppProportions.audienceAvatarSize(screenW) * 1.4 + 8;
@@ -145,15 +137,9 @@ class _CameraSectionState extends ConsumerState<CameraSection> {
         // the (photo + dots) cluster sits vertically centered in the space
         // between the top bar and the action bar.
         const Spacer(),
-        // Badge "Đang gửi: [SpaceName]" — chỉ hiện khi currentSpace != null.
-        // Render above frame để user scan rõ context trước khi chụp.
-        if (currentSpace != null) ...const [
-          SpaceContextBadge(),
-          SizedBox(height: 8),
-        ],
         _ViewfinderArea(
           camState: camState,
-          borderColor: accent,
+          borderColor: null,
           modePageController: _modePageController,
           onModePageChanged: _onModePageChanged,
           onPinchStart: () => _baseZoom = camState.zoomLevel,
@@ -191,7 +177,7 @@ class _CameraSectionState extends ConsumerState<CameraSection> {
                 ref.read(appCameraControllerProvider.notifier).toggleCamera(),
             isCapturing: camState.isCapturing,
             showFlip: camState.mode == CameraMode.single,
-            captureRingColor: accent,
+            captureRingColor: null,
           ),
         ),
         const Spacer(),

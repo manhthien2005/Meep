@@ -34,10 +34,14 @@ service cloud.firestore {
     }
 
     /// True when the calling user is a member of [spaceId].
+    /// Dùng get() lên Space doc (đọc memberIds denormalized) thay vì exists()
+    /// vào subcollection /space_members. Pattern exists() cross-collection
+    /// KHÔNG work cho collection query (Firestore rules engine không xác minh
+    /// được mỗi doc match query — reject toàn bộ với PERMISSION_DENIED).
+    /// memberIds sync với /space_members trong cùng CF batch nên tin cậy được.
     function isMember(spaceId) {
-      return isAuthed() && exists(
-        /databases/$(database)/documents/space_members/$(spaceId)/members/$(request.auth.uid)
-      );
+      return isAuthed() &&
+        get(/databases/$(database)/documents/spaces/$(spaceId)).data.memberIds.hasAny([request.auth.uid]);
     }
 
     /// True when the calling user is the creator of [spaceId].
@@ -106,6 +110,13 @@ service cloud.firestore {
       allow read: if isAuthed() && (
         resource.data.authorId == request.auth.uid ||
         isFriend(resource.data.authorId) ||
+        // Space member: dùng memberIds denormalized SẴN trên post doc thay
+        // vì isMember(spaceId) — get() cross-collection KHÔNG expressible
+        // cho collection query (Firestore reject toàn bộ với
+        // PERMISSION_DENIED). memberIds snapshot tại lúc tạo post; stale OK
+        // cho MVP (member rời/kick vẫn đọc được post cũ).
+        ('memberIds' in resource.data
+          && resource.data.memberIds.hasAny([request.auth.uid])) ||
         exists(/databases/$(database)/documents/users/$(request.auth.uid)/feed/$(postId))
       );
 
@@ -195,14 +206,9 @@ service cloud.firestore {
     // ===== /spaces/{spaceId} =====
     match /spaces/{spaceId} {
       // Read pass khi caller có trong memberIds denormalized array của doc.
-      //
-      // KHÔNG dùng `isMember(spaceId)` (helper check subcollection
-      // /space_members) vì pattern `exists()` cross-collection KHÔNG work
-      // cho collection query — Firestore rules engine không verify được
-      // mỗi doc match query đều thoả rule mà phải lookup external →
-      // reject toàn bộ query với PERMISSION_DENIED. Single doc get() vẫn
-      // pass nhưng `watchMySpaces` (where memberIds arrayContains uid)
-      // fail.
+      // isMember() đã được sửa dùng get() lên chính Space doc này (đọc
+      // memberIds) thay vì exists() vào subcollection — nên an toàn cho
+      // cả collection query (WHERE spaceId == X trong /posts).
       //
       // memberIds denormalized sync với /space_members trong cùng CF batch
       // (createSpace/kickMember/leaveSpace). Client KHÔNG được update

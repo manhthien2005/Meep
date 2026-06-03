@@ -18,11 +18,17 @@ class PostCard extends StatefulWidget {
     required this.post,
     this.footer,
     this.onLongPress,
+    this.borderColor,
   });
 
   final Post post;
   final Widget? footer;
   final VoidCallback? onLongPress;
+
+  /// Viền ngoài AppPhotoFrame. Null = không viền (mặc định). Feed truyền
+  /// space.colorHex của post.spaceId để PostCard visualize Space context
+  /// (giống camera page Space accent trước đây).
+  final Color? borderColor;
 
   @override
   State<PostCard> createState() => _PostCardState();
@@ -51,6 +57,7 @@ class _PostCardState extends State<PostCard> {
               ? () => setState(() => _primaryIsFront = !_primaryIsFront)
               : null,
           child: AppPhotoFrame(
+            borderColor: widget.borderColor,
             overlay: hasCaption
                 ? Padding(
                     padding: EdgeInsets.only(

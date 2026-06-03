@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
+import 'package:meep/core/theme/hex_color.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/post_card.dart';
 import 'package:meep/shared/widgets/share_modal.dart';
@@ -509,7 +511,7 @@ class OwnPostFooter extends StatelessWidget {
 /// Own post variant for the home PageView: photo near the top, footer
 /// (label + activity pill) pinned near the taskbar at ~4% screen height.
 /// Used instead of [OwnPostCard] when the post fills a full screen page.
-class OwnPostPage extends StatelessWidget {
+class OwnPostPage extends ConsumerWidget {
   const OwnPostPage({super.key, required this.post});
 
   final Post post;
@@ -519,20 +521,19 @@ class OwnPostPage extends StatelessWidget {
   static const double _bottomGapRatio = 0.04;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final screenH = MediaQuery.sizeOf(context).height;
+    final borderColor = _postBorderColor(ref, post);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        const Spacer(),
         PostCard(
           post: post,
+          borderColor: borderColor,
           onLongPress: () => _showShareModal(context, post, isAuthor: true),
         ),
-        // 1% of screen height — author pill sits just under the photo.
-        // The PostCard's internal photo→footer gap only runs when a footer is
-        // passed in; here we pass none (so the footer can be pinned near the
-        // taskbar), so the gap is applied explicitly at this level instead.
-        SizedBox(height: screenH * 0.01),
+        const SizedBox(height: 8),
         PostHeaderRow(post: post, isOwn: true),
         const Spacer(),
         const ActivityPill(),
@@ -545,7 +546,7 @@ class OwnPostPage extends StatelessWidget {
 /// Friend post variant for the home PageView. Mirrors [OwnPostPage] so both
 /// post types share the same vertical rhythm and horizontal gutters: photo
 /// on top, header + message bar pinned at ~4% above the taskbar.
-class FriendPostPage extends StatelessWidget {
+class FriendPostPage extends ConsumerWidget {
   const FriendPostPage({super.key, required this.post});
 
   final Post post;
@@ -554,18 +555,19 @@ class FriendPostPage extends StatelessWidget {
   static const double _gutter = 6;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final screenH = MediaQuery.sizeOf(context).height;
+    final borderColor = _postBorderColor(ref, post);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        const Spacer(),
         PostCard(
           post: post,
+          borderColor: borderColor,
           onLongPress: () => _showShareModal(context, post, isAuthor: false),
         ),
-        // 1% screen-height gap — author pill sits just under the photo,
-        // matching the OwnPostPage rhythm.
-        SizedBox(height: screenH * 0.01),
+        const SizedBox(height: 8),
         PostHeaderRow(post: post, isOwn: false),
         const Spacer(),
         Padding(
@@ -592,6 +594,17 @@ void _showShareModal(
     backgroundColor: Colors.transparent,
     builder: (_) => ShareModal(post: post, isAuthor: isAuthor),
   );
+}
+
+/// Derive border color cho PostCard từ post.spaceId. Trả null khi post không
+/// thuộc Space hoặc Space chưa load. Caller wrap kết quả vào PostCard
+/// borderColor để visualize Space context (mirror camera page Space accent).
+Color? _postBorderColor(WidgetRef ref, Post post) {
+  final sid = post.spaceId;
+  if (sid == null) return null;
+  final space = ref.watch(spaceByIdProvider(sid)).valueOrNull;
+  if (space == null) return null;
+  return hexToColor(space.colorHex);
 }
 
 class _FeedFooter extends StatelessWidget {

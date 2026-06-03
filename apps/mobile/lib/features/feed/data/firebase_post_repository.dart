@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/feed/data/post_repository.dart';
 
@@ -33,10 +34,21 @@ class FirebasePostRepository implements PostRepository {
 
   @override
   Stream<List<Post>> watchFeed(String uid, {String? spaceId}) {
+    // [DEBUG/Space Feed] Log entry point để xác nhận tham số được truyền
+    // đúng từ controller xuống. Nếu spaceId null mà anh đang chọn filter
+    // Space → bug ở provider/controller chứ không phải repo.
+    debugPrint(
+      '[Space Feed] watchFeed bắt đầu — uid=$uid, spaceId=${spaceId ?? "<null/feed chung>"}',
+    );
+
     // Branch theo Space context.
     if (spaceId != null) {
+      debugPrint(
+        '[Space Feed] → đi nhánh _watchSpaceFeed cho spaceId=$spaceId',
+      );
       return _watchSpaceFeed(spaceId);
     }
+    debugPrint('[Space Feed] → đi nhánh _watchFriendsFeed (feed chung)');
     return _watchFriendsFeed(uid);
   }
 
@@ -48,15 +60,85 @@ class FirebasePostRepository implements PostRepository {
   /// khi post.spaceId != null) — không cần Space member phải là friend
   /// của author.
   Stream<List<Post>> _watchSpaceFeed(String spaceId) {
+    debugPrint(
+      '[Space Feed] _watchSpaceFeed: gửi query Firestore '
+      '/posts WHERE spaceId == "$spaceId" ORDER BY createdAt DESC LIMIT 10',
+    );
     return _db
         .collection(_posts)
         .where('spaceId', isEqualTo: spaceId)
         .orderBy('createdAt', descending: true)
         .limit(10)
         .snapshots()
-        .map(
-          (snap) => snap.docs.map((doc) => Post.fromJson(doc.data())).toList(),
+        .map((snap) {
+      // [DEBUG/Space Feed] Mỗi lần Firestore emit snapshot — log số doc
+      // trả về để biết có phải query rỗng (0 doc) hay parse fail.
+      debugPrint(
+        '[Space Feed] _watchSpaceFeed snapshot — '
+        'spaceId=$spaceId trả về ${snap.docs.length} doc',
+      );
+      if (snap.docs.isEmpty) {
+        debugPrint(
+          '[Space Feed] CẢNH BÁO: snapshot rỗng. Khả năng: '
+          '(1) chưa có post nào thuộc Space này; '
+          '(2) rules deny silently — nhưng deny thường throw error chứ không trả [].',
         );
+      }
+      try {
+        final posts =
+            snap.docs.map((doc) => Post.fromJson(doc.data())).toList();
+        debugPrint(
+          '[Space Feed] _watchSpaceFeed parse OK ${posts.length} post',
+        );
+        return posts;
+      } catch (e, st) {
+        debugPrint(
+          '[Space Feed] LỖI parse Post.fromJson trong _watchSpaceFeed: $e',
+        );
+        debugPrint('[Space Feed] Stacktrace: $st');
+        rethrow;
+      }
+    }).handleError((Object e, StackTrace st) {
+      // [DEBUG/Space Feed] Bắt error từ Firestore stream — phân loại
+      // theo error code để anh đọc terminal biết nguyên nhân.
+      // QUAN TRỌNG: cuối cùng phải rethrow để FeedController vẫn
+      // vào nhánh AsyncError → UI hiện "Không tải được feed".
+      if (e is FirebaseException) {
+        debugPrint(
+          '[Space Feed] LỖI Firestore _watchSpaceFeed — '
+          'code=${e.code}, message=${e.message}',
+        );
+        switch (e.code) {
+          case 'failed-precondition':
+            debugPrint(
+              '[Space Feed] → NGUYÊN NHÂN: compound index '
+              '(spaceId asc, createdAt desc) chưa deploy. '
+              'Chạy: firebase deploy --only firestore:indexes',
+            );
+          case 'permission-denied':
+            debugPrint(
+              '[Space Feed] → NGUYÊN NHÂN: rules /posts deny read. '
+              'Khả năng: anh không phải member của Space này, '
+              'HOẶC CF spacePostFanOut chưa ghi /users/{uid}/feed/{postId}.',
+            );
+          case 'unavailable':
+            debugPrint(
+              '[Space Feed] → NGUYÊN NHÂN: mất kết nối Firestore.',
+            );
+          default:
+            debugPrint(
+              '[Space Feed] → Error code khác. Em cần đọc message để chẩn đoán.',
+            );
+        }
+      } else {
+        debugPrint(
+          '[Space Feed] LỖI không phải FirebaseException _watchSpaceFeed: $e',
+        );
+      }
+      debugPrint('[Space Feed] Stacktrace: $st');
+      // ignore: only_throw_errors — preserve original error type
+      throw e;
+    });
   }
 
   /// Feed chung — own posts + friends posts, loại Space posts.
