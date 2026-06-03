@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -288,10 +289,52 @@ class FriendMessageBar extends ConsumerStatefulWidget {
 
 class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
   bool _isSending = false;
+  final math.Random _rng = math.Random();
 
   // 💙 (U+1F499) ổn định cross-Android; tránh 🩵 (U+1FA75 — Unicode 14.0) bị
   // tofu trên Android < 12. Khớp chat_input_bar.quickEmojis default.
-  static const _presets = ['💙', '🤣', '🥰'];
+  static const _defaultPresets = ['💙', '🤣', '🥰'];
+
+  // 1 GlobalKey per slot — dùng để lấy global position khi spawn bubble float
+  // animation (Overlay cần absolute position, không phải local của widget).
+  final List<GlobalKey> _slotKeys = List.generate(3, (_) => GlobalKey());
+  final GlobalKey _smilePlusKey = GlobalKey();
+
+  /// Nếu user đã pick emoji custom (qua EmojiPickerSheet, không thuộc 3
+  /// default presets), replace slot 0 (💙) bằng emoji đó. Giúp user thấy
+  /// rõ mình đã chọn gì — nếu không sẽ "lost" sau khi đóng picker.
+  List<String> _displayPresets(String? myEmoji) {
+    if (myEmoji == null || _defaultPresets.contains(myEmoji)) {
+      return _defaultPresets;
+    }
+    return [myEmoji, _defaultPresets[1], _defaultPresets[2]];
+  }
+
+  /// Spawn 3 emoji bubbles staggered từ vị trí button được tap, float lên
+  /// kiểu Locket. Mỗi bubble drift X random + fade out 1.5s.
+  void _spawnBubbles(String emoji, GlobalKey slotKey) {
+    final box = slotKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final centerLocal = Offset(box.size.width / 2, box.size.height / 2);
+    final centerGlobal = box.localToGlobal(centerLocal);
+    final overlay = Overlay.of(context);
+    // 3 bubbles spawn delayed → wave effect kiểu Locket.
+    for (var i = 0; i < 3; i++) {
+      Future.delayed(Duration(milliseconds: 90 * i), () {
+        if (!mounted) return;
+        late OverlayEntry entry;
+        entry = OverlayEntry(
+          builder: (_) => _EmojiBubble(
+            emoji: emoji,
+            startGlobal: centerGlobal,
+            driftX: (_rng.nextDouble() - 0.5) * 80, // -40 → +40
+            onComplete: () => entry.remove(),
+          ),
+        );
+        overlay.insert(entry);
+      });
+    }
+  }
 
   /// Mở modal bottom sheet composer thay vì inline TextField.
   ///
@@ -351,8 +394,10 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
     );
   }
 
-  /// Safe toggle reaction — bắt lỗi, toast message nếu fail.
-  void _toggleReaction(String emoji) {
+  /// Safe toggle reaction — spawn bubble animation trước (instant UX feedback,
+  /// không đợi network), rồi gọi controller toggle. Bắt lỗi → toast message.
+  void _toggleReaction(String emoji, [GlobalKey? sourceKey]) {
+    if (sourceKey != null) _spawnBubbles(emoji, sourceKey);
     try {
       final auth = FirebaseAuth.instance;
       final uid = auth.currentUser?.uid;
@@ -422,15 +467,24 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
               ),
             ),
           ),
-          for (final emoji in _presets)
+          for (var i = 0; i < 3; i++)
             _EmojiButton(
-              emoji: emoji,
-              isActive: reactionState.myEmoji == emoji,
-              onTap: () => _toggleReaction(emoji),
+              key: _slotKeys[i],
+              emoji: _displayPresets(reactionState.myEmoji)[i],
+              isActive: reactionState.myEmoji ==
+                  _displayPresets(reactionState.myEmoji)[i],
+              onTap: () => _toggleReaction(
+                _displayPresets(reactionState.myEmoji)[i],
+                _slotKeys[i],
+              ),
             ),
           const SizedBox(width: 10),
           GestureDetector(
-            onTap: () => EmojiPickerSheet.show(context, _toggleReaction),
+            key: _smilePlusKey,
+            onTap: () => EmojiPickerSheet.show(
+              context,
+              (emoji) => _toggleReaction(emoji, _smilePlusKey),
+            ),
             child: const Icon(
               Icons.add_reaction_outlined,
               color: AppColors.bw500,
@@ -443,14 +497,15 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
   }
 }
 
-/// Emoji preset button — visual feedback khi user đã thả reaction:
-/// - Active: scale 1.35x + translate Y -10 (nổi lên khỏi ActText) + full opacity
-/// - Inactive: scale 1.0 + opacity 0.6
-/// Animate transition 200ms easeOutBack tạo cảm giác "bouncy".
+/// Emoji preset button — subtle opacity feedback active/inactive.
+/// Visual chính khi user thả reaction = bubble float animation
+/// (spawn từ _FriendMessageBarState._spawnBubbles), + replace slot 0 nếu
+/// emoji custom (xem _displayPresets).
 /// KHÔNG set fontFamily — để platform emoji font render glyph, tránh tofu
-/// (theo pattern chat_input_bar — comment lý do ở đó).
+/// (theo pattern chat_input_bar).
 class _EmojiButton extends StatelessWidget {
   const _EmojiButton({
+    super.key,
     required this.emoji,
     required this.isActive,
     required this.onTap,
@@ -467,25 +522,97 @@ class _EmojiButton extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: AnimatedSlide(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutBack,
-          offset: isActive ? const Offset(0, -0.45) : Offset.zero,
-          child: AnimatedScale(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutBack,
-            scale: isActive ? 1.35 : 1.0,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 180),
-              opacity: isActive ? 1.0 : 0.6,
-              child: Text(
-                emoji,
-                style: const TextStyle(fontSize: 22),
-              ),
-            ),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: isActive ? 1.0 : 0.6,
+          child: Text(
+            emoji,
+            style: const TextStyle(fontSize: 22),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Locket-style bubble float — emoji nổi lên + drift X + scale + fade out.
+/// Spawn từ Overlay nên không bị clip bởi ActText container.
+/// Tự remove khỏi overlay khi animation complete (1.5s).
+class _EmojiBubble extends StatefulWidget {
+  const _EmojiBubble({
+    required this.emoji,
+    required this.startGlobal,
+    required this.driftX,
+    required this.onComplete,
+  });
+
+  final String emoji;
+  final Offset startGlobal;
+  final double driftX;
+  final VoidCallback onComplete;
+
+  @override
+  State<_EmojiBubble> createState() => _EmojiBubbleState();
+}
+
+class _EmojiBubbleState extends State<_EmojiBubble>
+    with SingleTickerProviderStateMixin {
+  static const _emojiSize = 32.0;
+  static const _riseDistance = 140.0;
+
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )
+      ..forward()
+      ..addStatusListener((s) {
+        if (s == AnimationStatus.completed) widget.onComplete();
+      });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        final t = _ctrl.value;
+        // EaseOutCubic cho vertical rise — chậm dần khi lên cao.
+        final tEase = 1 - math.pow(1 - t, 3).toDouble();
+        final dy = -_riseDistance * tEase;
+        // Drift X áp dụng cubic ease — wobble subtle.
+        final dx = widget.driftX * tEase;
+        // Fade nhanh hơn ở cuối (60% mới bắt đầu fade rõ).
+        final opacity = (1.0 - math.max(0.0, (t - 0.4) / 0.6)).clamp(0.0, 1.0);
+        final scale = 1.0 + (0.25 * t);
+
+        return Positioned(
+          left: widget.startGlobal.dx - _emojiSize / 2 + dx,
+          top: widget.startGlobal.dy - _emojiSize / 2 + dy,
+          child: IgnorePointer(
+            child: Opacity(
+              opacity: opacity,
+              child: Transform.scale(
+                scale: scale,
+                child: Text(
+                  widget.emoji,
+                  style: const TextStyle(fontSize: _emojiSize),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
