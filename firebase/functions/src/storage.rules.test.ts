@@ -160,6 +160,153 @@ describe('Storage /avatars/{uid}/', () => {
   });
 });
 
+// ===== /diary/{uid}/{allPaths=**} =====
+
+describe('Storage /diary/{uid}/', () => {
+  describe('write', () => {
+    test('owner can upload valid JPEG ≤ 10MB', async () => {
+      const alice = uid('alice');
+      const ref = authed(alice)
+        .storage()
+        .ref(`diary/${alice}/entry-1/cover.jpg`);
+      await assertSucceeds(ref.put(fakeImage(1024)));
+    });
+
+    test('owner can upload exactly 10MB - 1 byte (under cap)', async () => {
+      const alice = uid('alice');
+      const ref = authed(alice)
+        .storage()
+        .ref(`diary/${alice}/entry-1/cover.jpg`);
+      await assertSucceeds(ref.put(fakeImage(10 * 1024 * 1024 - 1)));
+    });
+
+    test('owner cannot upload exactly 10MB (cap strict <)', async () => {
+      // Rule: request.resource.size < 10 * 1024 * 1024 — boundary excluded.
+      const alice = uid('alice');
+      const ref = authed(alice)
+        .storage()
+        .ref(`diary/${alice}/entry-1/cover.jpg`);
+      await assertFails(ref.put(fakeImage(10 * 1024 * 1024)));
+    });
+
+    test('owner cannot upload > 10MB', async () => {
+      const alice = uid('alice');
+      const ref = authed(alice)
+        .storage()
+        .ref(`diary/${alice}/entry-1/cover.jpg`);
+      await assertFails(ref.put(fakeImage(10 * 1024 * 1024 + 1)));
+    });
+
+    test('owner cannot upload non-image (text/plain)', async () => {
+      const alice = uid('alice');
+      const ref = authed(alice)
+        .storage()
+        .ref(`diary/${alice}/entry-1/notes.txt`);
+      await assertFails(ref.put(fakeImage(1024, 'text/plain')));
+    });
+
+    test('owner cannot upload non-image (application/pdf)', async () => {
+      const alice = uid('alice');
+      const ref = authed(alice)
+        .storage()
+        .ref(`diary/${alice}/entry-1/doc.pdf`);
+      await assertFails(ref.put(fakeImage(1024, 'application/pdf')));
+    });
+
+    test('owner can upload PNG (image/png matches image/.*)', async () => {
+      const alice = uid('alice');
+      const ref = authed(alice)
+        .storage()
+        .ref(`diary/${alice}/entry-1/img_1.png`);
+      await assertSucceeds(ref.put(fakeImage(1024, 'image/png')));
+    });
+
+    test('owner can upload inline image into nested path', async () => {
+      // Pattern `{allPaths=**}` allows deeper paths than `{filename}`. Diary
+      // dùng `diary/{uid}/{entryId}/img_N.jpg` (3 segments sau uid).
+      const alice = uid('alice');
+      const ref = authed(alice)
+        .storage()
+        .ref(`diary/${alice}/entry-1/img_2.jpg`);
+      await assertSucceeds(ref.put(fakeImage(1024)));
+    });
+
+    test('stranger cannot upload to another user prefix', async () => {
+      const alice = uid('alice');
+      const bob = uid('bob');
+      const ref = authed(bob)
+        .storage()
+        .ref(`diary/${alice}/entry-1/cover.jpg`);
+      await assertFails(ref.put(fakeImage(1024)));
+    });
+
+    test('stranger cannot upload to deep nested path of another user', async () => {
+      // Rule `{allPaths=**}` cho phép path sâu — defense check để pattern match
+      // không bypass uid enforcement.
+      const alice = uid('alice');
+      const bob = uid('bob');
+      const ref = authed(bob)
+        .storage()
+        .ref(`diary/${alice}/entry-1/sub/folder/file.jpg`);
+      await assertFails(ref.put(fakeImage(1024)));
+    });
+
+    test('unauthenticated cannot upload', async () => {
+      const alice = uid('alice');
+      const ref = unauthed()
+        .storage()
+        .ref(`diary/${alice}/entry-1/cover.jpg`);
+      await assertFails(ref.put(fakeImage(1024)));
+    });
+  });
+
+  describe('read', () => {
+    test('owner can read own diary image', async () => {
+      const alice = uid('alice');
+      const ref = authed(alice)
+        .storage()
+        .ref(`diary/${alice}/entry-1/cover.jpg`);
+      await ref.put(fakeImage(1024));
+
+      await assertSucceeds(ref.getDownloadURL());
+    });
+
+    test('other authed user can read (Firestore rule controls visibility)', async () => {
+      // Storage rule cho phép mọi authed user read; Firestore rule
+      // `/diary/{id}` mới enforce friend + privacy. URL đã được lưu
+      // trong doc nên client KHÔNG list được prefix.
+      const alice = uid('alice');
+      const bob = uid('bob');
+      await authed(alice)
+        .storage()
+        .ref(`diary/${alice}/entry-1/cover.jpg`)
+        .put(fakeImage(1024));
+
+      await assertSucceeds(
+        authed(bob)
+          .storage()
+          .ref(`diary/${alice}/entry-1/cover.jpg`)
+          .getDownloadURL(),
+      );
+    });
+
+    test('unauthenticated cannot read', async () => {
+      const alice = uid('alice');
+      await authed(alice)
+        .storage()
+        .ref(`diary/${alice}/entry-1/cover.jpg`)
+        .put(fakeImage(1024));
+
+      await assertFails(
+        unauthed()
+          .storage()
+          .ref(`diary/${alice}/entry-1/cover.jpg`)
+          .getDownloadURL(),
+      );
+    });
+  });
+});
+
 // ===== Default deny — non-avatar paths =====
 
 describe('Storage default deny', () => {
