@@ -9,8 +9,10 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:meep/features/feed/application/feed_state.dart';
 import 'package:meep/features/feed/data/firebase_post_repository.dart';
 import 'package:meep/features/feed/data/firebase_storage_repository.dart';
+import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/feed/data/post_repository.dart';
 import 'package:meep/features/feed/data/storage_repository.dart';
+import 'package:meep/features/widget/application/widget_data_service.dart';
 
 part 'feed_controller.g.dart';
 
@@ -79,6 +81,12 @@ class FeedController extends _$FeedController {
         } else {
           completer.complete(feedState);
         }
+
+        // Update home-screen widget with latest all-friends post.
+        // Best-effort — widget failures must not crash the feed.
+        if (filter == FeedFilter.all && filtered.isNotEmpty) {
+          _updateWidget(ref, filtered.first);
+        }
       },
       onError: (Object e, StackTrace st) {
         if (!completer.isCompleted) {
@@ -100,5 +108,19 @@ class FeedController extends _$FeedController {
   void onItemVisible(int index) {
     final posts = state.valueOrNull?.posts ?? [];
     if (index >= posts.length - _prefetchAt) loadMore();
+  }
+
+  void _updateWidget(Ref ref, Post post) {
+    try {
+      ref.read(widgetDataServiceProvider).updateWidgetData(
+            postId: post.postId,
+            imageUrl: post.coverImageUrl,
+            authorAvatarUrl: post.authorAvatarUrl,
+            caption: post.caption,
+            captionType: post.captionType?.name,
+          );
+    } catch (_) {
+      // Best-effort — widget update must not crash the feed stream.
+    }
   }
 }

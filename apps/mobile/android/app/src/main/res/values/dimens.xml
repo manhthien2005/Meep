@@ -5,7 +5,7 @@
     <dimen name="widget_inner_padding">12dp</dimen>
 
     <!-- Avatar (bottom-left, circular) -->
-    <dimen name="widget_avatar_size">40dp</dimen>
+    <dimen name="widget_avatar_size">24dp</dimen>
 
     <!-- Caption pill -->
     <dimen name="widget_caption_pill_radius">14dp</dimen>

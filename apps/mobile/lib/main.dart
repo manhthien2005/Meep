@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:meep/core/config/app_config.dart';
 import 'package:meep/core/router/app_router.dart';
@@ -28,6 +29,7 @@ import 'package:meep/features/settings/application/settings_controller.dart';
 import 'package:meep/features/settings/data/firebase_block_repository.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/firebase_space_repository.dart';
+import 'package:meep/features/widget/application/widget_data_service.dart';
 import 'package:meep/firebase_options.dart';
 
 // Pass --dart-define=USE_EMULATOR=true khi dev local để trỏ vào Firebase Emulator Suite.
@@ -44,6 +46,8 @@ void main() async {
     FirebaseFirestore.instance.useFirestoreEmulator(_emulatorHost, 9999);
     await FirebaseStorage.instance.useStorageEmulator(_emulatorHost, 9199);
   }
+
+  final prefs = await SharedPreferences.getInstance();
 
   final authRepo = FirebaseAuthRepository(
     auth: FirebaseAuth.instance,
@@ -94,17 +98,44 @@ void main() async {
             storage: FirebaseStorage.instance,
           ),
         ),
+        widgetDataServiceProvider.overrideWithValue(
+          WidgetDataService(prefs: prefs),
+        ),
       ],
       child: const MeepApp(),
     ),
   );
 }
 
-class MeepApp extends ConsumerWidget {
+class MeepApp extends ConsumerStatefulWidget {
   const MeepApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MeepApp> createState() => _MeepAppState();
+}
+
+class _MeepAppState extends ConsumerState<MeepApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(widgetDataServiceProvider).recordLastViewedAt();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Orphaned Google auth cleanup:
     // Nếu app mở lại mà uid tồn tại nhưng Firestore không có profile VÀ không
     // đang trong active signup/login flow → orphan → sign out về /intro.

@@ -7,6 +7,7 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/widget/application/widget_data_service.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
 
 class WidgetConfirmSheet extends ConsumerWidget {
@@ -46,14 +47,17 @@ class WidgetConfirmSheet extends ConsumerWidget {
                 label: 'Thêm',
                 bg: AppColors.turquoise600,
                 textColor: AppColors.turquoise900,
-                onTap: () {
+                onTap: () async {
+                  final supported = await ref
+                      .read(widgetDataServiceProvider)
+                      .requestPinAppWidget();
+                  if (!context.mounted) return;
                   Navigator.of(context).pop();
-                  // TODO(W/KhoaLND): requestPinAppWidget() Android intent.
-                  // Widget module = empty scaffold (apps/widget/ chưa tồn
-                  // tại). Button "Thêm" hiện no-op + hiện toast giả →
-                  // KhoaLND bind native Android intent khi build Widget
-                  // module.
-                  _showSuccessToast(context);
+                  if (supported) {
+                    _showSuccessToast(context);
+                  } else {
+                    _showManualToast(context);
+                  }
                 },
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -200,7 +204,20 @@ class WidgetConfirmSheet extends ConsumerWidget {
     showDialog<void>(
       context: context,
       barrierColor: AppColors.bw900.withValues(alpha: 0.45),
-      builder: (_) => const _SuccessToastDialog(),
+      builder: (_) => const _SuccessToastDialog(
+        message: 'Đã thêm tiện ích vào màn hình chờ thành công!',
+      ),
+    );
+  }
+
+  void _showManualToast(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      barrierColor: AppColors.bw900.withValues(alpha: 0.45),
+      builder: (_) => const _SuccessToastDialog(
+        message: 'Launcher không hỗ trợ thêm tự động. Hãy giữ ở màn hình chờ → '
+            'chọn Widget → chọn Meep.',
+      ),
     );
   }
 }
@@ -209,7 +226,9 @@ class WidgetConfirmSheet extends ConsumerWidget {
 /// `dispose()` — nếu user tap close hoặc barrier sớm, Timer huỷ ngay,
 /// tránh pop nhầm route khác.
 class _SuccessToastDialog extends StatefulWidget {
-  const _SuccessToastDialog();
+  const _SuccessToastDialog({required this.message});
+
+  final String message;
 
   @override
   State<_SuccessToastDialog> createState() => _SuccessToastDialogState();
@@ -251,7 +270,7 @@ class _SuccessToastDialogState extends State<_SuccessToastDialog> {
               vertical: 28,
             ),
             child: Text(
-              'Đã thêm tiện ích vào màn hình chờ thành công!',
+              widget.message,
               style: AppTextStyles.mdBold.copyWith(color: Colors.white),
               textAlign: TextAlign.center,
             ),

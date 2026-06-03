@@ -24,9 +24,10 @@ import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key, this.spaceId});
+  const HomeScreen({super.key, this.spaceId, this.highlightPostId});
 
   final String? spaceId;
+  final String? highlightPostId;
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
