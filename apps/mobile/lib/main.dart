@@ -31,6 +31,8 @@ import 'package:meep/features/settings/application/settings_controller.dart';
 import 'package:meep/features/settings/data/firebase_block_repository.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/firebase_space_repository.dart';
+import 'package:meep/features/streak/application/streak_controller.dart';
+import 'package:meep/features/streak/data/firebase_streak_repository.dart';
 import 'package:meep/features/widget/application/widget_data_service.dart';
 import 'package:meep/firebase_options.dart';
 
@@ -105,6 +107,9 @@ void main() async {
         ),
         reactionRepositoryProvider.overrideWithValue(
           FirebaseReactionRepository(FirebaseFirestore.instance),
+        ),
+        streakRepositoryProvider.overrideWithValue(
+          FirebaseStreakRepository(FirebaseFirestore.instance),
         ),
       ],
       child: const MeepApp(),
