@@ -403,18 +403,18 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
   ///
   /// displayName + avatarUrl lấy từ UserProfile (Firestore /users/{uid}) thay
   /// vì chỉ FirebaseAuth.currentUser — đảm bảo có data đúng cho mọi auth method
-  /// (Google / email signup). Fallback FirebaseAuth nếu profile chưa load.
+  /// (Google / email signup). uid lấy từ currentUidProvider (auth abstraction)
+  /// thay vì FirebaseAuth.instance trực tiếp — giữ layering UI → repository.
   void _toggleReaction(String emoji, [GlobalKey? sourceKey]) {
     if (sourceKey != null) _spawnBubbles(emoji, sourceKey);
     try {
-      final auth = FirebaseAuth.instance;
-      final uid = auth.currentUser?.uid;
+      final uid = ref.read(currentUidProvider).valueOrNull;
       if (uid == null) return;
       final profile = ref.read(currentUserProfileProvider).valueOrNull;
       final displayName = (profile?.displayName.isNotEmpty ?? false)
           ? profile!.displayName
-          : (auth.currentUser?.displayName ?? '');
-      final avatarUrl = profile?.avatarUrl ?? auth.currentUser?.photoURL;
+          : '';
+      final avatarUrl = profile?.avatarUrl;
       ref.read(reactionControllerProvider(widget.postId).notifier).toggleReact(
             uid: uid,
             displayName: displayName,
