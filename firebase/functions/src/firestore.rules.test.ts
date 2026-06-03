@@ -635,6 +635,82 @@ describe('/diary/{entryId}', () => {
     await seedEntry('private');
     await assertFails(authed(stranger).firestore().doc(`diary/${ENTRY_ID}`).delete());
   });
+
+  test('content > 20 blocks rejected', async () => {
+    // Spec §Data model: max 20 content blocks per entry.
+    // Rule firestore.rules `/diary/{id}` enforce: request.resource.data.content.size() <= 20.
+    const twentyOneBlocks = Array.from({ length: 21 }, (_, i) => ({
+      type: 'text',
+      value: `block ${i}`,
+    }));
+    await assertFails(
+      authed(alice).firestore().doc(`diary/${ENTRY_ID}`).set({
+        authorUid: alice,
+        privacy: 'private',
+        moodTemplate: 'happy',
+        coverImageUrl: 'https://example.com/cover.jpg',
+        moodCaption: 'Lots of blocks',
+        content: twentyOneBlocks,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+  });
+
+  test('content == 20 blocks accepted (boundary inclusive)', async () => {
+    // Rule cap là `<= 20` (inclusive). Bảo vệ off-by-one nếu rule drift sang `< 20`.
+    const twentyBlocks = Array.from({ length: 20 }, (_, i) => ({
+      type: 'text',
+      value: `block ${i}`,
+    }));
+    await assertSucceeds(
+      authed(alice).firestore().doc(`diary/${ENTRY_ID}`).set({
+        authorUid: alice,
+        privacy: 'private',
+        moodTemplate: 'happy',
+        coverImageUrl: 'https://example.com/cover.jpg',
+        moodCaption: 'Max blocks',
+        content: twentyBlocks,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+  });
+
+  test('owner can update own entry (caption + content)', async () => {
+    await seedEntry('private');
+    await assertSucceeds(
+      authed(alice).firestore().doc(`diary/${ENTRY_ID}`).set({
+        authorUid: alice,
+        privacy: 'private',
+        moodTemplate: 'happy',
+        coverImageUrl: 'https://example.com/cover.jpg',
+        moodCaption: 'Updated title',
+        content: [{ type: 'text', value: 'Updated body' }],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+  });
+
+  test('update cannot change authorUid (author hijack)', async () => {
+    // Rule: request.resource.data.authorUid == resource.data.authorUid
+    // → bob (logged in as bob) cannot reassign alice's entry to himself,
+    //   nor can alice flip authorUid to someone else.
+    await seedEntry('private');
+    await assertFails(
+      authed(alice).firestore().doc(`diary/${ENTRY_ID}`).set({
+        authorUid: bob, // hijack attempt
+        privacy: 'private',
+        moodTemplate: 'happy',
+        coverImageUrl: 'https://example.com/cover.jpg',
+        moodCaption: 'Hijacked',
+        content: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+  });
 });
 
 // ===== /conversations/{conversationId} =====
