@@ -502,10 +502,10 @@ class _ViewfinderContent extends StatelessWidget {
   final bool isInitialized;
   final String? error;
 
-  /// When true the live preview is un-mirrored. Android mirrors the front
-  /// camera preview by default (selfie-mirror); the captured file is NOT
-  /// mirrored, so the preview was lying about what the photo would look like.
-  /// Flipping with scaleX:-1 here makes the preview match the saved image.
+  /// Mặc định preview Android đã gương mặt cho cam trước (selfie-mirror) —
+  /// giữ nguyên hành vi đó. File chụp ra được flip ngang ở
+  /// [AppCameraController.capture] để khớp với preview, nên KHÔNG cần
+  /// Transform un-mirror ở đây nữa.
   final bool isFrontCamera;
 
   @override
@@ -521,24 +521,14 @@ class _ViewfinderContent extends StatelessWidget {
     if (!isInitialized || controller == null) {
       return const ColoredBox(color: AppColors.bw900);
     }
-    // CameraPreview already wraps itself in the correct AspectRatio +
-    // RotatedBox for the device orientation. We only need to scale it so the
-    // (typically 3:4) preview fills the square frame without distortion —
-    // matching how the captured photo is later shown with BoxFit.cover.
-    final previewRatio = 1 / controller!.value.aspectRatio; // portrait ratio
+    final previewRatio = 1 / controller!.value.aspectRatio;
     final coverScale = previewRatio < 1 ? 1 / previewRatio : previewRatio;
-    Widget preview = Transform.scale(
-      scale: coverScale,
-      child: Center(child: CameraPreview(controller!)),
+    return ClipRect(
+      child: Transform.scale(
+        scale: coverScale,
+        child: Center(child: CameraPreview(controller!)),
+      ),
     );
-    if (isFrontCamera) {
-      preview = Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.diagonal3Values(-1.0, 1.0, 1.0),
-        child: preview,
-      );
-    }
-    return ClipRect(child: preview);
   }
 }
 
