@@ -178,9 +178,9 @@ class FirebasePostRepository implements PostRepository {
 
       return _mergeStreams(streams).map((allPosts) {
         allPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        // Loại Space posts khỏi feed chung — chỉ post.spaceId == null
+        // Loại Space posts khỏi feed chung — chỉ post.spaceIds rỗng mới
         // xuất hiện ở "Mọi người" / "Bạn" / "Friend X" filter.
-        return allPosts.where((p) => p.spaceId == null).take(10).toList();
+        return allPosts.where((p) => p.spaceIds.isEmpty).take(10).toList();
       });
     });
   }

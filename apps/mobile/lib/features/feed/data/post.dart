@@ -29,15 +29,17 @@ class Post with _$Post {
     required AudienceType audienceType,
     @Default([]) List<String> audienceUids,
 
-    /// Reserved for Space module. Null = all-friends post.
-    /// When set: broadcast to all Space members; audienceType/audienceUids ignored.
-    String? spaceId,
+    /// Danh sách Space mà post được gửi tới. Empty = post All-friends.
+    /// Multi-select: user có thể chọn nhiều Space ở AudienceRow capture.
+    /// Trùng member giữa các Space → dedupe ở `memberIds` field bên dưới.
+    @Default(<String>[]) List<String> spaceIds,
 
-    /// Denormalized snapshot của Space.memberIds tại thời điểm tạo post.
-    /// Dùng cho Firestore rule check `memberIds.hasAny([uid])` ở collection
-    /// query (`WHERE spaceId == X`) — Firestore rules engine cần điều kiện
-    /// expressible từ resource.data, không dùng get()/exists() cross-doc.
-    /// Null khi post All-friends. Stale acceptable cho MVP (member rời/kick
+    /// Denormalized union dedupe của Space.memberIds từ tất cả `spaceIds`
+    /// tại thời điểm tạo post. Dùng cho Firestore rule check
+    /// `memberIds.hasAny([uid])` ở collection query (`WHERE spaceIds
+    /// array-contains X`) — Firestore rules engine cần điều kiện expressible
+    /// từ resource.data, không dùng get()/exists() cross-doc.
+    /// Empty khi post All-friends. Stale acceptable cho MVP (member rời/kick
     /// vẫn đọc được post cũ — không phải security issue, chỉ là cosmetic).
     @Default(<String>[]) List<String> memberIds,
     @TimestampConverter() required DateTime createdAt,

@@ -150,7 +150,8 @@ void main() {
         authorName: 'Test User',
         imageUrl: 'https://example.com/photo.jpg',
         audienceType: AudienceType.all,
-        spaceId: 's1', // gửi vào Space — KHÔNG nên xuất hiện feed chung
+        // Gửi vào Space — không nên xuất hiện trong feed chung
+        spaceIds: const ['s1'],
         createdAt: DateTime(2026, 5, 27),
       );
       await db.collection('posts').doc('p1').set(pChung.toJson());
@@ -171,7 +172,7 @@ void main() {
         authorName: 'Test User',
         imageUrl: 'https://example.com/photo.jpg',
         audienceType: AudienceType.all,
-        spaceId: 's1',
+        spaceIds: const ['s1'],
         createdAt: DateTime(2026, 5, 27),
       );
       final pS2 = Post(
@@ -180,12 +181,21 @@ void main() {
         authorName: 'Test User',
         imageUrl: 'https://example.com/photo.jpg',
         audienceType: AudienceType.all,
-        spaceId: 's2',
+        spaceIds: const ['s2'],
         createdAt: DateTime(2026, 5, 27),
       );
+      // Write with both field patterns: toJson() gives spaceIds (new model),
+      // add spaceId manually so the current repo query (WHERE spaceId == X)
+      // still matches. Branch 3 sẽ đổi query sang spaceIds array-contains.
       await db.collection('posts').doc('p_chung').set(pChung.toJson());
-      await db.collection('posts').doc('p_s1').set(pS1.toJson());
-      await db.collection('posts').doc('p_s2').set(pS2.toJson());
+      await db
+          .collection('posts')
+          .doc('p_s1')
+          .set(pS1.toJson()..['spaceId'] = 's1');
+      await db
+          .collection('posts')
+          .doc('p_s2')
+          .set(pS2.toJson()..['spaceId'] = 's2');
 
       final posts = await repo.watchFeed('uid1', spaceId: 's1').first;
       expect(posts.map((p) => p.postId), ['p_s1']);

@@ -6,6 +6,7 @@ import 'package:gal/gal.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_proportions.dart';
+import 'package:meep/core/theme/hex_color.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/feed/application/post_controller.dart';
@@ -14,6 +15,8 @@ import 'package:meep/features/feed/presentation/capture_action_bar.dart';
 import 'package:meep/features/feed/presentation/capture_preview_args.dart';
 import 'package:meep/features/feed/presentation/caption_preset_modal.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
+import 'package:meep/features/space/application/space_controller.dart';
+import 'package:meep/features/space/data/space.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_dots_indicator.dart';
 import 'package:meep/shared/widgets/app_note_pill.dart';
@@ -211,7 +214,8 @@ class _CapturePreviewScreenState extends ConsumerState<CapturePreviewScreen> {
               config: PreviewBarConfig(
                 isUploading: postState.isUploading,
                 canSend: !(postState.audienceType == AudienceType.select &&
-                    postState.selectedUids.isEmpty),
+                    postState.selectedUids.isEmpty &&
+                    postState.selectedSpaceIds.isEmpty),
                 onCancel: () => context.pop(),
                 onSend: _send,
                 onSparkles: _showCaptionModal,
@@ -232,9 +236,13 @@ class _CapturePreviewScreenState extends ConsumerState<CapturePreviewScreen> {
                 screenW: screenW,
                 audienceType: postState.audienceType,
                 selectedUids: postState.selectedUids,
+                selectedSpaceIds: postState.selectedSpaceIds,
                 onAudienceChanged: (type, uids) => ref
                     .read(postControllerProvider.notifier)
                     .setAudience(type, uids),
+                onSpaceToggled: (spaceId) => ref
+                    .read(postControllerProvider.notifier)
+                    .toggleSpace(spaceId),
               ),
             ),
             const SizedBox(height: 8),
@@ -288,16 +296,19 @@ class _AudienceRow extends ConsumerWidget {
     required this.screenW,
     required this.audienceType,
     required this.selectedUids,
+    required this.selectedSpaceIds,
     required this.onAudienceChanged,
+    required this.onSpaceToggled,
   });
 
   final double screenW;
   final AudienceType audienceType;
   final List<String> selectedUids;
+  final List<String> selectedSpaceIds;
   final void Function(AudienceType, List<String>) onAudienceChanged;
+  final void Function(String spaceId) onSpaceToggled;
 
-  // Figma: Buttons frame x=73 on 412 → left edge of X button
-  static const double _leftPaddingRatio = 73 / 412;
+  static const double _tileGap = 12.0;
 
   /// Toggle a friend in the selected list. Empty result flips back to
   /// AudienceType.all so the user doesn't need an explicit "deselect" gesture.
@@ -314,47 +325,21 @@ class _AudienceRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final leftPad = screenW * _leftPaddingRatio;
     final avatarSize = AppProportions.audienceAvatarSize(screenW);
-    final labelSize = avatarSize * 0.43; // keep below overflow threshold
+    final labelSize = avatarSize * 0.43;
     final isAll = audienceType == AudienceType.all;
-    const tileGap = 12.0;
-    const tileLabelWidth = 8.0; // _FriendAudienceTile pads label width by 8
 
     final currentUid = ref.watch(currentUidProvider).valueOrNull;
-    // Avoid throwing UnimplementedError when auth not ready — just render
-    // the "Tất cả" tile until the uid resolves.
     final friends = currentUid == null
         ? const <UserProfile>[]
         : ref.watch(
             friendControllerProvider(currentUid).select((s) => s.friends),
           );
-
-    final tiles = <Widget>[
-      _AllAudienceTile(
-        isSelected: isAll,
-        avatarSize: avatarSize,
-        labelSize: labelSize,
-        onTap: () => onAudienceChanged(AudienceType.all, const []),
-      ),
-      for (final friend in friends) ...[
-        const SizedBox(width: tileGap),
-        _FriendAudienceTile(
-          friend: friend,
-          isSelected: selectedUids.contains(friend.uid),
-          avatarSize: avatarSize,
-          labelSize: labelSize,
-          onTap: () => _toggleFriend(friend.uid),
-        ),
-      ],
-    ];
-
-    // Total horizontal space the tiles + their gaps occupy. Used to decide
-    // whether the list fits without scrolling (so the leading "Tất cả" tile
-    // stays anchored at center) or needs to scroll (in which case we revert
-    // to the Figma leading padding of 73/412 so it reads consistently).
-    final estimatedContentWidth =
-        avatarSize + friends.length * (avatarSize + tileLabelWidth + tileGap);
+    final spaces = currentUid == null
+        ? const <Space>[]
+        : ref.watch(
+            spaceControllerProvider(currentUid).select((s) => s.spaces),
+          );
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -362,27 +347,72 @@ class _AudienceRow extends ConsumerWidget {
         height: avatarSize + 4 + labelSize * 1.35 + 2,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // Anchor the first tile ("Tất cả") at the horizontal center of the
-            // row. We pad by (viewport - allTileWidth)/2 so the avatar itself
-            // sits on the centerline, and the friend tiles fan out to the right
-            // of it. When the full list fits without overflow, this also means
-            // the row is centered visually; when it overflows, the user can
-            // scroll the friends in from the right while "Tất cả" stays at its
-            // initial centered position.
-            final centerLeadingPad = (constraints.maxWidth - avatarSize) / 2;
-            final fits = estimatedContentWidth + centerLeadingPad + 20 <=
-                constraints.maxWidth;
-            // Once the friends list grows past the visible area, switch to the
-            // Figma leading padding so the start-of-list edge matches what was
-            // already shipped.
-            final leadingPad = fits ? centerLeadingPad : leftPad;
-            return ListView(
-              scrollDirection: Axis.horizontal,
-              physics: fits
-                  ? const NeverScrollableScrollPhysics()
-                  : const ClampingScrollPhysics(),
-              padding: EdgeInsets.only(left: leadingPad, right: 20),
-              children: tiles,
+            // AllTile held in center via Stack. Left + Right each take 50%
+            // of remaining space.
+            final centerSlot = avatarSize + 8; // ~label padding below
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                // ── Centered "Tất cả" tile ───────────────
+                _AllAudienceTile(
+                  isSelected: isAll,
+                  avatarSize: avatarSize,
+                  labelSize: labelSize,
+                  onTap: () => onAudienceChanged(AudienceType.all, const []),
+                ),
+                // ── Sides row ────────────────────────────
+                Row(
+                  children: [
+                    // ── Left: Spaces ────────────────────
+                    Expanded(
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: EdgeInsets.only(
+                          left: 12,
+                          right: centerSlot / 2,
+                        ),
+                        children: [
+                          for (final space in spaces)
+                            Padding(
+                              padding: const EdgeInsets.only(right: _tileGap),
+                              child: _SpaceAudienceTile(
+                                space: space,
+                                isSelected:
+                                    selectedSpaceIds.contains(space.spaceId),
+                                avatarSize: avatarSize,
+                                labelSize: labelSize,
+                                onTap: () => onSpaceToggled(space.spaceId),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // ── Right: Friends ────────────────────
+                    Expanded(
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: EdgeInsets.only(
+                          left: centerSlot / 2,
+                          right: 12,
+                        ),
+                        children: [
+                          for (final friend in friends)
+                            Padding(
+                              padding: const EdgeInsets.only(left: _tileGap),
+                              child: _FriendAudienceTile(
+                                friend: friend,
+                                isSelected: selectedUids.contains(friend.uid),
+                                avatarSize: avatarSize,
+                                labelSize: labelSize,
+                                onTap: () => _toggleFriend(friend.uid),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             );
           },
         ),
@@ -490,6 +520,71 @@ class _FriendAudienceTile extends StatelessWidget {
             width: avatarSize + 8,
             child: Text(
               friend.displayName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: accent,
+                fontSize: labelSize,
+                fontWeight: FontWeight.w800,
+                fontFamily: 'Nunito',
+                height: 1.1,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Space tile — circle với colorHex bg + iconEmoji centered. Layout like
+/// `_FriendAudienceTile` nhưng nền dùng màu Space thay vì avatar ảnh.
+class _SpaceAudienceTile extends StatelessWidget {
+  const _SpaceAudienceTile({
+    required this.space,
+    required this.isSelected,
+    required this.avatarSize,
+    required this.labelSize,
+    required this.onTap,
+  });
+
+  final Space space;
+  final bool isSelected;
+  final double avatarSize;
+  final double labelSize;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isSelected ? AppColors.turquoise500 : AppColors.bw100;
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: avatarSize,
+            height: avatarSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: hexToColor(space.colorHex),
+              border: Border.all(
+                color: isSelected ? AppColors.turquoise500 : AppColors.bw600,
+                width: 1.5,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              space.iconEmoji,
+              style: TextStyle(fontSize: avatarSize * 0.4),
+            ),
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: avatarSize + 8,
+            child: Text(
+              space.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
