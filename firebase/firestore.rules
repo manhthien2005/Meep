@@ -246,20 +246,27 @@ service cloud.firestore {
 
     // ===== /conversations/{conversationId} =====
     match /conversations/{conversationId} {
-      // Read + list: dùng resource.data trực tiếp — KHÔNG `get()` qua helper.
-      // Firestore rules engine fail `get()` trong nhánh `list` eval; query
-      // `.where('participantIds', arrayContains: uid)` sẽ PERMISSION_DENIED
-      // nếu rule chứa get(). Pattern này khớp /friendships đã hoạt động.
+      // TÁCH get/list — bắt buộc vì list eval khác get eval:
       //
-      // Null guard `resource == null`: getOrCreateConversation lần đầu gọi
-      // `docRef.get()` trên doc CHƯA TỒN TẠI → Firestore SDK v25 transform
-      // sang Listen → server eval rule → `resource` null → field access
-      // returns false → PERMISSION_DENIED. Allow null resource để client check
-      // exists trước khi create. List query không bao giờ trả null resource
-      // nên không lo leak.
-      allow read: if isAuthed()
+      // - GET: single doc read. Null guard `resource == null` cho phép client
+      //   `docRef.get()` trên doc CHƯA TỒN TẠI (getOrCreateConversation lần
+      //   đầu reply). Firestore SDK v25 transform sang Listen → server eval
+      //   rule → `resource` null → field access returns false → trước fix
+      //   bị PERMISSION_DENIED. Null guard fix bug đó.
+      //
+      // - LIST: collection query `.where('participantIds', arrayContains: uid)
+      //   .orderBy('lastMessageAt')`. Firestore static analysis prove
+      //   "query constraint đảm bảo rule TRUE cho mọi doc match" — DISJUNCTION
+      //   `resource == null || ...` BREAK static analysis (branch null không
+      //   derive được từ query). KHÔNG prove được → DENY toàn query. Bug
+      //   trước: gộp get+list dưới `allow read` + disjunction null → list
+      //   deny dù emulator test pass (emulator lenient).
+      //   Pattern này khớp /friendships rule — đơn giản, không disjunction.
+      allow get: if isAuthed()
         && (resource == null
             || request.auth.uid in resource.data.participantIds);
+      allow list: if isAuthed()
+        && request.auth.uid in resource.data.participantIds;
       allow create: if isAuthed()
         && request.resource.data.participantIds.hasAll([request.auth.uid]);
       // Whitelist update fields: lastMessage/lastMessageAt/lastSenderId set
