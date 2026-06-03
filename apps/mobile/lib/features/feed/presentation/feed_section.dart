@@ -219,62 +219,64 @@ class FriendMessageBar extends ConsumerStatefulWidget {
 }
 
 class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
-  final _controller = TextEditingController();
-  final _focusNode = FocusNode();
-  bool _expanded = false;
   bool _isSending = false;
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  void _expand() {
-    setState(() => _expanded = true);
-    // Defer requestFocus để widget render TextField xong trước.
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _focusNode.requestFocus());
-  }
-
-  void _collapse() {
-    _focusNode.unfocus();
-    _controller.clear();
-    setState(() => _expanded = false);
-  }
-
-  Future<void> _send() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty || _isSending) return;
-    setState(() => _isSending = true);
-    final conversationId =
-        await ref.read(chatControllerProvider.notifier).sendMessageFromFeed(
-              postId: widget.postId,
-              authorId: widget.authorId,
-              text: text,
-              spaceId: widget.spaceId,
-            );
-    if (!mounted) return;
-    setState(() => _isSending = false);
-    if (conversationId != null) {
-      _collapse();
-      // Pattern Locket: reply post → chuyển hướng vào chat screen với quoted
-      // photo block ở đầu thread. Group post → /group-chat, else 1-1 /chat.
-      final isSpace = widget.spaceId != null && widget.spaceId!.isNotEmpty;
-      final route =
-          isSpace ? '/group-chat/$conversationId' : '/chat/$conversationId';
-      unawaited(context.push(route));
-    } else {
-      // Controller đã set errorMessage trong state — read để show.
-      final err = ref.read(chatControllerProvider).errorMessage;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(err ?? 'Không gửi được tin nhắn'),
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
+  /// Mở modal bottom sheet composer thay vì inline TextField.
+  ///
+  /// **Lý do:** HomeFeed scaffold có camera fixed + taskbar pinned bottom.
+  /// Inline TextField + keyboard mở → Scaffold cố resize body → overflow
+  /// (camera không shrink) + taskbar lift theo keyboard. Modal sheet có own
+  /// scaffold context → keyboard handling tự nhiên, KHÔNG ảnh hưởng layout
+  /// home. Pattern Locket / Instagram story reply.
+  Future<void> _openComposer() async {
+    if (_isSending) return;
+    await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      // Cho phép sheet ngập keyboard area — sheet content tự padding bottom
+      // bằng MediaQuery.viewInsets.
+      builder: (sheetContext) => _ComposerSheet(
+        onSend: (text) async {
+          if (text.isEmpty) return false;
+          setState(() => _isSending = true);
+          final conversationId = await ref
+              .read(chatControllerProvider.notifier)
+              .sendMessageFromFeed(
+                postId: widget.postId,
+                authorId: widget.authorId,
+                text: text,
+                spaceId: widget.spaceId,
+              );
+          if (!mounted) return false;
+          setState(() => _isSending = false);
+          if (conversationId != null) {
+            // Pattern Locket: navigate to chat screen với quoted photo block
+            // ở đầu thread. Group → /group-chat, else 1-1 /chat.
+            final isSpace =
+                widget.spaceId != null && widget.spaceId!.isNotEmpty;
+            final route = isSpace
+                ? '/group-chat/$conversationId'
+                : '/chat/$conversationId';
+            if (sheetContext.mounted) Navigator.of(sheetContext).pop(true);
+            unawaited(context.push(route));
+            return true;
+          } else {
+            // Controller đã set errorMessage trong state — read để show.
+            final err = ref.read(chatControllerProvider).errorMessage;
+            if (sheetContext.mounted) {
+              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                SnackBar(
+                  content: Text(err ?? 'Không gửi được tin nhắn'),
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            }
+            return false;
+          }
+        },
+      ),
+    );
   }
 
   @override
@@ -289,97 +291,151 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
         borderRadius: BorderRadius.circular(22),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: _expanded ? _buildExpanded(screenW) : _buildCollapsed(screenW),
-    );
-  }
-
-  Widget _buildCollapsed(double screenW) {
-    return Row(
-      children: [
-        Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _expand,
-            child: Text(
-              'Gửi tin nhắn...',
-              style: TextStyle(
-                color: AppColors.bw100,
-                fontSize: screenW * 0.042,
-                fontWeight: FontWeight.w800,
-                fontFamily: 'Nunito',
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _openComposer,
+              child: Text(
+                'Gửi tin nhắn...',
+                style: TextStyle(
+                  color: AppColors.bw100,
+                  fontSize: screenW * 0.042,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Nunito',
+                ),
               ),
             ),
           ),
-        ),
-        const Text('💙', style: TextStyle(fontSize: 18)),
-        const SizedBox(width: 10),
-        const Text('😂', style: TextStyle(fontSize: 18)),
-        const SizedBox(width: 10),
-        const Text('🥰', style: TextStyle(fontSize: 18)),
-        const SizedBox(width: 10),
-        const Icon(
-          Icons.add_reaction_outlined,
-          color: AppColors.bw500,
-          size: 20,
-        ),
-      ],
+          const Text('💙', style: TextStyle(fontSize: 18)),
+          const SizedBox(width: 10),
+          const Text('😂', style: TextStyle(fontSize: 18)),
+          const SizedBox(width: 10),
+          const Text('🥰', style: TextStyle(fontSize: 18)),
+          const SizedBox(width: 10),
+          const Icon(
+            Icons.add_reaction_outlined,
+            color: AppColors.bw500,
+            size: 20,
+          ),
+        ],
+      ),
     );
   }
+}
 
-  Widget _buildExpanded(double screenW) {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: _controller,
-            focusNode: _focusNode,
-            enabled: !_isSending,
-            maxLength: 500,
-            textInputAction: TextInputAction.send,
-            onSubmitted: (_) => _send(),
-            onTapOutside: (_) {
-              if (_controller.text.trim().isEmpty) _collapse();
-            },
-            decoration: InputDecoration(
-              hintText: 'Gửi tin nhắn...',
-              hintStyle: TextStyle(
-                color: AppColors.bw500,
-                fontSize: screenW * 0.042,
-                fontWeight: FontWeight.w800,
-                fontFamily: 'Nunito',
-              ),
-              border: InputBorder.none,
-              isCollapsed: true,
-              counterText: '',
-            ),
-            style: TextStyle(
-              color: AppColors.bw100,
-              fontSize: screenW * 0.042,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Nunito',
-            ),
-            onChanged: (_) => setState(() {}),
+/// Modal bottom sheet composer — kẹp keyboard, không ảnh hưởng home layout.
+class _ComposerSheet extends StatefulWidget {
+  const _ComposerSheet({required this.onSend});
+
+  /// Returns true if message sent successfully.
+  final Future<bool> Function(String text) onSend;
+
+  @override
+  State<_ComposerSheet> createState() => _ComposerSheetState();
+}
+
+class _ComposerSheetState extends State<_ComposerSheet> {
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode();
+  bool _isSending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() => setState(() {}));
+    // Defer focus để bottom sheet render xong trước khi keyboard mở.
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _focusNode.requestFocus());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _isSending) return;
+    setState(() => _isSending = true);
+    await widget.onSend(text);
+    if (!mounted) return;
+    setState(() => _isSending = false);
+    // Send fail → onSend callback đã show snackbar. Controller text giữ
+    // nguyên (mặc định) → user thử lại được.
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenW = MediaQuery.sizeOf(context).width;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Padding(
+      // Padding bottom = keyboard height → sheet lift above keyboard.
+      padding: EdgeInsets.only(bottom: keyboardInset),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.bw800,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(22),
+            topRight: Radius.circular(22),
           ),
         ),
-        if (_controller.text.trim().isNotEmpty)
-          GestureDetector(
-            onTap: _send,
-            child: Icon(
-              Icons.send_rounded,
-              color: _isSending ? AppColors.bw500 : AppColors.turquoise500,
-              size: 22,
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                focusNode: _focusNode,
+                enabled: !_isSending,
+                maxLength: 500,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _send(),
+                decoration: InputDecoration(
+                  hintText: 'Gửi tin nhắn...',
+                  hintStyle: TextStyle(
+                    color: AppColors.bw500,
+                    fontSize: screenW * 0.042,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Nunito',
+                  ),
+                  border: InputBorder.none,
+                  isCollapsed: true,
+                  counterText: '',
+                ),
+                style: TextStyle(
+                  color: AppColors.bw100,
+                  fontSize: screenW * 0.042,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Nunito',
+                ),
+              ),
             ),
-          )
-        else
-          GestureDetector(
-            onTap: _collapse,
-            child: const Icon(
-              Icons.close,
-              color: AppColors.bw500,
-              size: 20,
-            ),
-          ),
-      ],
+            if (_controller.text.trim().isNotEmpty)
+              GestureDetector(
+                onTap: _send,
+                child: Icon(
+                  Icons.send_rounded,
+                  color: _isSending ? AppColors.bw500 : AppColors.turquoise500,
+                  size: 22,
+                ),
+              )
+            else
+              GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: const Icon(
+                  Icons.close,
+                  color: AppColors.bw500,
+                  size: 20,
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

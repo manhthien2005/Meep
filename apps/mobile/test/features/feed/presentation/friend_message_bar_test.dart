@@ -93,23 +93,25 @@ void main() {
     });
   });
 
-  group('FriendMessageBar — expand', () {
-    testWidgets('tap "Gửi tin nhắn..." → reveals TextField + close icon',
+  group('FriendMessageBar — open composer sheet', () {
+    testWidgets(
+        'tap "Gửi tin nhắn..." → opens modal bottom sheet với TextField',
         (tester) async {
       await pump(tester);
       await tester.tap(find.text('Gửi tin nhắn...'));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
+      // Modal sheet rendered → TextField + close icon (empty input).
       expect(find.byType(TextField), findsOneWidget);
-      // Empty input → close icon (X) hiện thay vì send.
       expect(find.byIcon(Icons.close), findsOneWidget);
       expect(find.byIcon(Icons.send_rounded), findsNothing);
     });
 
-    testWidgets('typing reveals send icon (hides close)', (tester) async {
+    testWidgets('typing trong sheet → reveals send icon (hides close)',
+        (tester) async {
       await pump(tester);
       await tester.tap(find.text('Gửi tin nhắn...'));
-      await tester.pump();
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'xin chào');
       await tester.pump();
 
@@ -117,14 +119,15 @@ void main() {
       expect(find.byIcon(Icons.close), findsNothing);
     });
 
-    testWidgets('tap close icon → collapse back to hint', (tester) async {
+    testWidgets('tap close icon → đóng sheet trở về collapsed bar',
+        (tester) async {
       await pump(tester);
       await tester.tap(find.text('Gửi tin nhắn...'));
-      await tester.pump();
+      await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.close));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      // Collapsed lại — TextField biến mất, emoji pills hiện lại.
+      // Sheet đóng — TextField mất, collapsed bar còn nguyên emoji pills.
       expect(find.byType(TextField), findsNothing);
       expect(find.text('💙'), findsOneWidget);
     });
@@ -136,13 +139,12 @@ void main() {
       await seedDirectConversation();
       await pump(tester);
       await tester.tap(find.text('Gửi tin nhắn...'));
-      await tester.pump();
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), '  hi đó  ');
       await tester.pump();
       await tester.tap(find.byIcon(Icons.send_rounded));
-      // Pump qua async send + snackbar animation.
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      // Pump qua async send + sheet close + navigation.
+      await tester.pumpAndSettle();
 
       // Message ghi xuống Firestore với text đã trim.
       final pairId = pairIdOf(myUid, authorUid);
@@ -154,10 +156,6 @@ void main() {
       expect(msgs.docs.length, 1);
       expect(msgs.docs.first.data()['text'], 'hi đó');
       expect(msgs.docs.first.data()['senderId'], myUid);
-
-      // UI thu lại collapsed sau khi gửi.
-      expect(find.byType(TextField), findsNothing);
-      expect(find.text('Gửi tin nhắn...'), findsOneWidget);
     });
 
     testWidgets('send creates conversation if missing (getOrCreate fallback)',
@@ -165,12 +163,11 @@ void main() {
       // KHÔNG seed conversation — sendMessageFromFeed phải getOrCreate trước.
       await pump(tester);
       await tester.tap(find.text('Gửi tin nhắn...'));
-      await tester.pump();
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'first message');
       await tester.pump();
       await tester.tap(find.byIcon(Icons.send_rounded));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
 
       final pairId = pairIdOf(myUid, authorUid);
       final conv =
