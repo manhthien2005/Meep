@@ -155,7 +155,10 @@ service cloud.firestore {
           && request.resource.data.emoji.size() > 0;
         allow update: if isAuthed() && request.auth.uid == reactorUid
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['emoji', 'createdAt']);
+            .hasOnly(['emoji', 'createdAt', 'reactorName', 'reactorAvatarUrl']);
+        // reactorName + reactorAvatarUrl whitelist vì denormalize từ
+        // UserProfile — user đổi profile rồi react lại sẽ refresh các field
+        // này. reactorUid IMMUTABLE (không trong whitelist).
         allow delete: if isAuthed() && request.auth.uid == reactorUid;
       }
     }

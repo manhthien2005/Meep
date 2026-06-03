@@ -180,6 +180,44 @@ describe('/posts/{postId}/reactions/{reactorUid}', () => {
     );
   });
 
+  test('update reactorName + reactorAvatarUrl by owner → ALLOW', async () => {
+    await seedPost();
+    // Seed reaction (no avatar)
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`posts/${postId}/reactions/${alice}`).set(
+        reactionDoc({ emoji: '🤣', reactorName: 'Alice' }),
+      );
+    });
+    // User đổi profile rồi react lại — denormalize fields refresh.
+    const db = authed(alice).firestore();
+    await assertSucceeds(
+      db.doc(`posts/${postId}/reactions/${alice}`).set(
+        reactionDoc({
+          emoji: '🥰',
+          reactorName: 'Alice Nguyen',
+          reactorAvatarUrl: 'https://example.com/avatar.jpg',
+        }),
+      ),
+    );
+  });
+
+  test('update non-whitelisted field by owner → DENY', async () => {
+    await seedPost();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`posts/${postId}/reactions/${alice}`).set(
+        reactionDoc(),
+      );
+    });
+    // Owner thêm field random (vd 'badge') — không trong whitelist → DENY.
+    const db = authed(alice).firestore();
+    await assertFails(
+      db.doc(`posts/${postId}/reactions/${alice}`).set({
+        ...reactionDoc(),
+        badge: 'admin',
+      }),
+    );
+  });
+
   test('delete by owner (alice) → ALLOW', async () => {
     await seedPost();
     // Seed reaction
