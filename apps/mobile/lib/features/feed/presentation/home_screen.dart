@@ -52,16 +52,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String? _selectedSpaceId;
   String _selectedLabel = 'Mọi người';
 
+  /// Widget-tap deeplink target — postId cần scroll tới khi feed có data.
+  /// Set từ `widget.highlightPostId` ở initState/didUpdateWidget, clear ngay
+  /// sau khi handle xong (animate hoặc fallback toast) để không re-fire khi
+  /// rebuild vì lý do khác.
+  String? _pendingHighlightPostId;
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+    _pendingHighlightPostId = widget.highlightPostId;
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Warm start: cùng HomeScreen instance, GoRouter chỉ update query param
+    // → re-arm pending khi postId thay đổi (kể cả từ non-null sang null
+    // mình bỏ qua).
+    if (widget.highlightPostId != null &&
+        widget.highlightPostId != oldWidget.highlightPostId) {
+      _pendingHighlightPostId = widget.highlightPostId;
+    }
   }
 
   @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  /// Scroll PageView tới page chứa [postId] (page 0 = camera, page i+1 =
+  /// posts[i]). Nếu không tìm thấy → snackbar fallback "Khoảnh khắc này
+  /// không còn tồn tại".
+  void _handleHighlight(String postId, List<Post> posts) {
+    if (!mounted) return;
+    final index = posts.indexWhere((p) => p.postId == postId);
+    if (index < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Khoảnh khắc này không còn tồn tại')),
+      );
+      return;
+    }
+    if (!_pageController.hasClients) return;
+    _pageController.animateToPage(
+      index + 1,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOut,
+    );
   }
 
   void _goToFeed() {
@@ -205,6 +244,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         filterSpaceId: _activeFilterSpaceId,
       ),
     );
+
+    // Widget deeplink → scroll tới post khi feed có data. Defer 1 frame để
+    // PageController kịp attach vào PageView.builder bên dưới. whenData chạy
+    // sync nếu feed đã cache; nếu chưa, rebuild kế tiếp (khi stream emit)
+    // sẽ hit lại nhánh này.
+    if (_pendingHighlightPostId != null) {
+      feedAsync.whenData((feedState) {
+        final pendingId = _pendingHighlightPostId!;
+        _pendingHighlightPostId = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _handleHighlight(pendingId, feedState.posts);
+        });
+      });
+    }
 
     final unreadCounts = ref.watch(unreadCountsProvider);
     final totalUnread =

@@ -386,9 +386,12 @@ GoRouter appRouter(Ref ref) {
   const channel = MethodChannel('meep/widget');
   channel.setMethodCallHandler((call) async {
     if (call.method != 'onWidgetTap') return;
-    final args = call.arguments as Map<String, dynamic>?;
-    final action = args?['action'] as String?;
-    final postId = args?['postId'] as String?;
+    // StandardMethodCodec decode `mapOf(...)` từ Kotlin thành
+    // Map<Object?, Object?> — không cast trực tiếp về Map<String, dynamic>
+    // (sẽ throw _TypeError và swallow silently). Type-check Map base rồi pluck.
+    final args = call.arguments;
+    final action = args is Map ? args['action'] as String? : null;
+    final postId = args is Map ? args['postId'] as String? : null;
 
     if (action == 'OPEN_POST' && postId != null) {
       router.go('/home?highlight=$postId');
