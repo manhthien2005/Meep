@@ -4,10 +4,10 @@ import 'package:meep/core/theme/app_proportions.dart';
 
 /// Editable caption overlay pill. cornerRadius 30, semi-transparent bg.
 ///
-/// Hug-content: the pill sizes itself to the current text instead of being
-/// fixed-width. The text area is measured with [TextPainter] each rebuild,
-/// then clamped to a sane min (so an empty pill is still tappable) and a max
-/// (so a maxed-out 30-char caption never overflows the photo frame).
+/// Editable mode width is fixed at [editableWidthRatio] of the screen (40%)
+/// so the pill anchors at a predictable size as the user swipes between
+/// caption presets. Long text scrolls horizontally inside the TextField.
+/// Read-only mode still hugs content with a soft ellipsis safety net.
 class AppNotePill extends StatefulWidget {
   const AppNotePill({
     super.key,
@@ -24,6 +24,10 @@ class AppNotePill extends StatefulWidget {
   /// (which is 200) but app-side we keep captions short enough to render
   /// nicely in a single-line overlay.
   static const int maxLength = 30;
+
+  /// Editable pill width as a ratio of screen width. Fixed (not hug-content)
+  /// so swiping between caption presets doesn't make the pill jump around.
+  static const double editableWidthRatio = 0.40;
 
   @override
   State<AppNotePill> createState() => _AppNotePillState();
@@ -46,8 +50,6 @@ class _AppNotePillState extends State<AppNotePill> {
     _ctrl = TextEditingController(text: widget.text);
     _ctrl.addListener(() {
       widget.onChanged?.call(_ctrl.text);
-      // Re-measure so the pill grows / shrinks as the user types.
-      if (mounted) setState(() {});
     });
   }
 
@@ -63,16 +65,6 @@ class _AppNotePillState extends State<AppNotePill> {
   void dispose() {
     _ctrl.dispose();
     super.dispose();
-  }
-
-  /// Measure the visual width of [text] at the current font.
-  double _measureText(String text) {
-    final tp = TextPainter(
-      text: TextSpan(text: text, style: _textStyle(_fontSize)),
-      maxLines: 1,
-      textDirection: TextDirection.ltr,
-    )..layout();
-    return tp.width;
   }
 
   @override
@@ -106,14 +98,9 @@ class _AppNotePillState extends State<AppNotePill> {
   }
 
   Widget _buildTextField(double screenW) {
-    // Hug width: measure the typed text, clamp to [min, max] so the pill is
-    // always tappable when empty and never spills past the photo frame.
-    final text = _ctrl.text;
-    final measured = _measureText(text.isEmpty ? 'A' : text);
-    final minW = _fontSize; // ~1 character of space when empty
-    final maxW =
-        screenW - AppProportions.pillPaddingH * 2 - 24; // 24 = safety margin
-    final width = measured.clamp(minW, maxW);
+    // Fixed 40%-of-screen width. The TextField stays single-line and scrolls
+    // horizontally inside itself when the typed text exceeds the visible area.
+    final width = screenW * AppNotePill.editableWidthRatio;
 
     return SizedBox(
       width: width,
