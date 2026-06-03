@@ -46,7 +46,11 @@ class AppPhotoFrame extends StatelessWidget {
             decoration: borderColor == null
                 ? null
                 : BoxDecoration(
-                    borderRadius: BorderRadius.circular(cornerRadius),
+                    // border vẽ ở outer edge của container → inner edge
+                    // = cornerRadius. Để inner edge bo trùng với ClipRRect,
+                    // outer phải = cornerRadius + borderWidth.
+                    borderRadius:
+                        BorderRadius.circular(cornerRadius + borderWidth),
                     border: Border.all(color: borderColor!, width: borderWidth),
                   ),
             child: ClipRRect(

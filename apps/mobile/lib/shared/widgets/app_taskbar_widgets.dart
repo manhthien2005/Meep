@@ -165,12 +165,16 @@ class _PillIndicator extends StatelessWidget {
   }
 }
 
-/// Active indicator của embedded: đĩa trắng + vòng cyan.
+/// Active indicator của embedded: đĩa trắng + vòng cyan (hoặc màu space).
 class _RingIndicator extends StatelessWidget {
-  const _RingIndicator();
+  const _RingIndicator({this.ringColor});
+
+  /// Màu ring. null = turquoise600 mặc định. Feed truyền space.colorHex.
+  final Color? ringColor;
 
   @override
   Widget build(BuildContext context) {
+    final color = ringColor ?? AppColors.turquoise600;
     return SizedBox(
       key: const Key('taskbarRingIndicator'),
       width: _Const.ringSize,
@@ -184,7 +188,7 @@ class _RingIndicator extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: AppColors.turquoise600,
+                color: color,
                 width: _Const.ringStroke,
               ),
             ),

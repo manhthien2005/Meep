@@ -32,6 +32,11 @@ class AppTaskbar extends StatelessWidget {
     this.chatBadgeCount = 0,
     this.onGridTap,
     this.onUploadTap,
+
+    /// Màu ring của nút chụp (center button, embedded variant).
+    /// null = mặc định turquoise600. Feed truyền space.colorHex của post
+    /// đang hiển thị để ring đồng bộ với background Space.
+    this.ringColor,
   });
 
   /// Tab đang active. `null` = không tab nào active (ẩn indicator).
@@ -48,6 +53,9 @@ class AppTaskbar extends StatelessWidget {
   /// Embedded only — nút upload (trailing). No-op khi `null`.
   final VoidCallback? onUploadTap;
 
+  /// Màu ring của nút chụp (embedded variant). null = turquoise600 mặc định.
+  final Color? ringColor;
+
   @override
   Widget build(BuildContext context) {
     switch (variant) {
@@ -63,6 +71,7 @@ class AppTaskbar extends StatelessWidget {
           chatBadgeCount: chatBadgeCount,
           onGridTap: onGridTap,
           onUploadTap: onUploadTap,
+          ringColor: ringColor,
         );
     }
   }
@@ -170,12 +179,14 @@ class _EmbeddedTaskbar extends StatelessWidget {
     required this.chatBadgeCount,
     required this.onGridTap,
     required this.onUploadTap,
+    this.ringColor,
   });
 
   final ValueChanged<TaskbarTab> onTabSelected;
   final int chatBadgeCount;
   final VoidCallback? onGridTap;
   final VoidCallback? onUploadTap;
+  final Color? ringColor;
 
   @override
   Widget build(BuildContext context) {
@@ -192,14 +203,14 @@ class _EmbeddedTaskbar extends StatelessWidget {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.bw800.withValues(alpha: 0.2),
+                color: AppColors.bw800.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(_Const.embeddedRadius),
               ),
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   // Ring + circle trắng cố định giữa
-                  const _RingIndicator(),
+                  _RingIndicator(ringColor: ringColor),
                   // Icons
                   Row(
                     children: [
