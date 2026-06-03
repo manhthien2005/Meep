@@ -122,7 +122,8 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(
-          find.text('Launcher không hỗ trợ thêm tự động. Hãy giữ ở màn hình chờ → '
+          find.text(
+              'Launcher không hỗ trợ thêm tự động. Hãy giữ ở màn hình chờ → '
               'chọn Widget → chọn Meep.'),
           findsOneWidget,
         );
