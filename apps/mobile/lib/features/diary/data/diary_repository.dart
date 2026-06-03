@@ -16,7 +16,13 @@ abstract class DiaryRepository {
     required String query,
   });
 
+  /// Reserve a new entry ID without writing — controller dùng trước upload
+  /// Storage để Storage path `diary/{uid}/{entryId}/...` khớp Firestore doc.
+  String reserveEntryId();
+
   /// Create a new entry. Returns the created entry with server timestamps.
+  /// If [entry.entryId] is non-empty, the value is used (e.g. ID reserved
+  /// via [reserveEntryId]). If empty, an auto-generated ID is assigned.
   Future<DiaryEntry> createEntry(DiaryEntry entry);
 
   /// Update an existing entry.

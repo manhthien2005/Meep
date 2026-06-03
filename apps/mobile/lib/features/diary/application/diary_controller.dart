@@ -1,19 +1,33 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:meep/core/error/app_error.dart';
+import 'package:meep/features/diary/data/diary_content_block.dart';
 import 'package:meep/features/diary/data/diary_entry.dart';
 import 'package:meep/features/diary/data/diary_repository.dart';
+import 'package:meep/features/diary/data/firebase_diary_repository.dart';
 
 part 'diary_controller.freezed.dart';
 part 'diary_controller.g.dart';
+
+/// Mode of the diary canvas — mirrors presentation-layer enum cùng tên.
+/// Định nghĩa ở application layer để [DiaryState] dùng trực tiếp,
+/// presentation import từ đây (không reverse-dependency).
+enum DiaryCanvasMode { create, read, edit }
 
 @freezed
 class DiaryState with _$DiaryState {
   const factory DiaryState({
     @Default([]) List<DiaryEntry> entries,
+    DiaryEntry? currentEntry,
     @Default(false) bool isLoading,
     @Default(false) bool isSaving,
     String? errorMessage,
+    @Default(DiaryCanvasMode.create) DiaryCanvasMode mode,
+    @Default([]) List<DiaryEntry> searchResults,
   }) = _DiaryState;
 }
 
@@ -21,42 +35,232 @@ class DiaryState with _$DiaryState {
 DiaryRepository diaryRepository(DiaryRepositoryRef ref) =>
     throw UnimplementedError(
       'diaryRepositoryProvider must be overridden — '
-      'wire FirebaseDiaryRepository in main.dart (TODO: D/T1/TBD)',
+      'wire FirebaseDiaryRepository in main.dart (TODO: D/T1/HanDHG)',
+    );
+
+@Riverpod(keepAlive: true)
+DiaryStorageClient diaryStorageClient(DiaryStorageClientRef ref) =>
+    throw UnimplementedError(
+      'diaryStorageClientProvider must be overridden — '
+      'wire FirebaseDiaryStorageClient in main.dart',
     );
 
 @riverpod
 class DiaryController extends _$DiaryController {
+  StreamSubscription<List<DiaryEntry>>? _entriesSub;
+
   @override
-  DiaryState build() => const DiaryState();
-
-  Future<void> loadEntries(String authorUid) async {
-    // TODO(D/T2/TBD): implement loadEntries
-    throw UnimplementedError('loadEntries — TODO: D/T2/TBD');
+  DiaryState build() {
+    // Single dispose registration — tránh queue grow khi loadEntries gọi
+    // nhiều lần (vd pull-to-refresh).
+    ref.onDispose(() => _entriesSub?.cancel());
+    return const DiaryState();
   }
 
-  Future<void> saveEntry(DiaryEntry entry) async {
-    // TODO(D/T3/TBD): implement saveEntry — decides create vs update by entryId
-    throw UnimplementedError('saveEntry — TODO: D/T3/TBD');
+  /// Subscribe `watchEntries(uid)` từ [DiaryRepository]. Stream emit tự động
+  /// đẩy danh sách entries mới vào [state.entries]. Lỗi → errorMessage.
+  void loadEntries(String authorUid) {
+    unawaited(_entriesSub?.cancel());
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    _entriesSub =
+        ref.read(diaryRepositoryProvider).watchEntries(authorUid).listen(
+              (entries) => state = state.copyWith(
+                entries: entries,
+                isLoading: false,
+                errorMessage: null,
+              ),
+              onError: (Object e) => state = _afterFailure(e),
+            );
   }
 
+  /// Save entry — tạo mới hoặc cập nhật tuỳ [state.mode].
+  ///
+  /// Upload sequence (spec §Lưu nhật ký):
+  /// 1. cover image → `diary/{uid}/{entryId}/cover.jpg` → coverUrl
+  /// 2. inline images tuần tự → `diary/{uid}/{entryId}/img_N.jpg` → inlineUrls
+  /// 3. TẤT CẢ URLs sẵn sàng → Firestore write với cùng entryId
+  ///
+  /// Tránh path mismatch: với create mode, controller reserve entryId TRƯỚC
+  /// upload nên Storage path khớp Firestore doc.
+  ///
+  /// Upload fail bất kỳ bước → KHÔNG tạo/update Firestore doc.
+  Future<void> saveEntry({
+    required DiaryEntry draft,
+    required Uint8List coverBytes,
+    List<Uint8List> inlineImageBytes = const [],
+  }) async {
+    state = state.copyWith(isSaving: true, errorMessage: null);
+
+    try {
+      final storage = ref.read(diaryStorageClientProvider);
+      final repo = ref.read(diaryRepositoryProvider);
+      final uid = draft.authorUid;
+      final mode = state.mode;
+
+      // Reserve entryId: create mode → repository.reserveEntryId();
+      // edit mode → dùng entryId của draft (đã có).
+      final entryId = mode == DiaryCanvasMode.create
+          ? repo.reserveEntryId()
+          : draft.entryId;
+
+      // Bước 1 — upload cover
+      String coverUrl;
+      try {
+        coverUrl = await storage.upload(
+          uid: uid,
+          entryId: entryId,
+          fileName: 'cover.jpg',
+          bytes: coverBytes,
+          contentType: 'image/jpeg',
+        );
+      } catch (e) {
+        state = _afterFailure(e, fallback: 'Tải ảnh bìa thất bại');
+        return;
+      }
+
+      // Bước 2 — upload inline images tuần tự
+      final inlineUrls = <String>[];
+      for (var i = 0; i < inlineImageBytes.length; i++) {
+        try {
+          final url = await storage.upload(
+            uid: uid,
+            entryId: entryId,
+            fileName: 'img_${i + 1}.jpg',
+            bytes: inlineImageBytes[i],
+            contentType: 'image/jpeg',
+          );
+          inlineUrls.add(url);
+        } catch (e) {
+          state = _afterFailure(e, fallback: 'Tải ảnh thứ ${i + 1} thất bại');
+          return;
+        }
+      }
+
+      // Bước 3 — build entry với URLs thật + Firestore write.
+      //
+      // Inline image URL mapping: controller replace ImageBlock placeholder
+      // theo thứ tự — block ảnh thứ N nhận `inlineUrls[N-1]`. PR4 wire UI
+      // sẽ define convention rõ ràng cho UI gọi.
+      var inlineIdx = 0;
+      final contentBlocks = draft.content.map((b) {
+        return b.when(
+          text: (value, style) => DiaryContentBlock.text(
+            value: value,
+            style: style,
+          ),
+          image: (_) {
+            final url =
+                inlineIdx < inlineUrls.length ? inlineUrls[inlineIdx++] : '';
+            return DiaryContentBlock.image(imageUrl: url);
+          },
+        );
+      }).toList();
+
+      final realEntry = draft.copyWith(
+        entryId: entryId,
+        coverImageUrl: coverUrl,
+        content: contentBlocks,
+      );
+
+      if (mode == DiaryCanvasMode.create) {
+        final created = await repo.createEntry(realEntry);
+        state = state.copyWith(
+          isSaving: false,
+          currentEntry: created,
+        );
+      } else {
+        await repo.updateEntry(realEntry);
+        state = state.copyWith(
+          isSaving: false,
+          currentEntry: realEntry,
+        );
+      }
+    } catch (e) {
+      state = _afterFailure(e);
+    }
+  }
+
+  /// Update chỉ field `privacy` + `updatedAt` — không kéo cả doc.
   Future<void> updatePrivacy({
     required String entryId,
     required DiaryPrivacy privacy,
   }) async {
-    // TODO(D/T4/TBD): implement updatePrivacy
-    throw UnimplementedError('updatePrivacy — TODO: D/T4/TBD');
+    state = state.copyWith(isSaving: true, errorMessage: null);
+    try {
+      await ref
+          .read(diaryRepositoryProvider)
+          .updatePrivacy(entryId: entryId, privacy: privacy);
+      // Cập nhật local state nếu currentEntry đang mở
+      if (state.currentEntry?.entryId == entryId) {
+        state = state.copyWith(
+          isSaving: false,
+          currentEntry: state.currentEntry?.copyWith(privacy: privacy),
+        );
+      } else {
+        state = state.copyWith(isSaving: false);
+      }
+    } catch (e) {
+      state = _afterFailure(e);
+    }
   }
 
-  Future<List<DiaryEntry>> searchEntries({
+  /// Search entries của [authorUid] — delegate sang repository, lưu kết quả
+  /// vào [state.searchResults].
+  Future<void> searchEntries({
     required String authorUid,
     required String query,
   }) async {
-    // TODO(D/T5/TBD): implement searchEntries
-    throw UnimplementedError('searchEntries — TODO: D/T5/TBD');
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final results = await ref
+          .read(diaryRepositoryProvider)
+          .searchEntries(authorUid: authorUid, query: query);
+      state = state.copyWith(
+        isLoading: false,
+        searchResults: results,
+      );
+    } catch (e) {
+      state = _afterFailure(e);
+    }
   }
 
+  /// Xoá entry + Storage assets (gọi repository.deleteEntry).
   Future<void> deleteEntry(String entryId) async {
-    // TODO(D/T6/TBD): implement deleteEntry
-    throw UnimplementedError('deleteEntry — TODO: D/T6/TBD');
+    state = state.copyWith(isSaving: true, errorMessage: null);
+    try {
+      await ref.read(diaryRepositoryProvider).deleteEntry(entryId);
+      state = state.copyWith(
+        isSaving: false,
+        currentEntry: null,
+      );
+    } catch (e) {
+      state = _afterFailure(e);
+    }
+  }
+
+  void clearError() {
+    if (state.errorMessage != null) {
+      state = state.copyWith(errorMessage: null);
+    }
+  }
+
+  void setMode(DiaryCanvasMode mode) {
+    state = state.copyWith(mode: mode);
+  }
+
+  void setCurrentEntry(DiaryEntry? entry) {
+    state = state.copyWith(currentEntry: entry);
+  }
+
+  DiaryState _afterFailure(
+    Object e, {
+    String fallback = 'Đã có lỗi xảy ra',
+  }) {
+    final err = AppError.fromUnknown(e, fallback: fallback);
+    return state.copyWith(
+      isLoading: false,
+      isSaving: false,
+      errorMessage: err is OperationCancelledError ? null : err.message,
+    );
   }
 }

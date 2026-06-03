@@ -22,6 +22,8 @@ import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/reaction/application/reaction_controller.dart';
 import 'package:meep/features/reaction/data/firebase_reaction_repository.dart';
 import 'package:meep/features/chat/data/firebase_conversation_repository.dart';
+import 'package:meep/features/diary/application/diary_controller.dart';
+import 'package:meep/features/diary/data/firebase_diary_repository.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/data/firebase_friend_repository.dart';
 import 'package:meep/features/friend/data/firebase_friend_request_repository.dart';
@@ -116,6 +118,15 @@ void main() async {
         ),
         notificationPreferencesProvider.overrideWithValue(
           NotificationPreferences(prefs: prefs),
+        ),
+        diaryRepositoryProvider.overrideWithValue(
+          FirebaseDiaryRepository.firebase(
+            firestore: FirebaseFirestore.instance,
+            storage: FirebaseStorage.instance,
+          ),
+        ),
+        diaryStorageClientProvider.overrideWithValue(
+          FirebaseDiaryStorageClient(FirebaseStorage.instance),
         ),
       ],
       child: const MeepApp(),

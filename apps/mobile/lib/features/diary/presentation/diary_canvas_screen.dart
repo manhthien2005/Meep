@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:meep/core/theme/app_colors.dart';
+import 'package:meep/features/diary/application/diary_controller.dart';
 import 'package:meep/features/diary/data/diary_entry.dart';
 import 'package:meep/features/diary/presentation/discard_changes_dialog.dart';
 import 'package:meep/features/diary/presentation/privacy_sheet.dart';
@@ -10,11 +11,14 @@ import 'package:meep/features/diary/presentation/widgets/diary_menu_sheet.dart';
 import 'package:meep/features/diary/presentation/widgets/polaroid_image_block.dart';
 import 'package:meep/features/diary/presentation/widgets/text_style_picker.dart';
 
+/// Re-export [DiaryCanvasMode] để các screen khác (`diary_list_screen`,...)
+/// import từ canvas screen như cũ, không phải đổi imports loạt.
+/// Definition canonical ở application/diary_controller.dart.
+export 'package:meep/features/diary/application/diary_controller.dart'
+    show DiaryCanvasMode;
+
 part 'diary_canvas_screen_toolbar.dart';
 part 'diary_canvas_screen_dot_grid.dart';
-
-/// Mode of the diary canvas screen.
-enum DiaryCanvasMode { create, read, edit }
 
 /// Payload pop về khi user tap check ở Canvas (create mode).
 ///
