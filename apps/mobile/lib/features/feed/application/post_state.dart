@@ -18,7 +18,14 @@ class PostState with _$PostState {
     String? caption,
     CaptionType? captionType,
     @Default(AudienceType.all) AudienceType audienceType,
+
+    /// Friends pick lẻ ở AudienceRow (KHÔNG include member từ Space — Space
+    /// member sẽ được derive denormalize ở `Post.memberIds` lúc submit).
     @Default([]) List<String> selectedUids,
+
+    /// Multi-Space pick ở AudienceRow. Empty = không gửi vào Space nào.
+    /// Trùng member giữa các Space → dedupe ở `Post.memberIds` lúc submit.
+    @Default(<String>[]) List<String> selectedSpaceIds,
     String? errorMessage,
   }) = _PostState;
 }

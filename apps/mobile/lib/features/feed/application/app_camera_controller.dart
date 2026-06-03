@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:meep/features/feed/application/camera_state.dart';
+import 'package:meep/features/feed/data/image_flip.dart';
 
 part 'app_camera_controller.g.dart';
 
@@ -108,6 +109,12 @@ class AppCameraController extends _$AppCameraController {
       state = state.copyWith(isCapturing: true);
       try {
         final file = await _cameraCtrl!.takePicture();
+        // Android lưu file cam trước un-mirror — flip lại để khớp với preview
+        // (selfie-mirror mặc định Android). Người dùng thấy "đúng mặt mình"
+        // ở cả live preview lẫn ảnh đã chụp.
+        if (state.isFrontCamera) {
+          await flipImageHorizontallyInPlace(file.path);
+        }
         return file.path;
       } catch (e) {
         debugPrint('capture error: $e');
@@ -126,6 +133,11 @@ class AppCameraController extends _$AppCameraController {
     try {
       final file = await _cameraCtrl!.takePicture();
       final path = file.path;
+
+      // Flip mirror cho lens trước (cùng lý do với single mode).
+      if (state.activeLens == CameraLens.front) {
+        await flipImageHorizontallyInPlace(path);
+      }
 
       // Save photo to the appropriate slot
       if (state.activeLens == CameraLens.back) {

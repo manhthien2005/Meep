@@ -778,7 +778,7 @@ class FriendPostCard extends StatelessWidget {
             child: FriendMessageBar(
               postId: post.postId,
               authorId: post.authorId,
-              spaceId: post.spaceId,
+              spaceId: post.spaceIds.isEmpty ? null : post.spaceIds.first,
             ),
           ),
         ],
@@ -891,7 +891,7 @@ class FriendPostPage extends ConsumerWidget {
           child: FriendMessageBar(
             postId: post.postId,
             authorId: post.authorId,
-            spaceId: post.spaceId,
+            spaceId: post.spaceIds.isEmpty ? null : post.spaceIds.first,
           ),
         ),
         SizedBox(height: screenH * _bottomGapRatio),
@@ -912,13 +912,12 @@ void _showShareModal(
   );
 }
 
-/// Derive border color cho PostCard từ post.spaceId. Trả null khi post không
-/// thuộc Space hoặc Space chưa load. Caller wrap kết quả vào PostCard
-/// borderColor để visualize Space context (mirror camera page Space accent).
+/// Derive border color cho PostCard từ Space đầu tiên trong post.spaceIds.
+/// Trả null khi post không thuộc Space nào hoặc Space chưa load. Pick first
+/// (post có thể gửi multi-Space nhưng visual hint dùng 1 màu).
 Color? _postBorderColor(WidgetRef ref, Post post) {
-  final sid = post.spaceId;
-  if (sid == null) return null;
-  final space = ref.watch(spaceByIdProvider(sid)).valueOrNull;
+  if (post.spaceIds.isEmpty) return null;
+  final space = ref.watch(spaceByIdProvider(post.spaceIds.first)).valueOrNull;
   if (space == null) return null;
   return hexToColor(space.colorHex);
 }

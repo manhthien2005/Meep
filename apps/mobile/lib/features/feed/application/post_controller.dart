@@ -5,6 +5,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/feed/application/caption_service.dart';
 import 'package:meep/features/feed/application/caption_service_impl.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
@@ -64,6 +65,22 @@ class PostController extends _$PostController {
     state = state.copyWith(audienceType: type, selectedUids: uids);
   }
 
+  /// Toggle 1 Space trong `selectedSpaceIds`. KHÔNG ảnh hưởng `selectedUids`
+  /// (friends pick lẻ độc lập với Space pick) hoặc `audienceType`.
+  void toggleSpace(String spaceId) {
+    final current = state.selectedSpaceIds;
+    final next = current.contains(spaceId)
+        ? current.where((id) => id != spaceId).toList()
+        : [...current, spaceId];
+    state = state.copyWith(selectedSpaceIds: next);
+  }
+
+  /// Set toàn bộ `selectedSpaceIds` (vd reset hoặc bulk select). KHÔNG đổi
+  /// `selectedUids` / `audienceType`.
+  void setSpaces(List<String> spaceIds) {
+    state = state.copyWith(selectedSpaceIds: spaceIds);
+  }
+
   Future<bool> submit() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return false;
@@ -78,9 +95,10 @@ class PostController extends _$PostController {
     }
 
     if (state.audienceType == AudienceType.select &&
-        state.selectedUids.isEmpty) {
+        state.selectedUids.isEmpty &&
+        state.selectedSpaceIds.isEmpty) {
       state = state.copyWith(
-        errorMessage: 'Chọn ít nhất 1 người nhận',
+        errorMessage: 'Chọn ít nhất 1 người nhận hoặc 1 Space',
       );
       return false;
     }
@@ -157,11 +175,26 @@ class PostController extends _$PostController {
       // Empty / whitespace caption → store null so it never renders downstream.
       final trimmedCaption = state.caption?.trim();
 
-      // Space context khi camera đang ở Space — null = post chung cho friends.
-      // currentSpaceProvider được CameraSection set qua SpaceContextBottomSheet
-      // long-press FriendsButton. CF spacePostFanOut sẽ fan-out feed entry
-      // cho mọi Space member khi post.spaceId != null.
-      final currentSpace = ref.read(currentSpaceProvider);
+      // Multi-Space pick từ AudienceRow. Trùng member giữa các Space →
+      // dedupe union ở `memberIds` (Firestore rule check hasAny([uid]) cho
+      // collection query `posts WHERE spaceIds array-contains X`).
+      final selectedSpaceIds = state.selectedSpaceIds;
+      List<String> memberIdsUnion = const [];
+      if (selectedSpaceIds.isNotEmpty) {
+        final currentUid = ref.read(currentUidProvider).valueOrNull;
+        if (currentUid != null) {
+          final allSpaces =
+              ref.read(spaceControllerProvider(currentUid)).spaces;
+          final selectedSpaces = allSpaces
+              .where((s) => selectedSpaceIds.contains(s.spaceId))
+              .toList();
+          final unionSet = <String>{};
+          for (final s in selectedSpaces) {
+            unionSet.addAll(s.memberIds);
+          }
+          memberIdsUnion = unionSet.toList();
+        }
+      }
 
       // authorName: chữ đầu tiên trong displayName, tối đa 6 ký tự.
       // Dài hơn → cắt còn 6 + "...".
@@ -186,11 +219,8 @@ class PostController extends _$PostController {
         audienceType: state.audienceType,
         audienceUids:
             state.audienceType == AudienceType.all ? [] : state.selectedUids,
-        spaceId: currentSpace?.spaceId,
-        // Denormalize memberIds từ Space snapshot tại lúc post — Firestore
-        // rule sẽ check `memberIds.hasAny([uid])` cho collection query
-        // `posts WHERE spaceId == X`. Field rỗng khi post All-friends.
-        memberIds: currentSpace?.memberIds ?? const <String>[],
+        spaceIds: selectedSpaceIds,
+        memberIds: memberIdsUnion,
         createdAt: DateTime.now(),
       );
       await postRepo.createPost(post);

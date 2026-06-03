@@ -77,7 +77,7 @@ abstract final class AppProportions {
 
   // ── Audience row ─────────────────────────────────────────────────────────
 
-  static const double audienceAvatarRatio = 30 / figmaFrameWidth;
+  static const double audienceAvatarRatio = 40 / figmaFrameWidth;
   static double audienceAvatarSize(double screenW) =>
       screenW * audienceAvatarRatio;
 

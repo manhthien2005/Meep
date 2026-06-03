@@ -92,7 +92,6 @@ void main() {
       expect(data.containsKey('backImageUrl'), isFalse);
       expect(data.containsKey('frontImageUrl'), isFalse);
       expect(data.containsKey('captionType'), isFalse);
-      expect(data.containsKey('spaceId'), isFalse);
       expect(data.containsKey('authorAvatarUrl'), isFalse);
       // Non-null fields stay.
       expect(data['authorId'], 'uid1');
@@ -141,29 +140,77 @@ void main() {
       expect(posts, isEmpty);
     });
 
-    test('feed chung (spaceId null) loại posts có spaceId', () async {
-      // Own post chung + own post Space → feed chung chỉ thấy post chung.
+    test('feed chung (spaceId null) bao gồm cả Space posts caller là member',
+        () async {
+      // Yêu cầu: filter "Mọi người" show TOÀN BỘ — own + friend + Space.
+      // Seed 3 posts:
+      // - p1: own post chung (không Space)
+      // - p2: own post Space s1 (memberIds chứa uid1)
+      // - p3: post của stranger uid2 trong Space s1 (uid1 cũng member,
+      //   uid2 KHÔNG phải friend) → vẫn phải show qua nhánh memberIds.
       final pChung = _makePost(postId: 'p1', authorId: 'uid1');
-      final pSpace = Post(
+      final pOwnSpace = Post(
         postId: 'p2',
         authorId: 'uid1',
         authorName: 'Test User',
         imageUrl: 'https://example.com/photo.jpg',
         audienceType: AudienceType.all,
-        spaceId: 's1', // gửi vào Space — KHÔNG nên xuất hiện feed chung
+        spaceIds: const ['s1'],
+        memberIds: const ['uid1', 'uid2'],
         createdAt: DateTime(2026, 5, 27),
       );
+      final pStrangerSpace = Post(
+        postId: 'p3',
+        authorId: 'uid2',
+        authorName: 'Stranger',
+        imageUrl: 'https://example.com/photo.jpg',
+        audienceType: AudienceType.all,
+        spaceIds: const ['s1'],
+        memberIds: const ['uid1', 'uid2'],
+        createdAt: DateTime(2026, 5, 28),
+      );
       await db.collection('posts').doc('p1').set(pChung.toJson());
-      await db.collection('posts').doc('p2').set(pSpace.toJson());
+      await db.collection('posts').doc('p2').set(pOwnSpace.toJson());
+      await db.collection('posts').doc('p3').set(pStrangerSpace.toJson());
 
       final posts = await repo.watchFeed('uid1').first;
-      expect(posts.map((p) => p.postId), contains('p1'));
-      expect(posts.map((p) => p.postId), isNot(contains('p2')));
+      expect(
+        posts.map((p) => p.postId),
+        containsAll(['p1', 'p2', 'p3']),
+      );
+    });
+
+    test('feed chung dedupe post của friend đăng vào Space caller cũng member',
+        () async {
+      // friend uid2 đăng vào Space s1 (uid1 cũng member). Post đó match
+      // CẢ nhánh perAuthor (authorId == uid2) lẫn nhánh memberIds
+      // (uid1 in memberIds). Kết quả phải chỉ có 1 entry, không duplicate.
+      await db.collection('friendships').doc('uid1_uid2').set({
+        'members': ['uid1', 'uid2'],
+        'createdAt': DateTime(2026, 5, 1),
+      });
+      final pFriendSpace = Post(
+        postId: 'p_dup',
+        authorId: 'uid2',
+        authorName: 'Friend',
+        imageUrl: 'https://example.com/photo.jpg',
+        audienceType: AudienceType.all,
+        spaceIds: const ['s1'],
+        memberIds: const ['uid1', 'uid2'],
+        createdAt: DateTime(2026, 5, 27),
+      );
+      await db.collection('posts').doc('p_dup').set(pFriendSpace.toJson());
+
+      final posts = await repo.watchFeed('uid1').first;
+      expect(posts.where((p) => p.postId == 'p_dup').length, 1);
     });
 
     test('spaceId != null trả về chỉ posts của Space đó', () async {
-      // Hỗn hợp: 1 post chung của user, 1 post Space s1 của user, 1 post
-      // Space s2 của user. watchFeed(uid, spaceId: 's1') chỉ trả p_s1.
+      // Caller uid1 là member của cả s1 và s2. Hỗn hợp post:
+      // - p_chung: post chung (không có memberIds)
+      // - p_s1: post Space s1, memberIds chứa uid1
+      // - p_s2: post Space s2, memberIds chứa uid1
+      // watchFeed(uid1, spaceId: 's1') chỉ trả p_s1.
       final pChung = _makePost(postId: 'p_chung', authorId: 'uid1');
       final pS1 = Post(
         postId: 'p_s1',
@@ -171,7 +218,8 @@ void main() {
         authorName: 'Test User',
         imageUrl: 'https://example.com/photo.jpg',
         audienceType: AudienceType.all,
-        spaceId: 's1',
+        spaceIds: const ['s1'],
+        memberIds: const ['uid1', 'uid2'],
         createdAt: DateTime(2026, 5, 27),
       );
       final pS2 = Post(
@@ -180,7 +228,8 @@ void main() {
         authorName: 'Test User',
         imageUrl: 'https://example.com/photo.jpg',
         audienceType: AudienceType.all,
-        spaceId: 's2',
+        spaceIds: const ['s2'],
+        memberIds: const ['uid1', 'uid3'],
         createdAt: DateTime(2026, 5, 27),
       );
       await db.collection('posts').doc('p_chung').set(pChung.toJson());

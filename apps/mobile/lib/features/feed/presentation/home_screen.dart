@@ -188,13 +188,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  /// Derive màu ring cho AppTaskbar từ post hiện tại (nếu có Space).
+  /// Derive màu ring cho AppTaskbar từ Space đầu tiên trong post hiện tại.
+  /// Multi-Space post pick first (visual hint dùng 1 màu).
   Color? get _ringColor {
     if (_currentPage < 1 || _currentPage - 1 >= _posts.length) return null;
     final post = _posts[_currentPage - 1];
-    final sid = post.spaceId;
-    if (sid == null) return null;
-    final space = ref.read(spaceByIdProvider(sid)).valueOrNull;
+    if (post.spaceIds.isEmpty) return null;
+    final space = ref.read(spaceByIdProvider(post.spaceIds.first)).valueOrNull;
     if (space == null) return null;
     return hexToColor(space.colorHex);
   }

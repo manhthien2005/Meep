@@ -1,4 +1,4 @@
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { logger } from 'firebase-functions/v2';
 
@@ -67,10 +67,14 @@ export async function spacePostFanOut(post: SpacePost): Promise<void> {
 
   // Step 3: Fan-out feed docs. Batch 499 (giữ lề 1 op an toàn dưới 500
   // limit Firestore). Worst case: 10 members → 1 batch đủ.
+  //
+  // Multi-Space (Branch 3): caller có thể gọi spacePostFanOut nhiều lần
+  // cho cùng post nhưng spaceId khác nhau. Để member trong cả 2 Space
+  // không bị ghi đè spaceId, dùng set merge + arrayUnion cho spaceIds.
   const feedDoc = {
     postId,
     authorId,
-    spaceId,
+    spaceIds: FieldValue.arrayUnion(spaceId),
     createdAt: post.createdAt,
   };
 
@@ -79,7 +83,7 @@ export async function spacePostFanOut(post: SpacePost): Promise<void> {
   let opCount = 0;
 
   for (const uid of memberUids) {
-    batch.set(db.doc(`users/${uid}/feed/${postId}`), feedDoc);
+    batch.set(db.doc(`users/${uid}/feed/${postId}`), feedDoc, { merge: true });
     opCount++;
     if (opCount === 499) {
       batches.push(batch);

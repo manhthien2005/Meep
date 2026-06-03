@@ -7,12 +7,12 @@ abstract class PostRepository {
   /// Stream of paginated feed for [uid], newest first.
   ///
   /// Khi [spaceId] null (default): feed chung — posts của user + friends,
-  /// loại bỏ posts đăng vào Space (post.spaceId != null).
+  /// loại bỏ posts đăng vào Space (post.spaceIds không rỗng).
   ///
-  /// Khi [spaceId] != null: chỉ posts đăng vào Space đó (post.spaceId ==
-  /// [spaceId]). Rule `/posts` read pass cho Space member qua nhánh
-  /// `exists(/users/{uid}/feed/{postId})` — server CF spacePostFanOut đã
-  /// fan-out feed entry cho mọi Space member.
+  /// Khi [spaceId] != null: chỉ posts đăng vào Space đó (post.spaceIds
+  /// chứa [spaceId]). Implementation query `memberIds arrayContains uid`
+  /// + client filter theo `spaceIds` — disjunct rule `/posts` (3) cần
+  /// query constraint khớp `memberIds.hasAny([uid])` để engine prove.
   Stream<List<Post>> watchFeed(String uid, {String? spaceId});
 
   /// Delete a post and its Storage assets.
