@@ -27,7 +27,7 @@ class FirebaseDiaryRepository implements DiaryRepository {
   }) {
     return FirebaseDiaryRepository(
       firestore: firestore,
-      storageClient: _FirebaseDiaryStorageClient(storage),
+      storageClient: FirebaseDiaryStorageClient(storage),
     );
   }
 
@@ -46,7 +46,10 @@ class FirebaseDiaryRepository implements DiaryRepository {
     _validateMoodCaption(entry.moodCaption);
     _validateBlockCount(entry.content);
 
-    final docRef = _col.doc();
+    // Tôn trọng entryId nếu caller pre-generate (ví dụ Controller reserve ID
+    // trước khi upload Storage để path khớp `diary/{uid}/{entryId}/...`).
+    // Empty → Firestore auto-gen, mirror behavior cũ.
+    final docRef = entry.entryId.isEmpty ? _col.doc() : _col.doc(entry.entryId);
     final entryWithId = entry.copyWith(entryId: docRef.id);
     final data = _serializeEntry(entryWithId)
       ..['createdAt'] = FieldValue.serverTimestamp()
@@ -59,6 +62,12 @@ class FirebaseDiaryRepository implements DiaryRepository {
     }
     return entryWithId;
   }
+
+  /// Reserve a new Firestore document ID without writing — controller dùng
+  /// trước upload Storage để Storage path `diary/{uid}/{entryId}/...` khớp
+  /// với Firestore doc ID, tránh path mismatch + collision.
+  @override
+  String reserveEntryId() => _col.doc().id;
 
   @override
   Stream<List<DiaryEntry>> watchEntries(String authorUid) {
@@ -317,8 +326,8 @@ abstract class DiaryStorageClient {
   Future<void> deletePrefix(String prefix);
 }
 
-class _FirebaseDiaryStorageClient implements DiaryStorageClient {
-  _FirebaseDiaryStorageClient(this._storage);
+class FirebaseDiaryStorageClient implements DiaryStorageClient {
+  FirebaseDiaryStorageClient(this._storage);
 
   final FirebaseStorage _storage;
 
