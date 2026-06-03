@@ -163,10 +163,17 @@ class PostController extends _$PostController {
       // cho mọi Space member khi post.spaceId != null.
       final currentSpace = ref.read(currentSpaceProvider);
 
+      // authorName: chữ đầu tiên trong displayName, tối đa 6 ký tự.
+      // Dài hơn → cắt còn 6 + "...".
+      final rawName = user.displayName?.trim() ?? '';
+      final firstName = rawName.split(' ').first;
+      final authorName =
+          firstName.length <= 6 ? firstName : '${firstName.substring(0, 6)}...';
+
       final post = Post(
         postId: postId,
         authorId: uid,
-        authorName: user.displayName ?? '',
+        authorName: authorName,
         authorAvatarUrl: user.photoURL,
         imageUrl: imageUrl,
         backImageUrl: backImageUrl,
@@ -180,6 +187,10 @@ class PostController extends _$PostController {
         audienceUids:
             state.audienceType == AudienceType.all ? [] : state.selectedUids,
         spaceId: currentSpace?.spaceId,
+        // Denormalize memberIds từ Space snapshot tại lúc post — Firestore
+        // rule sẽ check `memberIds.hasAny([uid])` cho collection query
+        // `posts WHERE spaceId == X`. Field rỗng khi post All-friends.
+        memberIds: currentSpace?.memberIds ?? const <String>[],
         createdAt: DateTime.now(),
       );
       await postRepo.createPost(post);
