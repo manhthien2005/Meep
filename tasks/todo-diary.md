@@ -9,10 +9,10 @@
 
 ## Phase 1 — Data layer
 
-- [ ] **T1** — `FirebaseDiaryRepository` (createEntry + watchEntries + **getPublicEntries(authorUid)** + getEntry + updateEntry + deleteEntry + searchEntries in-memory)
+- [x] **T1** — `FirebaseDiaryRepository` (createEntry + watchEntries + **getPublicEntries(authorUid)** + getEntry + updateEntry + deleteEntry + searchEntries in-memory)
 
 ## Checkpoint: Data layer ✓
-- [ ] `flutter test test/features/diary/` — 0 failures
+- [x] `flutter test test/features/diary/` — 0 failures
 
 ---
 
