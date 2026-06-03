@@ -105,7 +105,19 @@ abstract class AuthRepository {
   /// thể return list providers.
   String? get currentProviderId;
 
-  /// Update the email address of the current user.
+  /// Gửi email xác nhận tới [newEmail] để bắt đầu flow đổi email.
+  ///
+  /// Firebase Auth 5.x: dùng `verifyBeforeUpdateEmail` thay cho `updateEmail`
+  /// deprecated — email chỉ thực sự đổi sau khi user click link trong inbox
+  /// mới. UI nên show toast "Đã gửi email xác nhận" thay vì "Đã đổi email".
+  ///
+  /// Yêu cầu re-auth gần đây — caller phải gọi `reauthenticateWithPassword`
+  /// / `reauthenticateWithGoogle` trước khi gọi method này.
+  ///
+  /// Throws:
+  /// - [UnauthenticatedError] code `requires-recent-login` khi session cũ
+  /// - [ValidationError] khi email invalid / đã được dùng
+  /// - [NetworkError] khi mất mạng
   Future<void> updateEmail(String newEmail);
 
   /// Cascade-delete user account qua Cloud Function `deleteAccount`.

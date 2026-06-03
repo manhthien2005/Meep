@@ -328,4 +328,78 @@ void main() {
       );
     });
   });
+
+  group('updateEmail', () {
+    // mock_exceptions registers exceptions trong global map keyed by object;
+    // dùng uid unique mỗi test để tránh collision giữa MockUser instances.
+    FirebaseAuthRepository repoSignedIn(String uid, {MockUser? user}) {
+      final mockUser = user ?? MockUser(uid: uid, email: 'old@example.com');
+      final auth = MockFirebaseAuth(mockUser: mockUser, signedIn: true);
+      return FirebaseAuthRepository(auth: auth);
+    }
+
+    test('UnauthenticatedError khi chưa đăng nhập', () async {
+      await expectLater(
+        repo.updateEmail('new@example.com'),
+        throwsA(isA<UnauthenticatedError>()),
+      );
+    });
+
+    test('completes khi user signed in và Firebase trả OK', () async {
+      await expectLater(
+        repoSignedIn('uid-ok').updateEmail('new@example.com'),
+        completes,
+      );
+    });
+
+    test('UnauthenticatedError code "requires-recent-login" khi session cũ',
+        () async {
+      final user = MockUser(uid: 'uid-stale', email: 'old@example.com');
+      whenCalling(Invocation.method(#verifyBeforeUpdateEmail, null))
+          .on(user)
+          .thenThrow(FirebaseAuthException(code: 'requires-recent-login'));
+      Object? caught;
+      try {
+        await repoSignedIn('uid-stale', user: user)
+            .updateEmail('new@example.com');
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught, isA<UnauthenticatedError>());
+      expect((caught! as UnauthenticatedError).code, 'requires-recent-login');
+    });
+
+    test('ValidationError khi email đã được dùng', () async {
+      final user = MockUser(uid: 'uid-taken', email: 'old@example.com');
+      whenCalling(Invocation.method(#verifyBeforeUpdateEmail, null))
+          .on(user)
+          .thenThrow(FirebaseAuthException(code: 'email-already-in-use'));
+      await expectLater(
+        repoSignedIn('uid-taken', user: user).updateEmail('taken@example.com'),
+        throwsA(isA<ValidationError>()),
+      );
+    });
+
+    test('ValidationError khi email không hợp lệ', () async {
+      final user = MockUser(uid: 'uid-invalid', email: 'old@example.com');
+      whenCalling(Invocation.method(#verifyBeforeUpdateEmail, null))
+          .on(user)
+          .thenThrow(FirebaseAuthException(code: 'invalid-email'));
+      await expectLater(
+        repoSignedIn('uid-invalid', user: user).updateEmail('not-an-email'),
+        throwsA(isA<ValidationError>()),
+      );
+    });
+
+    test('NetworkError khi mất mạng', () async {
+      final user = MockUser(uid: 'uid-net', email: 'old@example.com');
+      whenCalling(Invocation.method(#verifyBeforeUpdateEmail, null))
+          .on(user)
+          .thenThrow(FirebaseAuthException(code: 'network-request-failed'));
+      await expectLater(
+        repoSignedIn('uid-net', user: user).updateEmail('new@example.com'),
+        throwsA(isA<NetworkError>()),
+      );
+    });
+  });
 }
