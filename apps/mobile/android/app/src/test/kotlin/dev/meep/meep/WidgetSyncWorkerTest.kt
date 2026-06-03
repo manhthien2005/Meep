@@ -18,14 +18,12 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GetTokenResult
-import com.google.firebase.firestore.AggregateQuery
 import com.google.firebase.firestore.AggregateQuerySnapshot
 import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
-import io.mockk.MockKAnnotations
 import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just
@@ -71,7 +69,6 @@ class WidgetSyncWorkerTest {
 
     @Before
     fun setUp() {
-        MockKAnnotations.init(this)
         context = ApplicationProvider.getApplicationContext()
 
         mockkStatic(FirebaseAuth::class)
