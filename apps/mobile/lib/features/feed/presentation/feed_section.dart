@@ -254,7 +254,7 @@ class _AvatarStack extends StatelessWidget {
 
 /// Friend message bar — 2-state inline composer trên Feed:
 /// - **Collapsed** (mặc định): text "Gửi tin nhắn..." + 3 emoji quick-react
-///   (🩵🤣🥰 — Figma 472:2252) + smile-plus picker. Tap text trái → expand
+///   (💙🤣🥰 — Figma 472:2252) + smile-plus picker. Tap text trái → expand
 ///   sang modal composer. Tap emoji → `ReactionController.toggleReact`
 ///   (optimistic + in-flight lock). Tap smile-plus → `EmojiPickerSheet`.
 /// - **Expanded:** TextField focused + send button. Tap-outside hoặc submit →
@@ -289,7 +289,9 @@ class FriendMessageBar extends ConsumerStatefulWidget {
 class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
   bool _isSending = false;
 
-  static const _presets = ['🩵', '🤣', '🥰'];
+  // 💙 (U+1F499) ổn định cross-Android; tránh 🩵 (U+1FA75 — Unicode 14.0) bị
+  // tofu trên Android < 12. Khớp chat_input_bar.quickEmojis default.
+  static const _presets = ['💙', '🤣', '🥰'];
 
   /// Mở modal bottom sheet composer thay vì inline TextField.
   ///
@@ -441,6 +443,12 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
   }
 }
 
+/// Emoji preset button — visual feedback khi user đã thả reaction:
+/// - Active: scale 1.35x + translate Y -10 (nổi lên khỏi ActText) + full opacity
+/// - Inactive: scale 1.0 + opacity 0.6
+/// Animate transition 200ms easeOutBack tạo cảm giác "bouncy".
+/// KHÔNG set fontFamily — để platform emoji font render glyph, tránh tofu
+/// (theo pattern chat_input_bar — comment lý do ở đó).
 class _EmojiButton extends StatelessWidget {
   const _EmojiButton({
     required this.emoji,
@@ -456,13 +464,25 @@ class _EmojiButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Opacity(
-          opacity: isActive ? 1.0 : 0.6,
-          child: Text(
-            emoji,
-            style: const TextStyle(fontSize: 24),
+        child: AnimatedSlide(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutBack,
+          offset: isActive ? const Offset(0, -0.45) : Offset.zero,
+          child: AnimatedScale(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutBack,
+            scale: isActive ? 1.35 : 1.0,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 180),
+              opacity: isActive ? 1.0 : 0.6,
+              child: Text(
+                emoji,
+                style: const TextStyle(fontSize: 22),
+              ),
+            ),
           ),
         ),
       ),

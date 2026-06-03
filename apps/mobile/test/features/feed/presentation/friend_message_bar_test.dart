@@ -88,7 +88,7 @@ void main() {
       await pump(tester);
 
       expect(find.text('Gửi tin nhắn...'), findsOneWidget);
-      expect(find.text('🩵'), findsOneWidget);
+      expect(find.text('💙'), findsOneWidget);
       expect(find.text('🤣'), findsOneWidget);
       expect(find.text('🥰'), findsOneWidget);
       expect(find.byIcon(Icons.add_reaction_outlined), findsOneWidget);
@@ -133,7 +133,7 @@ void main() {
 
       // Sheet đóng — TextField mất, collapsed bar còn nguyên emoji pills.
       expect(find.byType(TextField), findsNothing);
-      expect(find.text('🩵'), findsOneWidget);
+      expect(find.text('💙'), findsOneWidget);
     });
   });
 
