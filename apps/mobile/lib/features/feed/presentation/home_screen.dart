@@ -10,15 +10,16 @@ import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/feed/application/app_camera_controller.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
+import 'package:meep/features/feed/application/feed_filter_controller.dart';
 import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/feed/presentation/camera_section.dart';
+import 'package:meep/features/feed/presentation/feed_filter_dropdown.dart';
 import 'package:meep/features/feed/presentation/feed_section.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/presentation/friend_sheet.dart';
 import 'package:meep/features/settings/presentation/settings_sheet.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/space.dart';
-import 'package:meep/features/space/presentation/space_context_bottom_sheet.dart';
 import 'package:meep/features/space/presentation/space_management_sheet.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
@@ -40,17 +41,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// Drives the topbar mode (friend count on camera, filter on feed).
   int _currentPage = 0;
 
-  /// Selected feed filter on the home topbar.
-  /// null = "Mọi người" (all friends' feed). Otherwise filter by this author
-  /// uid: currentUid = "Bạn" (own posts), or a friend's uid.
-  String? _selectedAuthorUid;
-
-  /// Selected Space filter từ dropdown (mutually exclusive với author).
-  /// null = không filter theo Space. Khi set → `_filter == FeedFilter.space`
-  /// và `_activeFilterSpaceId` trả về giá trị này (ưu tiên hơn widget.spaceId
-  /// route param). Reset về null khi user chọn "Mọi người" / friend.
-  String? _selectedSpaceId;
-  String _selectedLabel = 'Mọi người';
+  /// Cache posts list để derive ringColor + bg space cho taskbar.
+  List<Post> _posts = [];
 
   /// Widget-tap deeplink target — postId cần scroll tới khi feed có data.
   /// Set từ `widget.highlightPostId` ở initState/didUpdateWidget, clear ngay
@@ -63,6 +55,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     _pageController = PageController();
     _pendingHighlightPostId = widget.highlightPostId;
+
+    // Deeplink `/space/:spaceId` → seed provider sau frame đầu (provider
+    // chưa thể mutate inside initState — ref.read OK nhưng convention
+    // post-frame). Deeplink luôn thắng provider state cũ. Label dùng
+    // placeholder "Space" — sẽ được sync về tên thật khi spaceById emit.
+    final routeSpaceId = widget.spaceId;
+    if (routeSpaceId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(feedFilterControllerProvider.notifier).seedFromRoute(
+              spaceId: routeSpaceId,
+              label: 'Space',
+            );
+      });
+    }
   }
 
   @override
@@ -114,6 +121,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _onPageChanged(int index) {
     setState(() => _currentPage = index);
     final notifier = ref.read(appCameraControllerProvider.notifier);
+    final filterSelection = ref.read(feedFilterControllerProvider);
+    final filterMode = _filterModeFor(filterSelection);
     if (index == 0) {
       notifier.resumePreview();
     } else {
@@ -121,56 +130,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref
           .read(
             feedControllerProvider(
-              filter: _filter,
-              filterUid: _activeFilterUid,
-              filterSpaceId: _activeFilterSpaceId,
+              filter: filterMode,
+              filterUid: filterSelection.authorUid,
+              filterSpaceId: filterSelection.spaceId,
             ).notifier,
           )
           .onItemVisible(index - 1);
     }
   }
 
-  /// Feed filter derived from topbar selector + space context.
-  /// Priority order: local `_selectedSpaceId` (chọn từ dropdown) >
-  /// `widget.spaceId` (route param `/space/:spaceId`) > `_selectedAuthorUid`
-  /// (chọn friend từ dropdown) > all.
-  FeedFilter get _filter {
-    if (_selectedSpaceId != null || widget.spaceId != null) {
-      return FeedFilter.space;
-    }
-    return _selectedAuthorUid != null ? FeedFilter.person : FeedFilter.all;
+  /// Derive FeedFilter mode từ selection state. spaceId thắng authorUid
+  /// (mutually exclusive trong selection, đề phòng future state changes).
+  FeedFilter _filterModeFor(FeedFilterSelection selection) {
+    if (selection.spaceId != null) return FeedFilter.space;
+    if (selection.authorUid != null) return FeedFilter.person;
+    return FeedFilter.all;
   }
 
-  /// Author uid passed to [FeedFilter.person]. Null in space/all modes.
-  String? get _activeFilterUid =>
-      (_selectedSpaceId != null || widget.spaceId != null)
-          ? null
-          : _selectedAuthorUid;
-
-  /// Space ID passed to [FeedFilter.space]. Ưu tiên local state từ dropdown
-  /// (cho phép user switch Space khi đang ở /home), fallback widget.spaceId
-  /// route param (giữ tương thích deeplink `/space/:spaceId`).
-  String? get _activeFilterSpaceId => _selectedSpaceId ?? widget.spaceId;
-
   void _onFilterSelected(String? authorUid, String label) {
-    setState(() {
-      _selectedAuthorUid = authorUid;
-      _selectedSpaceId = null; // reset Space khi chọn person/all
-      _selectedLabel = label;
-    });
+    final notifier = ref.read(feedFilterControllerProvider.notifier);
+    if (authorUid == null) {
+      notifier.selectAll();
+    } else {
+      notifier.selectAuthor(authorUid, label);
+    }
     // Jump back to the camera page so the freshly filtered feed loads cleanly.
     _pageController.jumpToPage(0);
   }
 
-  /// Khi user chọn 1 Space từ dropdown — set local space filter + clear
-  /// author filter. `currentSpaceProvider` cũng sync để Camera page biết
-  /// context Space (badge "Đang gửi: [name]" + viền camera theo colorHex).
+  /// Khi user chọn 1 Space từ dropdown — set filter provider + sync
+  /// `currentSpaceProvider` để Camera page biết context Space (badge
+  /// "Đang gửi: [name]" + viền camera theo colorHex).
   void _onSpaceFilterSelected(Space space) {
-    setState(() {
-      _selectedSpaceId = space.spaceId;
-      _selectedAuthorUid = null;
-      _selectedLabel = space.name;
-    });
+    ref.read(feedFilterControllerProvider.notifier).selectSpace(space);
     ref.read(currentSpaceProvider.notifier).select(space);
     _pageController.jumpToPage(0);
   }
@@ -196,13 +188,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  /// Derive màu ring cho AppTaskbar từ post hiện tại (nếu có Space).
+  Color? get _ringColor {
+    if (_currentPage < 1 || _currentPage - 1 >= _posts.length) return null;
+    final post = _posts[_currentPage - 1];
+    final sid = post.spaceId;
+    if (sid == null) return null;
+    final space = ref.read(spaceByIdProvider(sid)).valueOrNull;
+    if (space == null) return null;
+    return hexToColor(space.colorHex);
+  }
+
   // TODO(Feed/KhoaLND): wire luồng chia sẻ — nút phải embedded là nút share,
   // chưa chốt đích đến.
   void _onShareTap() {}
 
   /// Camera page (page 0) -> floating pill (hug-width, có active state).
   /// Feed (page >=1) -> embedded full-width với nút grid + share ngoài pill.
-  Widget _buildTaskbar(int chatBadgeCount) {
+  Widget _buildTaskbar(int chatBadgeCount, Color? ringColor) {
     if (_currentPage >= 1) {
       return Padding(
         padding: EdgeInsets.fromLTRB(
@@ -218,6 +221,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           onTabSelected: _onTaskbarTab,
           onGridTap: () => context.go('/grid-view'),
           onUploadTap: _onShareTap,
+          ringColor: ringColor,
         ),
       );
     }
@@ -237,11 +241,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filterSelection = ref.watch(feedFilterControllerProvider);
+    final filterMode = _filterModeFor(filterSelection);
+
+    // [DEBUG/Space Feed] Log mỗi lần HomeScreen rebuild với filter mới.
+    // Anh đối chiếu thứ tự: FilterController log → HomeScreen log → FeedController log → Repo log.
+    debugPrint(
+      '[Space Feed] HomeScreen build — mode=$filterMode, '
+      'authorUid=${filterSelection.authorUid}, '
+      'spaceId=${filterSelection.spaceId}, label="${filterSelection.label}"',
+    );
+
     final feedAsync = ref.watch(
       feedControllerProvider(
-        filter: _filter,
-        filterUid: _activeFilterUid,
-        filterSpaceId: _activeFilterSpaceId,
+        filter: filterMode,
+        filterUid: filterSelection.authorUid,
+        filterSpaceId: filterSelection.spaceId,
       ),
     );
 
@@ -276,7 +291,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             _HomeTopBar(
               isFeedMode: _currentPage >= 1,
-              selectedLabel: _selectedLabel,
+              selectedLabel: filterSelection.label,
               onFilterSelected: _onFilterSelected,
               onSpaceFilterSelected: _onSpaceFilterSelected,
               spaceId: widget.spaceId,
@@ -284,11 +299,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Expanded(
               child: feedAsync.when(
                 loading: () => _buildPageView(null, isLoading: true),
-                error: (_, __) => _buildPageView(null, isError: true),
-                data: (state) => _buildPageView(state.posts),
+                error: (e, st) {
+                  // [DEBUG/Space Feed] Đây là chỗ UI hiển thị "Không tải
+                  // được feed". Log error cuối cùng + stacktrace để anh
+                  // thấy rõ trong terminal.
+                  debugPrint(
+                    '[Space Feed] HomeScreen render ERROR state — '
+                    'mode=$filterMode, spaceId=${filterSelection.spaceId}, error=$e',
+                  );
+                  debugPrint('[Space Feed] Stacktrace UI: $st');
+                  return _buildPageView(null, isError: true);
+                },
+                data: (state) {
+                  debugPrint(
+                    '[Space Feed] HomeScreen render DATA state — '
+                    'mode=$filterMode, posts=${state.posts.length}',
+                  );
+                  _posts = state.posts;
+                  return _buildPageView(state.posts);
+                },
               ),
             ),
-            _buildTaskbar(totalUnread),
+            _buildTaskbar(totalUnread, _ringColor),
           ],
         ),
       ),
@@ -383,7 +415,7 @@ class _HomeTopBar extends ConsumerWidget {
       barrierLabel: 'Đóng bộ lọc',
       barrierColor: const Color(0x73000000),
       transitionDuration: const Duration(milliseconds: 150),
-      pageBuilder: (_, __, ___) => _FeedFilterDropdown(
+      pageBuilder: (_, __, ___) => FeedFilterDropdown(
         currentUid: currentUid,
         selectedLabel: selectedLabel,
         onFilterSelected: onFilterSelected,
@@ -422,7 +454,7 @@ class _HomeTopBar extends ConsumerWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppColors.bw700.withValues(alpha: 0.4),
+                    color: AppColors.bw700.withValues(alpha: 0.08),
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
@@ -457,18 +489,16 @@ class _HomeTopBar extends ConsumerWidget {
   }
 
   /// Camera page: pill hiển thị số bạn bè thật.
-  /// - Tap = mở FriendSheet (Figma).
-  /// - Long-press = mở SpaceContextBottomSheet để đổi Camera context
-  ///   (gửi cho All friends hay 1 Space cụ thể). Per Space spec T4.
+  /// Tap = mở FriendSheet (Figma). Space context được pick từ AudienceRow ở
+  /// CapturePreview thay vì long-press ở camera page.
   Widget _buildFriendCountPill(BuildContext context, int friendCount) {
     final label = friendCount == 0 ? 'Chưa có bạn bè' : '$friendCount bạn bè';
     return GestureDetector(
       onTap: () => _openFriendSheet(context),
-      onLongPress: () => SpaceContextBottomSheet.show(context),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.bw700.withValues(alpha: 0.4),
+          color: AppColors.bw700.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(40),
         ),
         child: Row(
@@ -503,7 +533,7 @@ class _HomeTopBar extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.bw700.withValues(alpha: 0.4),
+          color: AppColors.bw700.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(40),
         ),
         child: Row(
@@ -526,224 +556,10 @@ class _HomeTopBar extends ConsumerWidget {
   }
 }
 
-/// Feed filter dropdown — "Mọi người" / "Bạn" / per-friend / per-Space.
-/// Mirrors Figma "ListFriend" (269:1667): rounded card, dark rows with
-/// dividers. Spaces section (nếu user thuộc Space nào) hiện dưới friends.
-class _FeedFilterDropdown extends ConsumerWidget {
-  const _FeedFilterDropdown({
-    required this.currentUid,
-    required this.selectedLabel,
-    required this.onFilterSelected,
-    required this.onSpaceFilterSelected,
-  });
-
-  final String currentUid;
-  final String selectedLabel;
-  final void Function(String? authorUid, String label) onFilterSelected;
-  final void Function(Space space) onSpaceFilterSelected;
-
-  void _select(BuildContext context, String? authorUid, String label) {
-    Navigator.of(context).pop();
-    onFilterSelected(authorUid, label);
-  }
-
-  void _selectSpace(BuildContext context, Space space) {
-    Navigator.of(context).pop();
-    onSpaceFilterSelected(space);
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final friends = ref.watch(friendControllerProvider(currentUid)).friends;
-    final profile = ref.watch(currentUserProfileProvider).valueOrNull;
-    final spaces = ref.watch(
-      spaceControllerProvider(currentUid).select((s) => s.spaces),
-    );
-
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Padding(
-        padding: const EdgeInsets.only(top: 100),
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            width: 265,
-            decoration: BoxDecoration(
-              color: AppColors.bw600,
-              borderRadius: BorderRadius.circular(25),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _FilterRow(
-                    label: 'Mọi người',
-                    leading: _iconCircle('assets/icons/ic_users_round.svg'),
-                    onTap: () => _select(context, null, 'Mọi người'),
-                  ),
-                  _FilterRow(
-                    label: 'Bạn',
-                    leading: AppAvatar(
-                      imageUrl: profile?.avatarUrl,
-                      size: 25,
-                      fallbackText: (profile?.displayName.isNotEmpty ?? false)
-                          ? profile!.displayName[0].toUpperCase()
-                          : null,
-                    ),
-                    onTap: () => _select(context, currentUid, 'Bạn'),
-                  ),
-                  ...friends.map(
-                    (friend) => _FilterRow(
-                      label: friend.displayName,
-                      leading: AppAvatar(
-                        imageUrl: friend.avatarUrl,
-                        size: 25,
-                        fallbackText: friend.displayName.isNotEmpty
-                            ? friend.displayName[0].toUpperCase()
-                            : null,
-                      ),
-                      onTap: () => _select(
-                        context,
-                        friend.uid,
-                        friend.displayName,
-                      ),
-                    ),
-                  ),
-                  // Spaces section — chỉ render nếu user thuộc Space nào.
-                  // Header phân tách khỏi friends list, leading dùng emoji
-                  // + colorHex paired (giống SpaceListTile / SpaceQuickRow).
-                  if (spaces.isNotEmpty) ...[
-                    const _SpacesSectionHeader(),
-                    ...spaces.map(
-                      (space) => _FilterRow(
-                        label: space.name,
-                        leading: _SpaceLeadingCircle(space: space),
-                        onTap: () => _selectSpace(context, space),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _iconCircle(String iconPath) {
-    return Container(
-      width: 25,
-      height: 25,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppColors.bw600,
-      ),
-      padding: const EdgeInsets.all(6),
-      child: SvgPicture.asset(
-        iconPath,
-        colorFilter: const ColorFilter.mode(AppColors.bw100, BlendMode.srcIn),
-      ),
-    );
-  }
-}
-
-/// Section divider/header "SPACES" giữa friends list và Spaces list.
-class _SpacesSectionHeader extends StatelessWidget {
-  const _SpacesSectionHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: const BoxDecoration(
-        color: AppColors.bw700,
-        border: Border(bottom: BorderSide(color: AppColors.bw800)),
-      ),
-      child: Text(
-        'SPACES',
-        style: AppTextStyles.xsSemiBold.copyWith(
-          color: AppColors.bw400,
-          letterSpacing: 1,
-        ),
-      ),
-    );
-  }
-}
-
-/// Leading 25px circle dùng colorHex bg + emoji centered. Mirror pattern
-/// SpaceListTile / SpaceQuickRow để Space identity consistent xuyên UI.
-class _SpaceLeadingCircle extends StatelessWidget {
-  const _SpaceLeadingCircle({required this.space});
-
-  final Space space;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 25,
-      height: 25,
-      decoration: BoxDecoration(
-        color: hexToColor(space.colorHex),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        space.iconEmoji,
-        style: const TextStyle(fontSize: 14),
-      ),
-    );
-  }
-}
-
-class _FilterRow extends StatelessWidget {
-  const _FilterRow({
-    required this.label,
-    required this.leading,
-    required this.onTap,
-  });
-
-  final String label;
-  final Widget leading;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        decoration: const BoxDecoration(
-          color: AppColors.bw700,
-          border: Border(
-            bottom: BorderSide(color: AppColors.bw800),
-          ),
-        ),
-        child: Row(
-          children: [
-            leading,
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                label,
-                style: AppTextStyles.mdBold.copyWith(color: AppColors.bw100),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right,
-              color: AppColors.bw500,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
+/// Full-screen page render từng post trong PageView. Background đổi theo
+/// `post.spaceId.colorHex` — paint ở LEVEL Scaffold (_scaffoldBgColor) thay
+/// vì ColoredBox riêng cho từng page, để header pill + footer taskbar
+/// (transparent bg) phủ cùng màu space xuyên qua.
 class _PostPage extends StatelessWidget {
   const _PostPage({required this.post});
 
@@ -752,10 +568,9 @@ class _PostPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
-    if (post.authorId == currentUid) {
-      return OwnPostPage(post: post);
-    }
-    return FriendPostPage(post: post);
+    return post.authorId == currentUid
+        ? OwnPostPage(post: post)
+        : FriendPostPage(post: post);
   }
 }
 

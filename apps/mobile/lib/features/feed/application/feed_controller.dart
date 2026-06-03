@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -55,11 +56,25 @@ class FeedController extends _$FeedController {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     final repo = ref.read(postRepositoryProvider);
 
+    // [DEBUG/Space Feed] Log lúc build provider — anh đối chiếu với
+    // log từ UI để xác nhận FilterDropdown đã dispatch đúng mode.
+    debugPrint(
+      '[Space Feed] FeedController.build — filter=$filter, '
+      'filterUid=$filterUid, filterSpaceId=$filterSpaceId, currentUid=$uid',
+    );
+
     // Pass spaceId xuống repo khi filter là Space — repo branch sang
     // _watchSpaceFeed query thẳng /posts where spaceId == X. Khi filter
     // là all/person, spaceId truyền null → repo trả feed chung (đã loại
     // Space posts).
     final repoSpaceId = filter == FeedFilter.space ? filterSpaceId : null;
+
+    if (filter == FeedFilter.space && filterSpaceId == null) {
+      debugPrint(
+        '[Space Feed] CẢNH BÁO: filter=space nhưng filterSpaceId=null. '
+        'Sẽ rơi vào nhánh feed chung thay vì Space feed → bug ở provider/UI.',
+      );
+    }
 
     // Live stream so posts appear once the CF fan-out writes the feed doc —
     // no manual refresh needed. A single subscription drives both the initial
@@ -75,6 +90,10 @@ class FeedController extends _$FeedController {
             posts.where((p) => p.authorId == filterUid).toList(),
           _ => posts,
         };
+        debugPrint(
+          '[Space Feed] FeedController emit — filter=$filter, '
+          'posts từ repo=${posts.length}, sau client filter=${filtered.length}',
+        );
         final feedState = FeedState(posts: filtered, hasMore: false);
         if (completer.isCompleted) {
           state = AsyncData(feedState);
@@ -89,6 +108,13 @@ class FeedController extends _$FeedController {
         }
       },
       onError: (Object e, StackTrace st) {
+        // [DEBUG/Space Feed] Đây là điểm cuối cùng error đi qua trước khi
+        // UI hiện "Không tải được feed". Nếu anh thấy "Không tải được feed"
+        // mà KHÔNG có log nào trước log này → error chưa được catch ở repo.
+        debugPrint(
+          '[Space Feed] FeedController nhận error từ repo — '
+          'filter=$filter, filterSpaceId=$filterSpaceId, error=$e',
+        );
         if (!completer.isCompleted) {
           completer.completeError(e, st);
         } else {
