@@ -25,6 +25,7 @@ import 'package:meep/features/diary/presentation/diary_list_screen.dart';
 import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/feed/presentation/capture_preview_args.dart';
 import 'package:meep/features/feed/presentation/capture_preview_screen.dart';
+import 'package:meep/features/feed/presentation/grid_view_screen.dart';
 import 'package:meep/features/feed/presentation/home_screen.dart';
 import 'package:meep/features/home/presentation/home_page.dart';
 import 'package:meep/features/profile/presentation/edit_profile_screen.dart';
@@ -304,7 +305,7 @@ GoRouter appRouter(Ref ref) {
         path: '/caption-modal',
         builder: (_, __) => const HomeScreen(),
       ),
-      GoRoute(path: '/grid-view', builder: (_, __) => const HomeScreen()),
+      GoRoute(path: '/grid-view', builder: (_, __) => const GridViewScreen()),
       GoRoute(
         path: '/profile',
         builder: (_, state) => ProfileScreen(uid: state.extra as String? ?? ''),
