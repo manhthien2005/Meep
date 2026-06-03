@@ -28,6 +28,8 @@ import 'package:meep/features/feed/presentation/capture_preview_screen.dart';
 import 'package:meep/features/feed/presentation/grid_view_screen.dart';
 import 'package:meep/features/feed/presentation/home_screen.dart';
 import 'package:meep/features/home/presentation/home_page.dart';
+import 'package:meep/features/notification/application/notification_controller.dart';
+import 'package:meep/features/notification/application/notification_state.dart';
 import 'package:meep/features/profile/presentation/edit_profile_screen.dart';
 import 'package:meep/features/profile/presentation/friend_profile_screen.dart';
 import 'package:meep/features/profile/presentation/profile_screen.dart';
@@ -99,6 +101,39 @@ String? authRedirect({
   // uid != null, profile exists — không redirect user khỏi reset page
   if (location == '/login/reset-password') return null;
   return onAuthRoute ? '/home' : null;
+}
+
+/// Pure mapping: notification `data` payload → in-app route.
+///
+/// Designed to be testable without GoRouter or Firebase mocks. Caller picks
+/// the navigation primitive (`go` vs `push`) — T4 uses `go` to keep deep
+/// links idempotent (no duplicate route stack on double-tap).
+///
+///   friend_request / friend_accepted → /home?openFriendSheet=1
+///   reaction                         → /home?highlight=`postId`
+///   new_post                         → /home
+///   unknown / missing type           → /home
+///
+/// Missing postId for `reaction` falls back to `/home` — the source push
+/// always includes it, so a missing value means a malformed payload that
+/// the user shouldn't see a broken highlight for. HomeScreen already
+/// renders the "post no longer exists" toast when the postId can't be
+/// resolved to a Post, so unknown postIds reuse that path.
+String routeForNotification(Map<String, String> data) {
+  final type = data['type'];
+  switch (type) {
+    case 'friend_request':
+    case 'friend_accepted':
+      return '/home?openFriendSheet=1';
+    case 'reaction':
+      final postId = data['postId'];
+      if (postId == null || postId.isEmpty) return '/home';
+      return '/home?highlight=${Uri.encodeQueryComponent(postId)}';
+    case 'new_post':
+      return '/home';
+    default:
+      return '/home';
+  }
 }
 
 /// ChangeNotifier kích hoạt GoRouter redirect re-evaluation khi auth state thay đổi.
@@ -211,6 +246,7 @@ GoRouter appRouter(Ref ref) {
         builder: (_, state) => HomeScreen(
           spaceId: state.uri.queryParameters['spaceId'],
           highlightPostId: state.uri.queryParameters['highlight'],
+          openFriendSheet: state.uri.queryParameters['openFriendSheet'] == '1',
         ),
       ),
       GoRoute(
@@ -393,6 +429,30 @@ GoRouter appRouter(Ref ref) {
       router.go('/home');
     }
   });
+
+  // Notification deep link: NotificationController captures both the
+  // cold-start `getInitialMessage` and live `onMessageOpenedApp` into
+  // `state.lastOpenedApp`. Route once per unique messageId, then ask the
+  // controller to clear — guards against a stale payload re-firing on
+  // hot restart or provider re-listen.
+  //
+  // `fireImmediately: true` covers the race where `initFcm()` (kicked off
+  // by main.dart's auth listener) finishes BEFORE the router provider
+  // builds: state already has `lastOpenedApp`, listener attaches → fires
+  // synchronously with previous=null so the cold-start cmsg routes.
+  ref.listen<OpenedAppPayload?>(
+    notificationControllerProvider.select((s) => s.lastOpenedApp),
+    (previous, next) {
+      if (next == null) return;
+      if (previous?.messageId == next.messageId) return;
+      final route = routeForNotification(next.data);
+      router.go(route);
+      ref
+          .read(notificationControllerProvider.notifier)
+          .consumeOpenedAppMessage();
+    },
+    fireImmediately: true,
+  );
 
   ref.onDispose(() {
     channel.setMethodCallHandler(null);

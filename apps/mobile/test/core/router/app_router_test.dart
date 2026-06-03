@@ -332,4 +332,77 @@ void main() {
       );
     });
   });
+
+  group('routeForNotification — T4 deep link mapping', () {
+    test('friend_request → /home?openFriendSheet=1', () {
+      expect(
+        routeForNotification(const {
+          'type': 'friend_request',
+          'requestId': 'req-1',
+        }),
+        '/home?openFriendSheet=1',
+      );
+    });
+
+    test('friend_accepted → /home?openFriendSheet=1', () {
+      expect(
+        routeForNotification(const {
+          'type': 'friend_accepted',
+          'requestId': 'req-1',
+        }),
+        '/home?openFriendSheet=1',
+      );
+    });
+
+    test('reaction with postId → /home?highlight=<postId>', () {
+      expect(
+        routeForNotification(const {
+          'type': 'reaction',
+          'postId': 'post-abc',
+        }),
+        '/home?highlight=post-abc',
+      );
+    });
+
+    test('reaction with missing postId → /home (no broken highlight)', () {
+      // Defensive: a malformed payload should still land somewhere usable
+      // rather than throw or push an empty highlight query.
+      expect(routeForNotification(const {'type': 'reaction'}), '/home');
+      expect(
+        routeForNotification(const {'type': 'reaction', 'postId': ''}),
+        '/home',
+      );
+    });
+
+    test('reaction encodes a postId that contains special characters', () {
+      // Firestore doc IDs are safe in URLs by default, but `Uri.encode`
+      // guarantees nothing slips through even if a future id contains
+      // a reserved char.
+      expect(
+        routeForNotification(const {
+          'type': 'reaction',
+          'postId': 'a/b?c',
+        }),
+        '/home?highlight=a%2Fb%3Fc',
+      );
+    });
+
+    test('new_post → /home (no extra query)', () {
+      expect(
+        routeForNotification(const {'type': 'new_post'}),
+        '/home',
+      );
+    });
+
+    test('unknown type → /home (fallback, no crash)', () {
+      expect(
+        routeForNotification(const {'type': 'made_up_type'}),
+        '/home',
+      );
+    });
+
+    test('missing type → /home (fallback, no crash)', () {
+      expect(routeForNotification(const {}), '/home');
+    });
+  });
 }

@@ -25,10 +25,20 @@ import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key, this.spaceId, this.highlightPostId});
+  const HomeScreen({
+    super.key,
+    this.spaceId,
+    this.highlightPostId,
+    this.openFriendSheet = false,
+  });
 
   final String? spaceId;
   final String? highlightPostId;
+
+  /// Set true when navigated from a friend_request / friend_accepted push
+  /// (T4 deep link). HomeScreen auto-opens the FriendSheet once after
+  /// mount, then clears the pending flag.
+  final bool openFriendSheet;
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -50,11 +60,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// rebuild vì lý do khác.
   String? _pendingHighlightPostId;
 
+  /// Notification deep link target — set khi route mở với
+  /// `?openFriendSheet=1` (friend_request / friend_accepted push). Cleared
+  /// ngay sau khi showModalBottomSheet để rebuild kế tiếp không mở thêm
+  /// sheet thứ hai.
+  bool _pendingOpenFriendSheet = false;
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
     _pendingHighlightPostId = widget.highlightPostId;
+    _pendingOpenFriendSheet = widget.openFriendSheet;
 
     // Deeplink `/space/:spaceId` → seed provider sau frame đầu (provider
     // chưa thể mutate inside initState — ref.read OK nhưng convention
@@ -81,6 +98,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (widget.highlightPostId != null &&
         widget.highlightPostId != oldWidget.highlightPostId) {
       _pendingHighlightPostId = widget.highlightPostId;
+    }
+    if (widget.openFriendSheet && !oldWidget.openFriendSheet) {
+      _pendingOpenFriendSheet = true;
     }
   }
 
@@ -271,6 +291,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _handleHighlight(pendingId, feedState.posts);
         });
+      });
+    }
+
+    // Notification deep link (friend_request / friend_accepted) → auto-open
+    // FriendSheet. Independent of feed loading state — clear pending
+    // synchronously so this branch only fires once per arrival.
+    if (_pendingOpenFriendSheet) {
+      _pendingOpenFriendSheet = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          barrierColor: const Color(0x73000000),
+          builder: (_) => const FriendSheet(),
+        );
       });
     }
 

@@ -26,12 +26,6 @@ NotificationPreferences notificationPreferences(Ref ref) =>
       'wire NotificationPreferences in main.dart',
     );
 
-/// Messages delivered while app was killed, read once at cold start.
-/// T4 deep link handler consumes this.
-final initialMessageProvider = Provider<RemoteMessage?>((ref) {
-  return ref.read(notificationControllerProvider.notifier).initialMessage;
-});
-
 @riverpod
 class NotificationController extends _$NotificationController {
   final FlutterLocalNotificationsPlugin _localNotifications =
@@ -41,10 +35,7 @@ class NotificationController extends _$NotificationController {
   StreamSubscription<RemoteMessage>? _onMessageOpenedAppSub;
   StreamSubscription<String>? _onTokenRefreshSub;
   Timer? _bannerTimer;
-  RemoteMessage? _initialMessage;
   bool _fcmInitialized = false;
-
-  RemoteMessage? get initialMessage => _initialMessage;
 
   @override
   NotificationState build() {
@@ -96,13 +87,16 @@ class NotificationController extends _$NotificationController {
 
     // Cold-start deep link captured BEFORE wiring the live stream — else a
     // background-arriving message during init can be handled by both
-    // `_initialMessage` (T4 deep link) and `onMessageOpenedApp`, causing a
-    // double navigate. Per Firebase docs.
-    _initialMessage = await messaging.getInitialMessage();
+    // `getInitialMessage` (cold-start path) and `onMessageOpenedApp`,
+    // causing a double navigate. Per Firebase docs.
+    final initialMessage = await messaging.getInitialMessage();
+    if (initialMessage != null) {
+      handleOpenedApp(initialMessage);
+    }
 
     _onMessageSub = FirebaseMessaging.onMessage.listen(_handleForeground);
     _onMessageOpenedAppSub =
-        FirebaseMessaging.onMessageOpenedApp.listen(_handleOpenedApp);
+        FirebaseMessaging.onMessageOpenedApp.listen(handleOpenedApp);
   }
 
   Future<void> _saveToken(String token) async {
@@ -174,8 +168,33 @@ class NotificationController extends _$NotificationController {
     });
   }
 
-  void _handleOpenedApp(RemoteMessage message) {
-    // T4 wires deep link routing from this callback.
+  /// Wraps a tapped `RemoteMessage` into [OpenedAppPayload] and writes it
+  /// to state — the router's `ref.listen` consumes it and routes once.
+  ///
+  /// Public (not private) so unit tests can drive it directly without
+  /// mocking the FirebaseMessaging stream. Called by `initFcm` for the
+  /// cold-start `getInitialMessage` and by the `onMessageOpenedApp`
+  /// subscription for background taps.
+  void handleOpenedApp(RemoteMessage message) {
+    // `messageId` is FCM's dedupe key — guaranteed unique per delivery.
+    // Fall back to a synthetic id when null (vd push from emulator) so the
+    // payload is still emittable; equality still holds because the same
+    // RemoteMessage instance keeps the same fallback id during one tap.
+    final messageId = message.messageId ?? 'no-id-${message.hashCode}';
+    final data = Map<String, String>.from(
+      message.data.map((k, v) => MapEntry(k, v.toString())),
+    );
+    state = state.copyWith(
+      lastOpenedApp: OpenedAppPayload(messageId: messageId, data: data),
+    );
+  }
+
+  /// Router calls after dispatching the navigation. Clears `lastOpenedApp`
+  /// so a future re-listen (vd hot restart with the same payload still in
+  /// state) does not re-route.
+  void consumeOpenedAppMessage() {
+    if (state.lastOpenedApp == null) return;
+    state = state.copyWith(lastOpenedApp: null);
   }
 
   void dismissBanner() {
