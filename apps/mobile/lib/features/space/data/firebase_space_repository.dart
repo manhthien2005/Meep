@@ -51,8 +51,11 @@ class FirebaseSpaceRepository implements SpaceRepository {
 
   @override
   Stream<List<SpaceMember>> watchMembers(String spaceId) {
+    // Members lives in TOP-LEVEL collection `/space_members/{spaceId}/members/{uid}`
+    // (NOT `/spaces/{spaceId}/members`) — match CF createSpace.ts write path +
+    // firestore.rules `match /space_members/{spaceId}/members/{uid}`.
     return _firestore
-        .collection(_spacesCollection)
+        .collection('space_members')
         .doc(spaceId)
         .collection('members')
         .snapshots()

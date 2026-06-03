@@ -87,6 +87,12 @@ class FirebaseConversationRepository implements ConversationRepository {
     required String uid,
     required String otherUid,
   }) async {
+    if (uid.isEmpty || otherUid.isEmpty) {
+      throw const ValidationError(message: 'Thiếu thông tin người dùng');
+    }
+    if (uid == otherUid) {
+      throw const ValidationError(message: 'Không thể nhắn tin cho chính mình');
+    }
     try {
       final pairId = pairIdOf(uid, otherUid);
       final docRef = _firestore.collection(_conversationsCol).doc(pairId);
@@ -110,6 +116,12 @@ class FirebaseConversationRepository implements ConversationRepository {
         'lastSenderId': '',
         'status': 'active',
         'createdAt': FieldValue.serverTimestamp(),
+        // Seed lastReadAt cho cả 2 user — tránh false-positive unread badge khi
+        // mở conversation lần đầu (xem Bug #11 plan).
+        'lastReadAt': {
+          uid: FieldValue.serverTimestamp(),
+          otherUid: FieldValue.serverTimestamp(),
+        },
       });
       final created = await docRef.get();
       return Conversation.fromJson({
@@ -126,6 +138,7 @@ class FirebaseConversationRepository implements ConversationRepository {
     required String conversationId,
     required String senderId,
     required String text,
+    String? senderDisplayName,
   }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) {
@@ -153,6 +166,8 @@ class FirebaseConversationRepository implements ConversationRepository {
         'senderId': senderId,
         'text': trimmed,
         'createdAt': FieldValue.serverTimestamp(),
+        if (senderDisplayName != null && senderDisplayName.isNotEmpty)
+          'senderDisplayName': senderDisplayName,
       });
       batch.update(conversationRef, {
         'lastMessage': trimmed,
@@ -191,7 +206,9 @@ class FirebaseConversationRepository implements ConversationRepository {
     final serverMessage = e.message;
     switch (e.code) {
       case 'permission-denied':
-        return ForbiddenError(action);
+        return ForbiddenError(
+          '$action — kiểm tra trạng thái đăng nhập + kết bạn',
+        );
       case 'not-found':
         return NotFoundError(serverMessage ?? action);
       case 'unavailable':

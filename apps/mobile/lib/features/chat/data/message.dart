@@ -13,6 +13,12 @@ class Message with _$Message {
     /// Max 500 chars.
     required String text,
     @TimestampConverter() required DateTime createdAt,
+
+    /// Denormalized display name của sender — populated lúc gửi (client cache
+    /// từ currentUser profile). Optional cho backward compat: messages tạo
+    /// trước Bug #2 fix sẽ KHÔNG có field này → group chat fallback render
+    /// 'Người dùng'. Rule cap 50 chars.
+    String? senderDisplayName,
   }) = _Message;
 
   factory Message.fromJson(Map<String, dynamic> json) =>

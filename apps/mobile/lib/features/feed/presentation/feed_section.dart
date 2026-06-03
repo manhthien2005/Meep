@@ -195,13 +195,21 @@ class FriendMessageBar extends ConsumerStatefulWidget {
     super.key,
     required this.postId,
     required this.authorId,
+    this.spaceId,
   });
 
   /// postId — context cho `sendMessageFromFeed` (lưu quotedPostId tương lai).
   final String postId;
 
   /// authorId — peer uid để `getOrCreateConversation` tính pairId.
+  /// Khi [spaceId] != null, authorId chỉ dùng tham chiếu — message forward
+  /// sang space chat thay vì 1-1.
   final String authorId;
+
+  /// spaceId — nếu post được share trong Space, reply forward sang group
+  /// conversation của Space (`conversationId == spaceId`). Null = post
+  /// all-friends → forward 1-1 với author.
+  final String? spaceId;
 
   @override
   ConsumerState<FriendMessageBar> createState() => _FriendMessageBarState();
@@ -242,6 +250,7 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
               postId: widget.postId,
               authorId: widget.authorId,
               text: text,
+              spaceId: widget.spaceId,
             );
     if (!mounted) return;
     setState(() => _isSending = false);
@@ -392,6 +401,7 @@ class FriendPostCard extends StatelessWidget {
             child: FriendMessageBar(
               postId: post.postId,
               authorId: post.authorId,
+              spaceId: post.spaceId,
             ),
           ),
         ],
@@ -504,6 +514,7 @@ class FriendPostPage extends StatelessWidget {
           child: FriendMessageBar(
             postId: post.postId,
             authorId: post.authorId,
+            spaceId: post.spaceId,
           ),
         ),
         SizedBox(height: screenH * _bottomGapRatio),

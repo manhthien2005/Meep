@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,7 @@ import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/chat/data/conversation.dart';
+import 'package:meep/features/chat/data/message.dart';
 import 'package:meep/features/chat/presentation/chat_thread_view.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_confirm_dialogs.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_input_bar.dart';
@@ -68,22 +71,12 @@ class ChatScreen extends ConsumerWidget {
               ),
             ),
             Expanded(
-              child: messagesAsync.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.turquoise500,
-                  ),
-                ),
-                error: (_, __) => const Center(
-                  child: Text('Không tải được tin nhắn.'),
-                ),
-                data: (messages) => ChatThreadView(
-                  messages: messages,
-                  myUid: myUid,
-                  peerAvatarUrl: peer?.avatarUrl,
-                  quotedPostId: conversation?.quotedPostId,
-                  peerName: peer?.displayName ?? '',
-                ),
+              child: _MessageList(
+                messagesAsync: messagesAsync,
+                myUid: myUid,
+                peerAvatarUrl: peer?.avatarUrl,
+                peerName: peer?.displayName ?? '',
+                quotedPostId: conversation?.quotedPostId,
               ),
             ),
             if (isReadonly) _ReadonlyBanner(status: status),
@@ -111,6 +104,11 @@ class ChatScreen extends ConsumerWidget {
   ) async {
     final action = await showSettingMenu<ChatMenuAction>(context, const [
       SettingMenuItem(
+        icon: Icons.person_outline,
+        label: 'Xem hồ sơ',
+        value: ChatMenuAction.viewProfile,
+      ),
+      SettingMenuItem(
         icon: Icons.person_remove_outlined,
         label: 'Xóa bạn',
         value: ChatMenuAction.unfriend,
@@ -125,6 +123,9 @@ class ChatScreen extends ConsumerWidget {
     if (action == null || !context.mounted || peerUid == null) return;
 
     switch (action) {
+      case ChatMenuAction.viewProfile:
+        unawaited(context.push('/friend-profile/$peerUid'));
+
       case ChatMenuAction.unfriend:
         final confirmed = await showUnfriendDialog(context, name);
         if (!confirmed || !context.mounted) return;
@@ -155,7 +156,55 @@ class ChatScreen extends ConsumerWidget {
 }
 
 /// Overflow-menu actions for a 1-1 chat.
-enum ChatMenuAction { unfriend, block }
+enum ChatMenuAction { viewProfile, unfriend, block }
+
+/// Render message list nhưng GIỮ last data khi stream re-emit (transient
+/// loading state khi user send message → conversation doc update →
+/// `messagesProvider` re-emit qua `messagesAsync.isReloading`).
+///
+/// Pattern `valueOrNull` + previous-snapshot: KHÔNG dùng `.when` vì khi
+/// `AsyncValue` chuyển sang `AsyncLoading<List<Message>>` trong loading-on-
+/// reload, `.when` show CircularProgressIndicator full-screen → flicker.
+///
+/// Logic:
+/// - `valueOrNull != null` → render list ngay (kể cả isReloading)
+/// - `valueOrNull == null` + `hasError` → error view
+/// - `valueOrNull == null` + loading initial → spinner (chỉ first load)
+class _MessageList extends StatelessWidget {
+  const _MessageList({
+    required this.messagesAsync,
+    required this.myUid,
+    required this.peerName,
+    this.peerAvatarUrl,
+    this.quotedPostId,
+  });
+
+  final AsyncValue<List<Message>> messagesAsync;
+  final String myUid;
+  final String peerName;
+  final String? peerAvatarUrl;
+  final String? quotedPostId;
+
+  @override
+  Widget build(BuildContext context) {
+    final messages = messagesAsync.valueOrNull;
+    if (messages != null) {
+      return ChatThreadView(
+        messages: messages,
+        myUid: myUid,
+        peerAvatarUrl: peerAvatarUrl,
+        peerName: peerName,
+        quotedPostId: quotedPostId,
+      );
+    }
+    if (messagesAsync.hasError) {
+      return const Center(child: Text('Không tải được tin nhắn.'));
+    }
+    return const Center(
+      child: CircularProgressIndicator(color: AppColors.turquoise500),
+    );
+  }
+}
 
 /// Banner thay input bar khi conversation `status != active`.
 /// - `unfriended`: 2 user không còn là bạn → "Hãy thêm bạn lại để nhắn tin".

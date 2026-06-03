@@ -117,6 +117,23 @@ describe('/conversations/{conversationId}', () => {
     );
   });
 
+  test('participant can query conversations với orderBy lastMessageAt (Inbox)',
+      async () => {
+    // Reproduction case của bug Inbox "Không tải được tin nhắn":
+    // rule cũ dùng `isParticipant(conversationId)` qua `get()` → Firestore
+    // engine fail list query → PERMISSION_DENIED toàn collection. Fix (commit
+    // 103691b reapplied) đổi sang `resource.data.participantIds` direct.
+    await seedConversation();
+    await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .collection('conversations')
+        .where('participantIds', 'array-contains', alice)
+        .orderBy('lastMessageAt', 'desc')
+        .get(),
+    );
+  });
+
   test('non-participant query returns empty via rule filter', async () => {
     await seedConversation();
     const snap = await assertSucceeds(
@@ -183,6 +200,56 @@ describe('/conversations/{conversationId}', () => {
           senderId: alice,
           text: 'A'.repeat(501),
           createdAt: new Date(),
+        }),
+    );
+  });
+
+  // --- senderDisplayName denormalization (Bug #2) -------------------------
+
+  test('message với senderDisplayName ≤50 chars OK', async () => {
+    await seedConversation();
+    await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}/messages/msg-name`)
+        .set({
+          messageId: 'msg-name',
+          senderId: alice,
+          text: 'Xin chào',
+          createdAt: new Date(),
+          senderDisplayName: 'Alice Nguyen',
+        }),
+    );
+  });
+
+  test('message với senderDisplayName >50 chars rejected', async () => {
+    await seedConversation();
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}/messages/msg-long-name`)
+        .set({
+          messageId: 'msg-long-name',
+          senderId: alice,
+          text: 'hi',
+          createdAt: new Date(),
+          senderDisplayName: 'A'.repeat(51),
+        }),
+    );
+  });
+
+  test('message với senderDisplayName non-string rejected', async () => {
+    await seedConversation();
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}/messages/msg-non-string-name`)
+        .set({
+          messageId: 'msg-non-string-name',
+          senderId: alice,
+          text: 'hi',
+          createdAt: new Date(),
+          senderDisplayName: 42,
         }),
     );
   });

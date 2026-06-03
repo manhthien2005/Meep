@@ -218,6 +218,50 @@ void main() {
 
       expect(r2.conversationId, r1.conversationId);
     });
+
+    test('throws ValidationError when uid empty (defensive)', () async {
+      expect(
+        () => repository.getOrCreateConversation(uid: '', otherUid: bobUid),
+        throwsA(isA<ValidationError>()),
+      );
+    });
+
+    test('throws ValidationError when otherUid empty (defensive)', () async {
+      expect(
+        () => repository.getOrCreateConversation(uid: aliceUid, otherUid: ''),
+        throwsA(isA<ValidationError>()),
+      );
+    });
+
+    test('throws ValidationError when uid == otherUid (self-chat)', () async {
+      expect(
+        () => repository.getOrCreateConversation(
+          uid: aliceUid,
+          otherUid: aliceUid,
+        ),
+        throwsA(isA<ValidationError>()),
+      );
+    });
+
+    test('seeds lastReadAt for both participants on create', () async {
+      final pairId = aliceBobPairId();
+      final result = await repository.getOrCreateConversation(
+        uid: aliceUid,
+        otherUid: bobUid,
+      );
+
+      // Verify lastReadAt seeded — tránh badge unread sai khi vừa tạo conv.
+      final doc = await firestore
+          .collection('conversations')
+          .doc(result.conversationId)
+          .get();
+      final lastReadAt = doc.data()!['lastReadAt'] as Map<String, dynamic>;
+      expect(lastReadAt.keys, containsAll([aliceUid, bobUid]));
+      expect(lastReadAt[aliceUid], isNotNull);
+      expect(lastReadAt[bobUid], isNotNull);
+      // Suppress unused var lint
+      expect(result.conversationId, pairId);
+    });
   });
 
   // --- sendMessage ---------------------------------------------------------

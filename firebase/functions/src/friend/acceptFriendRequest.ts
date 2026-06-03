@@ -115,11 +115,25 @@ export const acceptFriendRequest = onCall(
     });
 
     // 3b. Create conversation
+    // lastMessage/lastMessageAt/lastSenderId BẮT BUỘC khởi tạo dù chưa có msg
+    // — Inbox query orderBy lastMessageAt sẽ loại trừ docs thiếu field.
+    // lastReadAt SEED cho cả 2 user = now → unreadCountsProvider không
+    // false-positive "unread" cho conversation vừa accept friend (Bug #11).
+    const now = FieldValue.serverTimestamp();
     batch.set(db.collection('conversations').doc(pairId), {
+      conversationId: pairId,
       type: 'direct',
       participantIds: [uid1, uid2],
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
+      status: 'active',
+      lastMessage: '',
+      lastMessageAt: now,
+      lastSenderId: '',
+      lastReadAt: {
+        [uid1]: now,
+        [uid2]: now,
+      },
+      createdAt: now,
+      updatedAt: now,
     });
 
     // 3c. Update friend request status

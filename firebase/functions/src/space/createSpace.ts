@@ -146,6 +146,14 @@ export const createSpace = onCall(
     // docs thiếu field này (Firestore behavior). Thiếu = group chat invisible
     // cho đến khi gửi msg đầu tiên. Init lastMessageAt = now để Space mới hiện
     // ngay trên đầu Inbox.
+    //
+    // lastReadAt SEED cho mọi member = now → unreadCountsProvider không
+    // false-positive "unread" cho space vừa tạo (lastMessageAt == lastReadAt
+    // → không unread). Bug #11 fix.
+    const lastReadAtSeed: Record<string, FirebaseFirestore.FieldValue> = {};
+    for (const uid of memberIds) {
+      lastReadAtSeed[uid] = now;
+    }
     batch.set(db.collection('conversations').doc(spaceId), {
       conversationId: spaceId,
       type: 'space',
@@ -155,6 +163,7 @@ export const createSpace = onCall(
       lastMessage: '',
       lastMessageAt: now,
       lastSenderId: '',
+      lastReadAt: lastReadAtSeed,
       createdAt: now,
       updatedAt: now,
     });

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
+import 'package:meep/features/space/data/space_member.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
 
@@ -70,6 +71,7 @@ class SpaceMembersSheet extends ConsumerWidget {
                             ? 'Bạn'
                             : (profile?.displayName ?? 'Thành viên'),
                         avatarUrl: profile?.avatarUrl,
+                        isCreator: member.role == SpaceRole.creator,
                       );
                     },
                   ),
@@ -84,10 +86,15 @@ class SpaceMembersSheet extends ConsumerWidget {
 }
 
 class _MemberRow extends StatelessWidget {
-  const _MemberRow({required this.name, this.avatarUrl});
+  const _MemberRow({
+    required this.name,
+    this.avatarUrl,
+    this.isCreator = false,
+  });
 
   final String name;
   final String? avatarUrl;
+  final bool isCreator;
 
   @override
   Widget build(BuildContext context) {
@@ -97,11 +104,37 @@ class _MemberRow extends StatelessWidget {
         children: [
           AppAvatar(imageUrl: avatarUrl, size: 44),
           const SizedBox(width: 14),
-          Text(
-            name,
-            style: AppTextStyles.mdBold.copyWith(color: AppColors.bw100),
+          Flexible(
+            child: Text(
+              name,
+              style: AppTextStyles.mdBold.copyWith(color: AppColors.bw100),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
+          if (isCreator) ...[
+            const SizedBox(width: 8),
+            const _CreatorBadge(),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _CreatorBadge extends StatelessWidget {
+  const _CreatorBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.turquoise500.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        'Creator',
+        style: AppTextStyles.xsSemiBold.copyWith(color: AppColors.turquoise500),
       ),
     );
   }

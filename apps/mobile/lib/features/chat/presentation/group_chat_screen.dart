@@ -6,6 +6,7 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
+import 'package:meep/features/chat/data/message.dart';
 import 'package:meep/features/chat/presentation/chat_thread_view.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_confirm_dialogs.dart';
 import 'package:meep/features/chat/presentation/widgets/chat_input_bar.dart';
@@ -13,6 +14,7 @@ import 'package:meep/features/chat/presentation/widgets/chat_menu_sheet.dart';
 import 'package:meep/features/chat/presentation/widgets/mark_as_read_listener.dart';
 import 'package:meep/features/chat/presentation/widgets/space_members_sheet.dart';
 import 'package:meep/features/space/application/space_controller.dart';
+import 'package:meep/features/space/presentation/space_edit_sheet.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 
 /// Space group chat thread. Figma `564:8603` (+ menu `564:8733`).
@@ -33,6 +35,7 @@ class GroupChatScreen extends ConsumerWidget {
     final space = spaceAsync.valueOrNull;
 
     final myUid = ref.watch(currentChatUidProvider);
+    final isCreator = space != null && space.creatorId == myUid;
     final messagesAsync = ref.watch(messagesProvider(conversationId));
     final sendStatus = ref.watch(chatControllerProvider);
 
@@ -48,22 +51,13 @@ class GroupChatScreen extends ConsumerWidget {
               title: space?.name ?? 'Space',
               emoji: space?.iconEmoji ?? '👥',
               colorHex: space?.colorHex ?? '#00DEEE',
-              onMenu: () => _onMenu(context, ref, spaceId),
+              onMenu: () => _onMenu(context, ref, spaceId, isCreator),
             ),
             Expanded(
-              child: messagesAsync.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.turquoise500,
-                  ),
-                ),
-                error: (_, __) =>
-                    const Center(child: Text('Không tải được tin nhắn.')),
-                data: (messages) => ChatThreadView(
-                  messages: messages,
-                  myUid: myUid,
-                  peerName: space?.name ?? '',
-                ),
+              child: _GroupMessageList(
+                messagesAsync: messagesAsync,
+                myUid: myUid,
+                spaceName: space?.name ?? '',
               ),
             ),
             Padding(
@@ -85,19 +79,23 @@ class GroupChatScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     String spaceId,
+    bool isCreator,
   ) async {
-    final action = await showSettingMenu<GroupMenuAction>(context, const [
-      SettingMenuItem(
-        icon: Icons.palette_outlined,
-        label: 'Chỉnh sửa theme',
-        value: GroupMenuAction.editTheme,
-      ),
-      SettingMenuItem(
+    // Action set gating: viewMembers + leaveSpace cho mọi member; editSpace
+    // chỉ creator (UI guard layer 1, defense in depth với rules + CF).
+    final action = await showSettingMenu<GroupMenuAction>(context, [
+      const SettingMenuItem(
         icon: Icons.group_outlined,
         label: 'Xem thành viên',
         value: GroupMenuAction.viewMembers,
       ),
-      SettingMenuItem(
+      if (isCreator)
+        const SettingMenuItem(
+          icon: Icons.edit_outlined,
+          label: 'Chỉnh sửa Space',
+          value: GroupMenuAction.editSpace,
+        ),
+      const SettingMenuItem(
         icon: Icons.logout,
         label: 'Rời khỏi Space',
         value: GroupMenuAction.leaveSpace,
@@ -107,11 +105,15 @@ class GroupChatScreen extends ConsumerWidget {
     if (action == null || !context.mounted) return;
 
     switch (action) {
-      case GroupMenuAction.editTheme:
-        // TODO(C/HanDHG): open Space theme editor (Space module #137).
-        break;
       case GroupMenuAction.viewMembers:
         await SpaceMembersSheet.show(context, spaceId);
+      case GroupMenuAction.editSpace:
+        await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => SpaceEditSheet(spaceId: spaceId),
+        );
       case GroupMenuAction.leaveSpace:
         final confirmed = await showLeaveSpaceDialog(context);
         if (!confirmed || !context.mounted) return;
@@ -131,7 +133,42 @@ class GroupChatScreen extends ConsumerWidget {
 }
 
 /// Overflow-menu actions for a Space group chat.
-enum GroupMenuAction { editTheme, viewMembers, leaveSpace }
+/// `editSpace` chỉ visible cho creator — gating ở `_onMenu` build action list.
+enum GroupMenuAction { viewMembers, editSpace, leaveSpace }
+
+/// Render group messages giữ last value qua loading-on-reload — tránh flicker
+/// spinner khi user send message. Xem doc trong `chat_screen.dart::_MessageList`
+/// để biết lý do KHÔNG dùng `messagesAsync.when`.
+class _GroupMessageList extends StatelessWidget {
+  const _GroupMessageList({
+    required this.messagesAsync,
+    required this.myUid,
+    required this.spaceName,
+  });
+
+  final AsyncValue<List<Message>> messagesAsync;
+  final String myUid;
+  final String spaceName;
+
+  @override
+  Widget build(BuildContext context) {
+    final messages = messagesAsync.valueOrNull;
+    if (messages != null) {
+      return ChatThreadView(
+        messages: messages,
+        myUid: myUid,
+        peerName: spaceName,
+        isGroup: true,
+      );
+    }
+    if (messagesAsync.hasError) {
+      return const Center(child: Text('Không tải được tin nhắn.'));
+    }
+    return const Center(
+      child: CircularProgressIndicator(color: AppColors.turquoise500),
+    );
+  }
+}
 
 class _GroupHeader extends StatelessWidget {
   const _GroupHeader({

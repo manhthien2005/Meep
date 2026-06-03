@@ -246,14 +246,26 @@ service cloud.firestore {
 
     // ===== /conversations/{conversationId} =====
     match /conversations/{conversationId} {
-      allow read: if isParticipant(conversationId);
+      // Read + list: dùng resource.data trực tiếp — KHÔNG `get()` qua helper.
+      // Firestore rules engine fail `get()` trong nhánh `list` eval; query
+      // `.where('participantIds', arrayContains: uid)` sẽ PERMISSION_DENIED
+      // nếu rule chứa get(). Pattern này khớp /friendships đã hoạt động.
+      //
+      // Side effect: `getOrCreateConversation` lần đầu (chưa tồn tại doc) cũng
+      // fail nếu rule eval get() → resource null. Direct read field tránh.
+      allow read: if isAuthed()
+        && request.auth.uid in resource.data.participantIds;
       allow create: if isAuthed()
         && request.resource.data.participantIds.hasAll([request.auth.uid]);
-      allow update: if isParticipant(conversationId)
+      allow update: if isAuthed()
+        && request.auth.uid in resource.data.participantIds
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'lastReadAt']);
       allow delete: if false;
 
+      // Messages subcollection vẫn dùng isParticipant() — query luôn scoped
+      // vào 1 parent conversationId cụ thể (không phải collection-group list),
+      // nên get() trong rule eval work fine.
       match /messages/{messageId} {
         allow read: if isParticipant(conversationId);
         allow create: if isParticipant(conversationId)
@@ -261,7 +273,10 @@ service cloud.firestore {
                .data.status == 'active'
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.text is string
-          && request.resource.data.text.size() <= 500;
+          && request.resource.data.text.size() <= 500
+          && (!('senderDisplayName' in request.resource.data) ||
+              (request.resource.data.senderDisplayName is string &&
+               request.resource.data.senderDisplayName.size() <= 50));
         allow update, delete: if false;
       }
     }
