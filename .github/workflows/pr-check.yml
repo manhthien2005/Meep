@@ -154,7 +154,7 @@ jobs:
         working-directory: firebase
         run: |
           firebase emulators:exec \
-            --only firestore \
+            --only firestore,storage \
             --project demo-meep-test \
             "cd functions && npm run test:rules" \
           || echo "::warning::Rules tests skipped (chưa có script test:rules — sẽ enable khi có rules tests đầu tiên)"

@@ -176,6 +176,83 @@ describe('/users/{uid} — field validation', () => {
     );
   });
 
+  // T9 — Profile spec allowlist fields có thể update qua client.
+  // Firestore rule dùng blocklist (`!hasAny([immutable])`), nên Profile fields
+  // tự động pass nếu không nằm trong blocklist.
+
+  test('owner can update bio (Profile T1 allowlist)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertSucceeds(
+      authed(alice).firestore().doc(`users/${alice}`).update({ bio: 'New bio' }),
+    );
+  });
+
+  test('owner can update dateOfBirth (Profile T1 allowlist)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertSucceeds(
+      authed(alice).firestore().doc(`users/${alice}`).update({ dateOfBirth: '01/01/2000' }),
+    );
+  });
+
+  test('owner can update phoneNumber (Profile T1 allowlist)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertSucceeds(
+      authed(alice).firestore().doc(`users/${alice}`).update({ phoneNumber: '0912345678' }),
+    );
+  });
+
+  test('owner can update gender (Profile T1 allowlist)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertSucceeds(
+      authed(alice).firestore().doc(`users/${alice}`).update({ gender: 'female' }),
+    );
+  });
+
+  test('owner can update avatarUrl (Profile T1 allowlist)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .doc(`users/${alice}`)
+        .update({ avatarUrl: 'https://cdn/avatar.jpg' }),
+    );
+  });
+
+  test('owner can set avatarUrl = null (removeAvatar path)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set({
+        ...validProfile,
+        avatarUrl: 'https://cdn/old.jpg',
+      });
+    });
+    await assertSucceeds(
+      authed(alice).firestore().doc(`users/${alice}`).update({ avatarUrl: null }),
+    );
+  });
+
+  test('other authed user cannot update owner profile', async () => {
+    const bob = uid('bob');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertFails(
+      authed(bob)
+        .firestore()
+        .doc(`users/${alice}`)
+        .update({ displayName: 'Hacked' }),
+    );
+  });
+
   test('owner cannot update uid — immutable', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc(`users/${alice}`).set(validProfile);
