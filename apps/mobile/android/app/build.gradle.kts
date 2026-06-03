@@ -42,6 +42,11 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 flutter {
@@ -65,4 +70,12 @@ dependencies {
 
     // Glide — image download + cache + circular avatar transform (T3)
     implementation("com.github.bumptech.glide:glide:4.16.0")
+
+    // T6 — Kotlin unit tests for WidgetSyncWorker
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("io.mockk:mockk:1.13.13")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("androidx.work:work-testing:2.9.1")
+    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation("androidx.test:core-ktx:1.6.1")
 }
