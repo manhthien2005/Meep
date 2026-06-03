@@ -1,8 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/feed/presentation/feed_section.dart';
+import 'package:meep/features/reaction/application/reaction_controller.dart';
+import 'package:meep/features/reaction/data/reaction_repository.dart';
+
+class MockReactionRepository extends Mock implements ReactionRepository {}
 
 Post _post({DateTime? createdAt}) => Post(
       postId: 'p1',
@@ -14,18 +22,28 @@ Post _post({DateTime? createdAt}) => Post(
     );
 
 void main() {
-  // The test font renders much wider than Nunito (Figma measures the activity
-  // pill at ~255px). Use a large physical surface so photoSize is wide enough
-  // to avoid a font-driven overflow that never happens in the real app, and
-  // scroll vertically like the real feed (SliverList) / home (scroll view).
+  setUpAll(() => registerFallbackValue(''));
+
+  ProviderScope makeScope(Widget child) {
+    final repo = MockReactionRepository();
+    when(() => repo.watchReactions(any()))
+        .thenAnswer((_) => const Stream.empty());
+    return ProviderScope(
+      overrides: [reactionRepositoryProvider.overrideWithValue(repo)],
+      child: child,
+    );
+  }
+
   Future<void> pump(WidgetTester tester, Post post) async {
     tester.view.physicalSize = const Size(900, 1600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(child: OwnPostCard(post: post)),
+      makeScope(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(child: OwnPostCard(post: post)),
+          ),
         ),
       ),
     );

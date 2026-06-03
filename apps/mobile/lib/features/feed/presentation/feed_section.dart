@@ -9,6 +9,10 @@ import 'package:meep/core/theme/hex_color.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/features/reaction/application/reaction_controller.dart';
+import 'package:meep/features/reaction/data/reaction.dart';
+import 'package:meep/features/reaction/presentation/emoji_picker_sheet.dart';
+import 'package:meep/features/reaction/presentation/reaction_list_sheet.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/post_card.dart';
@@ -148,53 +152,114 @@ class PostHeaderRow extends StatelessWidget {
   }
 }
 
-/// Activity pill — own posts only ("Chưa có hoạt động nào!"). Hug content,
-/// transparent rounded background. Centered in its parent.
-class ActivityPill extends StatelessWidget {
-  const ActivityPill({super.key});
+/// Activity pill — own posts only. Two states:
+/// - Empty: "Chưa có hoạt động nào!" (M2 fallback khi chưa có react)
+/// - Has reactions: "Hoạt động" + stacked avatars + ReactionListSheet on tap
+class ActivityPill extends ConsumerWidget {
+  const ActivityPill({super.key, required this.postId});
+
+  final String postId;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0x66252627),
-        borderRadius: BorderRadius.circular(40),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.auto_awesome_outlined,
-            color: AppColors.bw400,
-            size: 18,
-          ),
-          SizedBox(width: 10),
-          Text(
-            'Chưa có hoạt động nào!',
-            style: TextStyle(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(reactionControllerProvider(postId));
+    final reactions = state.reactions;
+    final isEmpty = reactions.isEmpty;
+
+    return GestureDetector(
+      onTap: isEmpty ? null : () => ReactionListSheet.show(context, postId),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0x66252627),
+          borderRadius: BorderRadius.circular(40),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.auto_awesome_outlined,
               color: AppColors.bw400,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              fontFamily: 'Nunito',
+              size: 18,
             ),
-          ),
-        ],
+            const SizedBox(width: 10),
+            Text(
+              isEmpty ? 'Chưa có hoạt động nào!' : 'Hoạt động',
+              style: TextStyle(
+                color: isEmpty ? AppColors.bw400 : AppColors.bw100,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Nunito',
+              ),
+            ),
+            if (!isEmpty) ...[
+              const SizedBox(width: 10),
+              _AvatarStack(reactions: reactions),
+            ],
+          ],
+        ),
       ),
     );
   }
 }
 
+/// Stacked avatars — max 3 first + "+N" badge if count > 3.
+/// Figma 472:2052 node 769:4494.
+class _AvatarStack extends StatelessWidget {
+  const _AvatarStack({required this.reactions});
+
+  final List<Reaction> reactions;
+
+  @override
+  Widget build(BuildContext context) {
+    final top3 = reactions.length <= 3
+        ? reactions
+        : reactions.sublist(0, 3); // already sorted DESC from State
+    final overflow = reactions.length - 3;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final r in top3)
+          Padding(
+            padding: const EdgeInsets.only(right: 2),
+            child: AppAvatar(
+              fallbackText: r.reactorName,
+              size: 32,
+            ),
+          ),
+        if (overflow > 0)
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.bw300,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.bw100, width: 1),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '+$overflow',
+              style: const TextStyle(
+                color: AppColors.bw700,
+                fontSize: 14,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 /// Friend message bar — 2-state inline composer trên Feed:
-/// - **Collapsed** (mặc định): text "Gửi tin nhắn..." + 3 emoji quick-react +
-///   icon add-reaction. Tap vùng text trái → expand sang TextField.
+/// - **Collapsed** (mặc định): text "Gửi tin nhắn..." + 3 emoji quick-react
+///   (🩵🤣🥰 — Figma 472:2252) + smile-plus picker. Tap text trái → expand
+///   sang modal composer. Tap emoji → `ReactionController.toggleReact`
+///   (optimistic + in-flight lock). Tap smile-plus → `EmojiPickerSheet`.
 /// - **Expanded:** TextField focused + send button. Tap-outside hoặc submit →
 ///   collapse. Submit gọi `ChatController.sendMessageFromFeed(postId, authorId)`
-///   để tạo/lookup direct conversation rồi append message. KHÔNG navigate —
-///   theo spec, user vẫn ở Feed sau khi gửi (input chỉ collapse).
-///
-/// Emoji quick-react ở collapsed state hiện chưa wire (chờ T5 reactions —
-/// `tasks/todo-chat.md`). Trong PR này chỉ wire text → send flow.
+///   để tạo/lookup direct conversation rồi append message.
 class FriendMessageBar extends ConsumerStatefulWidget {
   const FriendMessageBar({
     super.key,
@@ -203,7 +268,8 @@ class FriendMessageBar extends ConsumerStatefulWidget {
     this.spaceId,
   });
 
-  /// postId — context cho `sendMessageFromFeed` (lưu quotedPostId tương lai).
+  /// postId — context cho `sendMessageFromFeed` (lưu quotedPostId tương lai)
+  /// và cho `reactionControllerProvider(postId)`.
   final String postId;
 
   /// authorId — peer uid để `getOrCreateConversation` tính pairId.
@@ -222,6 +288,8 @@ class FriendMessageBar extends ConsumerStatefulWidget {
 
 class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
   bool _isSending = false;
+
+  static const _presets = ['🩵', '🤣', '🥰'];
 
   /// Mở modal bottom sheet composer thay vì inline TextField.
   ///
@@ -281,10 +349,52 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
     );
   }
 
+  /// Safe toggle reaction — bắt lỗi, toast message nếu fail.
+  void _toggleReaction(String emoji) {
+    try {
+      final auth = FirebaseAuth.instance;
+      final uid = auth.currentUser?.uid;
+      if (uid == null) return;
+      ref.read(reactionControllerProvider(widget.postId).notifier).toggleReact(
+            uid: uid,
+            displayName: auth.currentUser?.displayName ?? '',
+            emoji: emoji,
+          );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Thả cảm xúc thất bại — thử lại'),
+          backgroundColor: AppColors.bw700,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenW = MediaQuery.sizeOf(context).width;
     final screenH = MediaQuery.sizeOf(context).height;
+    final reactionState = ref.watch(reactionControllerProvider(widget.postId));
+
+    // Show error toast nếu reaction controller có errorMessage.
+    if (reactionState.errorMessage != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(reactionState.errorMessage!),
+            backgroundColor: AppColors.bw700,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        ref
+            .read(reactionControllerProvider(widget.postId).notifier)
+            .clearError();
+      });
+    }
+
     return Container(
       height: screenH * 0.07,
       width: screenW * 0.8,
@@ -310,18 +420,51 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
               ),
             ),
           ),
-          const Text('💙', style: TextStyle(fontSize: 18)),
+          for (final emoji in _presets)
+            _EmojiButton(
+              emoji: emoji,
+              isActive: reactionState.myEmoji == emoji,
+              onTap: () => _toggleReaction(emoji),
+            ),
           const SizedBox(width: 10),
-          const Text('😂', style: TextStyle(fontSize: 18)),
-          const SizedBox(width: 10),
-          const Text('🥰', style: TextStyle(fontSize: 18)),
-          const SizedBox(width: 10),
-          const Icon(
-            Icons.add_reaction_outlined,
-            color: AppColors.bw500,
-            size: 20,
+          GestureDetector(
+            onTap: () => EmojiPickerSheet.show(context, _toggleReaction),
+            child: const Icon(
+              Icons.add_reaction_outlined,
+              color: AppColors.bw500,
+              size: 20,
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _EmojiButton extends StatelessWidget {
+  const _EmojiButton({
+    required this.emoji,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  final String emoji;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Opacity(
+          opacity: isActive ? 1.0 : 0.6,
+          child: Text(
+            emoji,
+            style: const TextStyle(fontSize: 24),
+          ),
+        ),
       ),
     );
   }
@@ -502,7 +645,7 @@ class OwnPostFooter extends StatelessWidget {
       children: [
         PostHeaderRow(post: post, isOwn: true),
         const SizedBox(height: 12),
-        const ActivityPill(),
+        ActivityPill(postId: post.postId),
       ],
     );
   }
@@ -536,7 +679,7 @@ class OwnPostPage extends ConsumerWidget {
         const SizedBox(height: 8),
         PostHeaderRow(post: post, isOwn: true),
         const Spacer(),
-        const ActivityPill(),
+        ActivityPill(postId: post.postId),
         SizedBox(height: screenH * _bottomGapRatio),
       ],
     );

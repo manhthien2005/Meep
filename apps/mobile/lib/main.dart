@@ -19,6 +19,8 @@ import 'package:meep/features/auth/data/firebase_auth_repository.dart';
 import 'package:meep/features/auth/data/firebase_user_repository.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
+import 'package:meep/features/reaction/application/reaction_controller.dart';
+import 'package:meep/features/reaction/data/firebase_reaction_repository.dart';
 import 'package:meep/features/chat/data/firebase_conversation_repository.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/data/firebase_friend_repository.dart';
@@ -100,6 +102,9 @@ void main() async {
         ),
         widgetDataServiceProvider.overrideWithValue(
           WidgetDataService(prefs: prefs),
+        ),
+        reactionRepositoryProvider.overrideWithValue(
+          FirebaseReactionRepository(FirebaseFirestore.instance),
         ),
       ],
       child: const MeepApp(),
