@@ -54,6 +54,7 @@ class FeedFilterDropdown extends ConsumerWidget {
       spaceControllerProvider(currentUid).select((s) => s.spaces),
     );
 
+    final screenH = MediaQuery.sizeOf(context).height;
     return Align(
       alignment: Alignment.topCenter,
       child: Padding(
@@ -62,6 +63,7 @@ class FeedFilterDropdown extends ConsumerWidget {
           color: Colors.transparent,
           child: Container(
             width: 265,
+            height: screenH * 0.4,
             decoration: BoxDecoration(
               color: AppColors.bw600,
               borderRadius: BorderRadius.circular(25),
