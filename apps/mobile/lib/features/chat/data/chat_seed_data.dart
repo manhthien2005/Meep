@@ -122,7 +122,6 @@ abstract final class ChatSeed {
           conversationId: convTalaki,
           type: ConversationType.direct,
           participantIds: [me.uid, talaki.uid],
-          quotedPostId: 'post-dalat',
           lastMessage: 'Đi chứ!',
           lastMessageAt: _now.subtract(const Duration(minutes: 2)),
           lastSenderId: talaki.uid,

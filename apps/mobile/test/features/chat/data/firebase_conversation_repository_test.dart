@@ -218,6 +218,50 @@ void main() {
 
       expect(r2.conversationId, r1.conversationId);
     });
+
+    test('throws ValidationError when uid empty (defensive)', () async {
+      expect(
+        () => repository.getOrCreateConversation(uid: '', otherUid: bobUid),
+        throwsA(isA<ValidationError>()),
+      );
+    });
+
+    test('throws ValidationError when otherUid empty (defensive)', () async {
+      expect(
+        () => repository.getOrCreateConversation(uid: aliceUid, otherUid: ''),
+        throwsA(isA<ValidationError>()),
+      );
+    });
+
+    test('throws ValidationError when uid == otherUid (self-chat)', () async {
+      expect(
+        () => repository.getOrCreateConversation(
+          uid: aliceUid,
+          otherUid: aliceUid,
+        ),
+        throwsA(isA<ValidationError>()),
+      );
+    });
+
+    test('seeds lastReadAt for both participants on create', () async {
+      final pairId = aliceBobPairId();
+      final result = await repository.getOrCreateConversation(
+        uid: aliceUid,
+        otherUid: bobUid,
+      );
+
+      // Verify lastReadAt seeded — tránh badge unread sai khi vừa tạo conv.
+      final doc = await firestore
+          .collection('conversations')
+          .doc(result.conversationId)
+          .get();
+      final lastReadAt = doc.data()!['lastReadAt'] as Map<String, dynamic>;
+      expect(lastReadAt.keys, containsAll([aliceUid, bobUid]));
+      expect(lastReadAt[aliceUid], isNotNull);
+      expect(lastReadAt[bobUid], isNotNull);
+      // Suppress unused var lint
+      expect(result.conversationId, pairId);
+    });
   });
 
   // --- sendMessage ---------------------------------------------------------
@@ -430,6 +474,59 @@ void main() {
       expect(messages[0].text, 'Msg 7');
       expect(messages[1].text, 'Msg 8');
       expect(messages[2].text, 'Msg 9');
+    });
+  });
+
+  // --- markAsRead ----------------------------------------------------------
+
+  group('markAsRead', () {
+    test('sets lastReadAt[uid] without overwriting other uids', () async {
+      final pairId = aliceBobPairId();
+      // Seed conversation với bob đã đọc trước. Update của alice phải KHÔNG
+      // động tới timestamp của bob (dot-notation merge).
+      final bobReadTime = DateTime(2026, 6, 1, 10);
+      await firestore.collection('conversations').doc(pairId).set({
+        'conversationId': pairId,
+        'type': 'direct',
+        'participantIds': [aliceUid, bobUid],
+        'status': 'active',
+        'lastMessage': '',
+        'lastMessageAt': Timestamp.fromDate(DateTime(2026, 6, 1, 12)),
+        'lastSenderId': '',
+        'createdAt': Timestamp.fromDate(DateTime(2026, 6, 1)),
+        'lastReadAt': {bobUid: Timestamp.fromDate(bobReadTime)},
+      });
+
+      await repository.markAsRead(conversationId: pairId, uid: aliceUid);
+
+      final doc = await firestore.collection('conversations').doc(pairId).get();
+      final lastReadAt = doc.data()!['lastReadAt'] as Map<String, dynamic>;
+      // Bob's timestamp giữ nguyên (không bị overwrite).
+      expect(lastReadAt[bobUid], isA<Timestamp>());
+      expect(
+        (lastReadAt[bobUid] as Timestamp).toDate(),
+        bobReadTime,
+      );
+      // Alice's timestamp đã được set.
+      expect(lastReadAt[aliceUid], isNotNull);
+    });
+
+    test('no-op khi uid empty (defensive cho unauthenticated)', () async {
+      final pairId = aliceBobPairId();
+      await seedConversation(
+        conversationDoc(
+          conversationId: pairId,
+          participantIds: [aliceUid, bobUid],
+        ),
+      );
+
+      // Empty uid → return sớm, KHÔNG ghi gì → KHÔNG throw.
+      await repository.markAsRead(conversationId: pairId, uid: '');
+
+      final doc = await firestore.collection('conversations').doc(pairId).get();
+      // lastReadAt vẫn empty (chỉ có default từ seed).
+      final lastReadAt = doc.data()!['lastReadAt'];
+      expect(lastReadAt, anyOf(isNull, isEmpty));
     });
   });
 }

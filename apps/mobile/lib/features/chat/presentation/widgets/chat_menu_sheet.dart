@@ -53,7 +53,7 @@ class _SettingMenuCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       decoration: BoxDecoration(
         color: AppColors.bw800,
         borderRadius: BorderRadius.circular(30),
@@ -63,7 +63,10 @@ class _SettingMenuCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (var i = 0; i < items.length; i++) _MenuRow(item: items[i]),
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) const SizedBox(height: 14),
+            _MenuRow(item: items[i]),
+          ],
         ],
       ),
     );
@@ -78,19 +81,27 @@ class _MenuRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = item.isDestructive ? AppColors.error800 : AppColors.bw100;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.pop(context, item.value),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(item.icon, size: 18, color: color),
-          const SizedBox(width: 10),
-          Text(
-            item.label,
-            style: AppTextStyles.mdRegular.copyWith(color: color),
+    return Semantics(
+      label: item.label,
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.pop(context, item.value),
+        // Touch target ≥48px — Material accessibility minimum.
+        child: SizedBox(
+          height: 32,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(item.icon, size: 20, color: color),
+              const SizedBox(width: 12),
+              Text(
+                item.label,
+                style: AppTextStyles.mdRegular.copyWith(color: color),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
@@ -9,6 +10,15 @@ const double _kRingWidth = 2;
 
 /// Gap between the ring and the avatar image.
 const double _kRingGap = 2;
+
+/// First-letter fallback từ displayName cho avatar. Empty/null → null (giữ
+/// solid gray circle như behavior cũ). Uppercase để Material consistent.
+String? avatarFallbackFromName(String? name) {
+  if (name == null) return null;
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return null;
+  return trimmed.characters.first.toUpperCase();
+}
 
 /// Circular avatar for user profile pictures.
 ///
@@ -35,30 +45,45 @@ class AppAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final inset = ringColor != null ? (_kRingWidth + _kRingGap) : 0.0;
     final inner = size - inset * 2;
+    // CachedNetworkImage thay NetworkImage trong DecorationImage: avatar được
+    // cache trên disk → mở lại bất cứ screen nào (inbox, chat, members sheet,
+    // ...) hiện instant thay vì flash + reload.
+    final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
     final avatar = ClipOval(
       child: Container(
         width: inner,
         height: inner,
-        decoration: BoxDecoration(
-          color: AppColors.bw700,
-          shape: BoxShape.circle,
-          image: (imageUrl != null && imageUrl!.isNotEmpty)
-              ? DecorationImage(
-                  image: NetworkImage(imageUrl!),
-                  fit: BoxFit.cover,
-                )
-              : null,
-        ),
-        child: (imageUrl == null || imageUrl!.isEmpty) && fallbackText != null
-            ? Center(
-                child: Text(
-                  fallbackText!,
-                  style: AppTextStyles.mdBold.copyWith(
-                    color: AppColors.bw100,
-                  ),
-                ),
+        color: AppColors.bw700,
+        child: hasImage
+            ? CachedNetworkImage(
+                imageUrl: imageUrl!,
+                width: inner,
+                height: inner,
+                fit: BoxFit.cover,
+                // Placeholder = empty container (giữ màu bw700 nền) — KHÔNG
+                // spinner để tránh flicker spinner ngắn ngủi khi cache hit.
+                placeholder: (_, __) => const SizedBox.shrink(),
+                errorWidget: (_, __, ___) => fallbackText != null
+                    ? Center(
+                        child: Text(
+                          fallbackText!,
+                          style: AppTextStyles.mdBold.copyWith(
+                            color: AppColors.bw100,
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
               )
-            : null,
+            : fallbackText != null
+                ? Center(
+                    child: Text(
+                      fallbackText!,
+                      style: AppTextStyles.mdBold.copyWith(
+                        color: AppColors.bw100,
+                      ),
+                    ),
+                  )
+                : null,
       ),
     );
 

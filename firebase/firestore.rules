@@ -246,14 +246,47 @@ service cloud.firestore {
 
     // ===== /conversations/{conversationId} =====
     match /conversations/{conversationId} {
-      allow read: if isParticipant(conversationId);
+      // TÁCH get/list — bắt buộc vì list eval khác get eval:
+      //
+      // - GET: single doc read. Null guard `resource == null` cho phép client
+      //   `docRef.get()` trên doc CHƯA TỒN TẠI (getOrCreateConversation lần
+      //   đầu reply). Firestore SDK v25 transform sang Listen → server eval
+      //   rule → `resource` null → field access returns false → trước fix
+      //   bị PERMISSION_DENIED. Null guard fix bug đó.
+      //
+      // - LIST: collection query `.where('participantIds', arrayContains: uid)
+      //   .orderBy('lastMessageAt')`. Firestore static analysis prove
+      //   "query constraint đảm bảo rule TRUE cho mọi doc match" — DISJUNCTION
+      //   `resource == null || ...` BREAK static analysis (branch null không
+      //   derive được từ query). KHÔNG prove được → DENY toàn query. Bug
+      //   trước: gộp get+list dưới `allow read` + disjunction null → list
+      //   deny dù emulator test pass (emulator lenient).
+      //   Pattern này khớp /friendships rule — đơn giản, không disjunction.
+      allow get: if isAuthed()
+        && (resource == null
+            || request.auth.uid in resource.data.participantIds);
+      allow list: if isAuthed()
+        && request.auth.uid in resource.data.participantIds;
       allow create: if isAuthed()
         && request.resource.data.participantIds.hasAll([request.auth.uid]);
-      allow update: if isParticipant(conversationId)
+      // Whitelist update fields: lastMessage/lastMessageAt/lastSenderId set
+      // bởi sendMessage; lastReadAt bởi markAsRead.
+      // (quotedPostId moved to per-MESSAGE — FB story reply pattern, không
+      // phải per-conversation nữa.)
+      allow update: if isAuthed()
+        && request.auth.uid in resource.data.participantIds
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId']);
+             .hasOnly([
+               'lastMessage',
+               'lastMessageAt',
+               'lastSenderId',
+               'lastReadAt',
+             ]);
       allow delete: if false;
 
+      // Messages subcollection vẫn dùng isParticipant() — query luôn scoped
+      // vào 1 parent conversationId cụ thể (không phải collection-group list),
+      // nên get() trong rule eval work fine.
       match /messages/{messageId} {
         allow read: if isParticipant(conversationId);
         allow create: if isParticipant(conversationId)
@@ -261,7 +294,14 @@ service cloud.firestore {
                .data.status == 'active'
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.text is string
-          && request.resource.data.text.size() <= 500;
+          && request.resource.data.text.size() <= 500
+          && (!('senderDisplayName' in request.resource.data) ||
+              (request.resource.data.senderDisplayName is string &&
+               request.resource.data.senderDisplayName.size() <= 50))
+          && (!('quotedPostId' in request.resource.data) ||
+              (request.resource.data.quotedPostId is string &&
+               request.resource.data.quotedPostId.size() > 0 &&
+               request.resource.data.quotedPostId.size() <= 30));
         allow update, delete: if false;
       }
     }

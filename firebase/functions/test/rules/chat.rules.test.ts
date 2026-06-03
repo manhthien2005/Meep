@@ -117,6 +117,37 @@ describe('/conversations/{conversationId}', () => {
     );
   });
 
+  test('participant can query conversations với orderBy lastMessageAt (Inbox)',
+      async () => {
+    // Reproduction case của bug Inbox "Không tải được tin nhắn":
+    // rule cũ dùng `isParticipant(conversationId)` qua `get()` → Firestore
+    // engine fail list query → PERMISSION_DENIED toàn collection. Fix (commit
+    // 103691b reapplied) đổi sang `resource.data.participantIds` direct.
+    await seedConversation();
+    await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .collection('conversations')
+        .where('participantIds', 'array-contains', alice)
+        .orderBy('lastMessageAt', 'desc')
+        .get(),
+    );
+  });
+
+  test('authed user can get non-existent conversation doc (getOrCreate flow)',
+      async () => {
+    // Reproduction case của bug Reply Post "không gửi được tin nhắn":
+    // rule mới `request.auth.uid in resource.data.participantIds` fail khi
+    // doc chưa tồn tại → resource null → PERMISSION_DENIED. Fix `resource ==
+    // null || ...` cho phép client check exists trước khi create.
+    const newConvId = [alice, uid('charlie')].sort().join('_');
+    // Doc CHƯA seed — getOrCreate cần get() đầu tiên để check.
+    const doc = await assertSucceeds(
+      authed(alice).firestore().doc(`conversations/${newConvId}`).get(),
+    );
+    expect(doc.exists).toBe(false);
+  });
+
   test('non-participant query returns empty via rule filter', async () => {
     await seedConversation();
     const snap = await assertSucceeds(
@@ -183,6 +214,56 @@ describe('/conversations/{conversationId}', () => {
           senderId: alice,
           text: 'A'.repeat(501),
           createdAt: new Date(),
+        }),
+    );
+  });
+
+  // --- senderDisplayName denormalization (Bug #2) -------------------------
+
+  test('message với senderDisplayName ≤50 chars OK', async () => {
+    await seedConversation();
+    await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}/messages/msg-name`)
+        .set({
+          messageId: 'msg-name',
+          senderId: alice,
+          text: 'Xin chào',
+          createdAt: new Date(),
+          senderDisplayName: 'Alice Nguyen',
+        }),
+    );
+  });
+
+  test('message với senderDisplayName >50 chars rejected', async () => {
+    await seedConversation();
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}/messages/msg-long-name`)
+        .set({
+          messageId: 'msg-long-name',
+          senderId: alice,
+          text: 'hi',
+          createdAt: new Date(),
+          senderDisplayName: 'A'.repeat(51),
+        }),
+    );
+  });
+
+  test('message với senderDisplayName non-string rejected', async () => {
+    await seedConversation();
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}/messages/msg-non-string-name`)
+        .set({
+          messageId: 'msg-non-string-name',
+          senderId: alice,
+          text: 'hi',
+          createdAt: new Date(),
+          senderDisplayName: 42,
         }),
     );
   });
@@ -265,6 +346,41 @@ describe('/conversations/{conversationId}', () => {
           lastSenderId: '',
           createdAt: new Date(),
         }),
+    );
+  });
+
+  // --- markAsRead (lastReadAt field) ----------------------------------------
+
+  test('participant can update lastReadAt for self (markAsRead)', async () => {
+    await seedConversation();
+    // Dot-notation field update: lastReadAt.{uid} — pattern client dùng.
+    await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}`)
+        .update({ [`lastReadAt.${alice}`]: new Date() }),
+    );
+  });
+
+  test('non-participant cannot update lastReadAt', async () => {
+    await seedConversation();
+    await assertFails(
+      authed(stranger)
+        .firestore()
+        .doc(`conversations/${CONV_ID}`)
+        .update({ [`lastReadAt.${stranger}`]: new Date() }),
+    );
+  });
+
+  test('participant cannot sneak non-whitelisted field via update', async () => {
+    await seedConversation();
+    // Update whitelist allow: lastMessage, lastMessageAt, lastSenderId, lastReadAt.
+    // Cố tình đổi participantIds → fail.
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}`)
+        .update({ participantIds: [alice] }),
     );
   });
 });

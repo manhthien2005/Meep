@@ -92,7 +92,11 @@ class ConversationTile extends StatelessWidget {
                 ringColor: ringColor,
               )
             else
-              AppAvatar(imageUrl: avatarUrl, ringColor: ringColor),
+              AppAvatar(
+                imageUrl: avatarUrl,
+                ringColor: ringColor,
+                fallbackText: avatarFallbackFromName(title),
+              ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(

@@ -89,6 +89,8 @@ class FakeConversationRepository implements ConversationRepository {
     required String conversationId,
     required String senderId,
     required String text,
+    String? senderDisplayName,
+    String? quotedPostId,
   }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) {
@@ -110,6 +112,8 @@ class FakeConversationRepository implements ConversationRepository {
       senderId: senderId,
       text: trimmed,
       createdAt: now,
+      senderDisplayName: senderDisplayName,
+      quotedPostId: quotedPostId,
     );
 
     _messages = {
@@ -123,6 +127,24 @@ class FakeConversationRepository implements ConversationRepository {
       );
 
     _messageCtrls[conversationId]?.add(_messagesOf(conversationId));
+    _conversationsCtrl.add(_conversations);
+  }
+
+  @override
+  Future<void> markAsRead({
+    required String conversationId,
+    required String uid,
+  }) async {
+    if (uid.isEmpty) return;
+    final idx = _conversations.indexWhere(
+      (c) => c.conversationId == conversationId,
+    );
+    if (idx == -1) return;
+    final conv = _conversations[idx];
+    final newMap = Map<String, DateTime>.from(conv.lastReadAt)
+      ..[uid] = DateTime.now();
+    _conversations = [..._conversations]..[idx] =
+        conv.copyWith(lastReadAt: newMap);
     _conversationsCtrl.add(_conversations);
   }
 

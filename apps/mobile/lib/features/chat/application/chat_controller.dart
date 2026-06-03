@@ -1,7 +1,10 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:meep/core/error/app_error.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/chat/data/conversation_repository.dart';
 
@@ -26,44 +29,107 @@ class ChatController extends _$ChatController {
     required String conversationId,
     required String text,
   }) async {
+    final myUid = ref.read(currentChatUidProvider);
+    if (myUid.isEmpty) {
+      state = const ChatSendStatus(
+        errorMessage: 'Đang khởi tạo phiên đăng nhập, thử lại sau giây lát',
+      );
+      return;
+    }
     state = const ChatSendStatus(isSending: true);
     try {
       await ref.read(conversationRepositoryProvider).sendMessage(
             conversationId: conversationId,
-            senderId: ref.read(currentChatUidProvider),
+            senderId: myUid,
             text: text,
+            senderDisplayName: _resolveDisplayName(),
           );
       state = const ChatSendStatus();
-    } catch (e) {
+    } catch (e, s) {
+      developer.log(
+        'sendMessage failed',
+        name: 'chat',
+        error: e,
+        stackTrace: s,
+      );
       state = ChatSendStatus(errorMessage: AppError.fromUnknown(e).message);
     }
   }
 
-  /// Reply to a feed post — get/create the 1-1 conversation then send.
-  /// Returns the conversation id so the caller can navigate to the thread.
+  /// Reply to a feed post — get/create the conversation rồi send.
+  /// Returns the conversation id (1-1 pairId hoặc spaceId).
+  ///
+  /// **Routing logic:**
+  /// - Post có `spaceId != null` (post được share trong Space) → forward sang
+  ///   group conversation của Space đó (`conversationId == spaceId`).
+  /// - Post không có spaceId (all-friends post) → forward 1-1 conversation với
+  ///   author (pairId = sorted uid pair).
+  ///
+  /// Space conversation đã được tạo sẵn bởi CF `createSpace` — em chỉ cần gửi
+  /// message vào, KHÔNG `getOrCreateConversation`.
   Future<String?> sendMessageFromFeed({
     required String postId,
     required String authorId,
     required String text,
+    String? spaceId,
   }) async {
+    final myUid = ref.read(currentChatUidProvider);
+    if (myUid.isEmpty) {
+      state = const ChatSendStatus(
+        errorMessage: 'Đang khởi tạo phiên đăng nhập, thử lại sau giây lát',
+      );
+      return null;
+    }
+    final isSpacePost = spaceId != null && spaceId.isNotEmpty;
+    if (!isSpacePost && (authorId.isEmpty || myUid == authorId)) {
+      state = const ChatSendStatus(errorMessage: 'Không thể gửi tin nhắn');
+      return null;
+    }
     state = const ChatSendStatus(isSending: true);
     try {
       final repo = ref.read(conversationRepositoryProvider);
-      final conversation = await repo.getOrCreateConversation(
-        uid: ref.read(currentChatUidProvider),
-        otherUid: authorId,
-      );
+      final String conversationId;
+      if (isSpacePost) {
+        // Space conversation = spaceId (đã được CF createSpace tạo sẵn).
+        conversationId = spaceId;
+      } else {
+        final conversation = await repo.getOrCreateConversation(
+          uid: myUid,
+          otherUid: authorId,
+        );
+        conversationId = conversation.conversationId;
+      }
       await repo.sendMessage(
-        conversationId: conversation.conversationId,
-        senderId: ref.read(currentChatUidProvider),
+        conversationId: conversationId,
+        senderId: myUid,
         text: text,
+        senderDisplayName: _resolveDisplayName(),
+        // FB story reply pattern: postId gắn vào message → ChatThreadView
+        // render mini quoted card phía trên bubble (per-message, không phải
+        // 1 header chung cho conversation).
+        quotedPostId: postId,
       );
       state = const ChatSendStatus();
-      return conversation.conversationId;
-    } catch (e) {
+      return conversationId;
+    } catch (e, s) {
+      developer.log(
+        'sendMessageFromFeed failed',
+        name: 'chat',
+        error: e,
+        stackTrace: s,
+      );
       state = ChatSendStatus(errorMessage: AppError.fromUnknown(e).message);
       return null;
     }
+  }
+
+  /// Pluck displayName từ currentUserProfileProvider — null nếu profile chưa
+  /// load hoặc displayName empty. Caller pass xuống repo để denormalize cho
+  /// group chat sender label.
+  String? _resolveDisplayName() {
+    final profile = ref.read(currentUserProfileProvider).valueOrNull;
+    final name = profile?.displayName.trim();
+    return (name == null || name.isEmpty) ? null : name;
   }
 
   void clearError() => state = const ChatSendStatus();

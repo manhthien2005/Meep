@@ -211,6 +211,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bw900,
+      // Khi mở composer sheet để reply post, keyboard appear → nếu Scaffold
+      // tự resize, PageView shrunk làm FriendPostPage Column tràn (overflow
+      // 314px) và embedded taskbar bị đẩy lên trên keyboard che modal sheet
+      // TextField. Sheet đã tự lift bằng MediaQuery.viewInsets — Scaffold
+      // không cần can thiệp.
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: Column(
           children: [

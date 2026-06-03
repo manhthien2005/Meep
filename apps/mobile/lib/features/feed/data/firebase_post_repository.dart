@@ -168,4 +168,12 @@ class FirebasePostRepository implements PostRepository {
         .get();
     return snap.docs.map((d) => Post.fromJson(d.data())).toList();
   }
+
+  @override
+  Future<Post?> getPost(String postId) async {
+    if (postId.isEmpty) return null;
+    final doc = await _db.collection(_posts).doc(postId).get();
+    if (!doc.exists) return null;
+    return Post.fromJson({...doc.data()!, 'postId': doc.id});
+  }
 }

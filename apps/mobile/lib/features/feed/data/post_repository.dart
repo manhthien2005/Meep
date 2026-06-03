@@ -20,4 +20,12 @@ abstract class PostRepository {
 
   /// All posts authored by [authorId], newest first.
   Future<List<Post>> getPostsByAuthor(String authorId);
+
+  /// Fetch a single post by id. Returns null when doc không tồn tại (đã xóa
+  /// hoặc id sai). Caller responsibility lấy permission đúng — rule `/posts`
+  /// read enforce friend/owner/feed-entry.
+  ///
+  /// Dùng bởi chat module (`chatQuotedPostProvider`) để render quoted photo
+  /// block ở đầu thread khi user reply post từ feed.
+  Future<Post?> getPost(String postId);
 }
