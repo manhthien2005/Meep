@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -5,23 +6,14 @@ import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
+import 'package:meep/features/profile/application/friend_posts_provider.dart';
+import 'package:meep/features/profile/application/profile_controller.dart';
 import 'package:meep/features/profile/presentation/widgets/diary_tab_content.dart';
 import 'package:meep/features/profile/presentation/widgets/photo_grid.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 import 'package:meep/shared/widgets/share_profile_sheet.dart';
 
-// ─── MOCK DATA — xoá khi wire ProfileController ──────────────────────────────
-const _kFriendUsername = 'bk';
-const _kFriendBio = '🍚 👚 🌾 💵\n💙 Mê xe độ 💙\nĐối sao đáp vậy 👍';
-const _kFriendPostCount = 6;
-const _kFriendFriendCount = 15;
-const _kFriendSpaceCount = 4;
-
-final _kFriendPhotos = List.generate(
-  _kFriendPostCount,
-  (i) => 'https://picsum.photos/seed/friend_mock_$i/400',
-);
-
+// ─── Missing design tokens — ping leader để add vào core/theme/ ──────────────
 const _cBg = Color(0xFF050F10);
 const _cButtonFill = Color(0xFF363636);
 const _cButtonText = Color(0xFFDDDDDD);
@@ -43,6 +35,7 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isFriendAsync = ref.watch(isFriendOfCurrentProvider(widget.uid));
     final unreadCounts = ref.watch(unreadCountsProvider);
     final totalUnread =
         unreadCounts.values.fold<int>(0, (sum, val) => sum + val);
@@ -50,123 +43,59 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
     return Scaffold(
       backgroundColor: _cBg,
       body: SafeArea(
-        child: Stack(
+        child: isFriendAsync.when(
+          loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.bw100),
+          ),
+          error: (e, _) => _GateMessage(
+            message: 'Không tải được hồ sơ bạn bè.',
+            onBack: () => context.pop(),
+          ),
+          data: (isFriend) {
+            if (!isFriend) {
+              return _GateMessage(
+                message: 'Bạn cần kết bạn để xem trang cá nhân này.',
+                onBack: () => context.pop(),
+              );
+            }
+            return _FriendProfileBody(
+              friendUid: widget.uid,
+              activeTab: _activeTab,
+              onTabChanged: (t) => setState(() => _activeTab = t),
+              totalUnread: totalUnread,
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Gate fallback — non-friend / error / unauth ─────────────────────────────
+
+class _GateMessage extends StatelessWidget {
+  const _GateMessage({required this.message, required this.onBack});
+
+  final String message;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 30, 20, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          _FriendAvatar(username: _kFriendUsername),
-                          SizedBox(width: 25),
-                          _StatsRow(
-                            postCount: _kFriendPostCount,
-                            friendCount: _kFriendFriendCount,
-                            spaceCount: _kFriendSpaceCount,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        _kFriendUsername,
-                        style: TextStyle(
-                          fontFamily: 'Nunito',
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          height: 28 / 20,
-                          color: AppColors.bw100,
-                        ),
-                      ),
-                      if (_kFriendBio.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          _kFriendBio,
-                          style: AppTextStyles.smRegular.copyWith(
-                            color: AppColors.bw100,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _FriendActionButton(
-                              label: 'Nhắn tin',
-                              onTap: () {
-                                // TODO(T3/HanDHG): navigate to chat
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _FriendActionButton(
-                              label: 'Chia sẻ trang cá nhân',
-                              onTap: () => ShareProfileSheet.show(
-                                context,
-                                uid: widget.uid,
-                                username: _kFriendUsername,
-                                title: 'Chia sẻ liên kết của bạn bè',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                  ),
-                ),
-                _FriendTabBar(
-                  activeTab: _activeTab,
-                  onTabChanged: (t) => setState(() => _activeTab = t),
-                ),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: _activeTab == 0
-                      ? PhotoGrid(
-                          photos: _kFriendPhotos,
-                          onTap: (index) => context.push(
-                            '/profile/photo/friend-$index',
-                            extra: <String, dynamic>{
-                              'index': index,
-                              'photos': _kFriendPhotos,
-                            },
-                          ),
-                        )
-                      : const DiaryTabContent(itemCount: 4),
-                ),
-              ],
+            Text(
+              message,
+              style: AppTextStyles.mdRegular.copyWith(color: AppColors.bw100),
+              textAlign: TextAlign.center,
             ),
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).size.height * 0.045,
-                ),
-                child: AppTaskbar(
-                  activeTab: TaskbarTab.profile,
-                  chatBadgeCount: totalUnread,
-                  onTabSelected: (tab) {
-                    switch (tab) {
-                      case TaskbarTab.streak:
-                        context.go('/streak');
-                      case TaskbarTab.diary:
-                        context.go('/diary');
-                      case TaskbarTab.home:
-                        context.go('/home');
-                      case TaskbarTab.chat:
-                        context.go('/inbox');
-                      case TaskbarTab.profile:
-                        context.go('/profile', extra: widget.uid);
-                    }
-                  },
-                ),
-              ),
+            const SizedBox(height: 20),
+            _FriendActionButton(
+              label: 'Quay lại',
+              onTap: onBack,
             ),
           ],
         ),
@@ -175,12 +104,212 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
   }
 }
 
+// ─── Body — load profile + posts cho friend ─────────────────────────────────
+
+class _FriendProfileBody extends ConsumerWidget {
+  const _FriendProfileBody({
+    required this.friendUid,
+    required this.activeTab,
+    required this.onTabChanged,
+    required this.totalUnread,
+  });
+
+  final String friendUid;
+  final int activeTab;
+  final ValueChanged<int> onTabChanged;
+  final int totalUnread;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(profileControllerProvider(friendUid));
+
+    if (state.isLoading && state.profile == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.bw100),
+      );
+    }
+
+    final profile = state.profile;
+    if (profile == null) {
+      return _GateMessage(
+        message: state.errorMessage ?? 'Không tải được hồ sơ',
+        onBack: () => context.pop(),
+      );
+    }
+
+    return Stack(
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 30, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _FriendAvatar(
+                        username: profile.username,
+                        avatarUrl: profile.avatarUrl,
+                      ),
+                      const SizedBox(width: 25),
+                      // Friend profile chỉ hiện Khoảnh khắc + Bạn bè per spec —
+                      // Space ẩn (không gọi từ profile.spaceCount).
+                      _StatsRow(
+                        postCount: profile.postCount,
+                        friendCount: profile.friendCount,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    profile.username,
+                    style: const TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      height: 28 / 20,
+                      color: AppColors.bw100,
+                    ),
+                  ),
+                  if ((profile.bio ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      profile.bio!,
+                      style: AppTextStyles.smRegular
+                          .copyWith(color: AppColors.bw100),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _FriendActionButton(
+                          label: 'Nhắn tin',
+                          onTap: () {
+                            // TODO(P/T7/HanDHG): navigate to chat conversation
+                            // qua pairId — đợi Chat module BE
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _FriendActionButton(
+                          label: 'Chia sẻ trang cá nhân',
+                          onTap: () => ShareProfileSheet.show(
+                            context,
+                            uid: friendUid,
+                            username: profile.username,
+                            title: 'Chia sẻ liên kết của bạn bè',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+            _FriendTabBar(
+              activeTab: activeTab,
+              onTabChanged: onTabChanged,
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: activeTab == 0
+                  ? _FriendPhotosTab(friendUid: friendUid)
+                  : const DiaryTabContent(),
+            ),
+          ],
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).size.height * 0.045,
+            ),
+            child: AppTaskbar(
+              activeTab: TaskbarTab.profile,
+              chatBadgeCount: totalUnread,
+              onTabSelected: (tab) {
+                switch (tab) {
+                  case TaskbarTab.streak:
+                    context.go('/streak');
+                  case TaskbarTab.diary:
+                    context.go('/diary');
+                  case TaskbarTab.home:
+                    context.go('/home');
+                  case TaskbarTab.chat:
+                    context.go('/inbox');
+                  case TaskbarTab.profile:
+                    context.go('/profile', extra: friendUid);
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Photos tab — audience filtered ──────────────────────────────────────────
+
+class _FriendPhotosTab extends ConsumerWidget {
+  const _FriendPhotosTab({required this.friendUid});
+
+  final String friendUid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ref.watch(friendPostsProvider(friendUid)).when(
+          loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.bw100),
+          ),
+          error: (e, _) => Center(
+            child: Text(
+              'Không tải được ảnh.',
+              style: AppTextStyles.smRegular.copyWith(color: AppColors.bw500),
+            ),
+          ),
+          data: (posts) {
+            if (posts == null || posts.isEmpty) {
+              return Center(
+                child: Text(
+                  'Chưa có ảnh nào',
+                  style:
+                      AppTextStyles.smRegular.copyWith(color: AppColors.bw500),
+                ),
+              );
+            }
+            final urls = posts.map((p) => p.coverImageUrl).toList();
+            return PhotoGrid(
+              photos: urls,
+              onTap: (index) {
+                final post = posts[index];
+                context.push(
+                  '/profile/photo/${post.postId}',
+                  extra: <String, Object>{
+                    'posts': posts,
+                    'index': index,
+                  },
+                );
+              },
+            );
+          },
+        );
+  }
+}
+
 // ─── Avatar ──────────────────────────────────────────────────────────────────
 
 class _FriendAvatar extends StatelessWidget {
-  const _FriendAvatar({required this.username});
+  const _FriendAvatar({required this.username, this.avatarUrl});
 
   final String username;
+  final String? avatarUrl;
 
   String get _initials {
     final parts = username.trim().split(' ');
@@ -190,6 +319,7 @@ class _FriendAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final url = avatarUrl;
     return Container(
       width: 100,
       height: 100,
@@ -201,31 +331,37 @@ class _FriendAvatar extends StatelessWidget {
       ),
       padding: const EdgeInsets.all(4),
       child: ClipOval(
-        child: Container(
-          color: AppColors.bw700,
-          alignment: Alignment.center,
-          child: Text(
-            _initials,
-            style: AppTextStyles.lgBold.copyWith(color: AppColors.bw100),
-          ),
-        ),
+        child: url != null && url.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => _initialsFallback(),
+                placeholder: (_, __) => Container(color: AppColors.bw800),
+              )
+            : _initialsFallback(),
+      ),
+    );
+  }
+
+  Widget _initialsFallback() {
+    return Container(
+      color: AppColors.bw700,
+      alignment: Alignment.center,
+      child: Text(
+        _initials,
+        style: AppTextStyles.lgBold.copyWith(color: AppColors.bw100),
       ),
     );
   }
 }
 
-// ─── Stats ───────────────────────────────────────────────────────────────────
+// ─── Stats — chỉ 2 cột (Khoảnh khắc + Bạn bè), KHÔNG hiện Space ──────────────
 
 class _StatsRow extends StatelessWidget {
-  const _StatsRow({
-    required this.postCount,
-    required this.friendCount,
-    required this.spaceCount,
-  });
+  const _StatsRow({required this.postCount, required this.friendCount});
 
   final int postCount;
   final int friendCount;
-  final int spaceCount;
 
   @override
   Widget build(BuildContext context) {
@@ -235,8 +371,6 @@ class _StatsRow extends StatelessWidget {
         _StatItem(count: postCount, label: 'Khoảnh khắc'),
         const SizedBox(width: 30),
         _StatItem(count: friendCount, label: 'Bạn bè'),
-        const SizedBox(width: 30),
-        _StatItem(count: spaceCount, label: 'Space'),
       ],
     );
   }
