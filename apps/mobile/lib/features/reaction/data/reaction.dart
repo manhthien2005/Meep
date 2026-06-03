@@ -11,6 +11,10 @@ class Reaction with _$Reaction {
     required String reactorUid,
     required String reactorName,
 
+    /// Avatar URL (denormalized từ UserProfile khi upsert). Null/empty →
+    /// ReactionListSheet fallback sang initials của reactorName.
+    String? reactorAvatarUrl,
+
     /// Single emoji character e.g. "😂"
     required String emoji,
     @TimestampConverter() required DateTime createdAt,

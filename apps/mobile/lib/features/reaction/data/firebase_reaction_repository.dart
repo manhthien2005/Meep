@@ -23,12 +23,15 @@ class FirebaseReactionRepository implements ReactionRepository {
     required String postId,
     required String reactorUid,
     required String reactorName,
+    String? reactorAvatarUrl,
     required String emoji,
   }) async {
     // docId = reactorUid → enforce 1 reaction/user/post. set() upsert, KHÔNG add().
     await _reactionsRef(postId).doc(reactorUid).set({
       'reactorUid': reactorUid,
       'reactorName': reactorName,
+      if (reactorAvatarUrl != null && reactorAvatarUrl.isNotEmpty)
+        'reactorAvatarUrl': reactorAvatarUrl,
       'emoji': emoji,
       'createdAt': FieldValue.serverTimestamp(),
     });

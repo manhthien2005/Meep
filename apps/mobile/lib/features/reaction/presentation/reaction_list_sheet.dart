@@ -89,27 +89,42 @@ class _ReactionRow extends StatelessWidget {
 
   final Reaction reaction;
 
+  /// Lấy chữ cái đầu của display name làm avatar fallback. Trim + uppercase.
+  /// Empty name → '?' để không crash UI.
+  static String _initialOf(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return '?';
+    return trimmed[0].toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final displayName =
+        reaction.reactorName.isNotEmpty ? reaction.reactorName : 'Bạn';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
       child: Row(
         children: [
           AppAvatar(
-            fallbackText: reaction.reactorName,
+            imageUrl: reaction.reactorAvatarUrl,
+            fallbackText: _initialOf(reaction.reactorName),
             size: 50,
           ),
           const SizedBox(width: 16),
-          Text(
-            reaction.reactorName,
-            style: const TextStyle(
-              color: AppColors.bw100,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              fontFamily: 'Nunito',
+          Expanded(
+            child: Text(
+              displayName,
+              style: const TextStyle(
+                color: AppColors.bw100,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Nunito',
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 12),
           Text(
             reaction.emoji,
             style: const TextStyle(fontSize: 24),

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/hex_color.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/data/post.dart';
@@ -225,7 +226,10 @@ class _AvatarStack extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 2),
             child: AppAvatar(
-              fallbackText: r.reactorName,
+              imageUrl: r.reactorAvatarUrl,
+              fallbackText: r.reactorName.isNotEmpty
+                  ? r.reactorName[0].toUpperCase()
+                  : '?',
               size: 32,
             ),
           ),
@@ -396,15 +400,25 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
 
   /// Safe toggle reaction — spawn bubble animation trước (instant UX feedback,
   /// không đợi network), rồi gọi controller toggle. Bắt lỗi → toast message.
+  ///
+  /// displayName + avatarUrl lấy từ UserProfile (Firestore /users/{uid}) thay
+  /// vì chỉ FirebaseAuth.currentUser — đảm bảo có data đúng cho mọi auth method
+  /// (Google / email signup). Fallback FirebaseAuth nếu profile chưa load.
   void _toggleReaction(String emoji, [GlobalKey? sourceKey]) {
     if (sourceKey != null) _spawnBubbles(emoji, sourceKey);
     try {
       final auth = FirebaseAuth.instance;
       final uid = auth.currentUser?.uid;
       if (uid == null) return;
+      final profile = ref.read(currentUserProfileProvider).valueOrNull;
+      final displayName = (profile?.displayName.isNotEmpty ?? false)
+          ? profile!.displayName
+          : (auth.currentUser?.displayName ?? '');
+      final avatarUrl = profile?.avatarUrl ?? auth.currentUser?.photoURL;
       ref.read(reactionControllerProvider(widget.postId).notifier).toggleReact(
             uid: uid,
-            displayName: auth.currentUser?.displayName ?? '',
+            displayName: displayName,
+            avatarUrl: avatarUrl,
             emoji: emoji,
           );
     } catch (_) {
@@ -568,7 +582,7 @@ class _EmojiBubbleState extends State<_EmojiBubble>
     _ctrl = AnimationController(
       vsync: this,
       // 2.4s — đủ thong thả để mắt theo dõi quỹ đạo, không cảm giác "vọt".
-      duration: const Duration(milliseconds: 2400),
+      duration: const Duration(milliseconds: 3000),
     )
       ..forward()
       ..addStatusListener((s) {
