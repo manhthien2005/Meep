@@ -2,7 +2,13 @@
 <!--
   Meep AppWidget metadata.
 
-  Sizing: 2x2 on the default home grid (~250dp x 250dp).
+  Sizing: 2x2 on the home grid.
+    - minWidth/Height 110dp = công thức cũ pre-Android 12 (70 * n - 30, n=2)
+      → launcher Android 11 trở xuống tính đúng 2 cell.
+    - targetCellWidth/Height = 2 → Android 12+ launcher dùng grid riêng,
+      buộc đúng 2 cell bất kể device.
+    - resizeMode "none" → ép kích cỡ cố định 2x2, không cho user resize.
+
   Update period: Android enforces a 30-minute minimum for updatePeriodMillis.
   Real-time updates come from WidgetSyncWorker (WorkManager, 15-min cadence).
 -->
