@@ -207,8 +207,8 @@ class _CapturePreviewScreenState extends ConsumerState<CapturePreviewScreen> {
               current: _captionIndex,
               shrinkOuter: true,
             ),
-            // Spacers above and below the bar center it in the gap between
-            // dots and audience row.
+            // Equal spacers above + below CaptureActionBar so nó căn giữa
+            // giữa đáy photo (sau dots) và AudienceRow ở bottom.
             const Spacer(),
             CaptureActionBar(
               config: PreviewBarConfig(
@@ -221,6 +221,7 @@ class _CapturePreviewScreenState extends ConsumerState<CapturePreviewScreen> {
                 onSparkles: _showCaptionModal,
               ),
             ),
+            const Spacer(),
             if (postState.errorMessage != null)
               Padding(
                 padding:
@@ -231,19 +232,17 @@ class _CapturePreviewScreenState extends ConsumerState<CapturePreviewScreen> {
                   textAlign: TextAlign.center,
                 ),
               ),
-            Flexible(
-              child: _AudienceRow(
-                screenW: screenW,
-                audienceType: postState.audienceType,
-                selectedUids: postState.selectedUids,
-                selectedSpaceIds: postState.selectedSpaceIds,
-                onAudienceChanged: (type, uids) => ref
-                    .read(postControllerProvider.notifier)
-                    .setAudience(type, uids),
-                onSpaceToggled: (spaceId) => ref
-                    .read(postControllerProvider.notifier)
-                    .toggleSpace(spaceId),
-              ),
+            _AudienceRow(
+              screenW: screenW,
+              audienceType: postState.audienceType,
+              selectedUids: postState.selectedUids,
+              selectedSpaceIds: postState.selectedSpaceIds,
+              onAudienceChanged: (type, uids) => ref
+                  .read(postControllerProvider.notifier)
+                  .setAudience(type, uids),
+              onSpaceToggled: (spaceId) => ref
+                  .read(postControllerProvider.notifier)
+                  .toggleSpace(spaceId),
             ),
             const SizedBox(height: 8),
           ],
@@ -343,7 +342,7 @@ class _AudienceRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final avatarSize = AppProportions.audienceAvatarSize(screenW);
-    final labelSize = avatarSize * 0.43;
+    final labelSize = avatarSize * 0.5;
     final isAll = audienceType == AudienceType.all;
 
     final currentUid = ref.watch(currentUidProvider).valueOrNull ?? '';
@@ -518,7 +517,7 @@ class _AllAudienceTile extends StatelessWidget {
             style: TextStyle(
               color: accent,
               fontSize: labelSize,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
               fontFamily: 'Nunito',
               height: 1.1,
             ),
@@ -583,7 +582,7 @@ class _SelfAudienceTile extends StatelessWidget {
               style: TextStyle(
                 color: accent,
                 fontSize: labelSize,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w900,
                 fontFamily: 'Nunito',
                 height: 1.1,
               ),
@@ -638,7 +637,7 @@ class _FriendAudienceTile extends StatelessWidget {
               style: TextStyle(
                 color: accent,
                 fontSize: labelSize,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w900,
                 fontFamily: 'Nunito',
                 height: 1.1,
               ),
@@ -703,7 +702,7 @@ class _SpaceAudienceTile extends StatelessWidget {
               style: TextStyle(
                 color: accent,
                 fontSize: labelSize,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w900,
                 fontFamily: 'Nunito',
                 height: 1.1,
               ),

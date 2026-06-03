@@ -107,7 +107,7 @@ class CaptureActionBar extends StatelessWidget {
                 size: sideSize,
                 onPressed: isUploading ? null : onCancel,
                 transparentBackground: true,
-                iconScale: 0.66,
+                iconScale: 0.9,
               ),
               SizedBox(width: gap),
               AppCircleIconButton(
@@ -125,7 +125,7 @@ class CaptureActionBar extends StatelessWidget {
                 size: sideSize,
                 onPressed: onSparkles,
                 transparentBackground: true,
-                iconScale: 0.66,
+                iconScale: 0.9,
               ),
             ],
         },
