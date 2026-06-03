@@ -38,6 +38,8 @@ import 'package:meep/features/notification/data/notification_preferences.dart';
 import 'package:meep/features/notification/presentation/widgets/notification_banner.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/firebase_space_repository.dart';
+import 'package:meep/features/streak/application/streak_controller.dart';
+import 'package:meep/features/streak/data/firebase_streak_repository.dart';
 import 'package:meep/features/widget/application/widget_data_service.dart';
 import 'package:meep/firebase_options.dart';
 
@@ -127,6 +129,9 @@ void main() async {
         ),
         diaryStorageClientProvider.overrideWithValue(
           FirebaseDiaryStorageClient(FirebaseStorage.instance),
+        ),
+        streakRepositoryProvider.overrideWithValue(
+          FirebaseStreakRepository(FirebaseFirestore.instance),
         ),
       ],
       child: const MeepApp(),
