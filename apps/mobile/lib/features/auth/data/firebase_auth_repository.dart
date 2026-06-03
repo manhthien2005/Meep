@@ -246,8 +246,20 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Future<void> updateEmail(String newEmail) async {
-    // TODO(A/T7/ThienPDM): implement — needed by Profile for email change
-    throw UnimplementedError('updateEmail — implement at T7');
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw const UnauthenticatedError(
+        message: 'Bạn cần đăng nhập để đổi email',
+      );
+    }
+    try {
+      // Firebase Auth 5.x deprecate updateEmail() — dùng verifyBeforeUpdateEmail
+      // để chống account takeover. Email chỉ đổi sau khi user click link
+      // verification trong inbox của địa chỉ mới.
+      await user.verifyBeforeUpdateEmail(newEmail);
+    } on FirebaseAuthException catch (e) {
+      throw _mapUpdateEmailError(e);
+    }
   }
 
   @override
@@ -305,6 +317,26 @@ class FirebaseAuthRepository implements AuthRepository {
       };
 
   AppError _mapGenericError(FirebaseAuthException e) => switch (e.code) {
+        'network-request-failed' =>
+          const NetworkError(message: 'Không có kết nối mạng'),
+        _ => UnexpectedError(message: e.message ?? e.code, cause: e),
+      };
+
+  /// `verifyBeforeUpdateEmail` có thể fail vì email invalid, đã tồn tại,
+  /// hoặc session quá cũ (`requires-recent-login`) — caller phải gọi
+  /// `reauthenticateWithPassword` / `reauthenticateWithGoogle` trước.
+  AppError _mapUpdateEmailError(FirebaseAuthException e) => switch (e.code) {
+        'invalid-email' => const ValidationError(message: 'Email không hợp lệ'),
+        'email-already-in-use' =>
+          const ValidationError(message: 'Email này đã được sử dụng'),
+        'requires-recent-login' => UnauthenticatedError(
+            message: 'Phiên đăng nhập hết hạn. Vui lòng xác thực lại',
+            code: e.code,
+            cause: e,
+          ),
+        'too-many-requests' => const UnauthenticatedError(
+            message: 'Quá nhiều lần thử. Vui lòng thử lại sau',
+          ),
         'network-request-failed' =>
           const NetworkError(message: 'Không có kết nối mạng'),
         _ => UnexpectedError(message: e.message ?? e.code, cause: e),
