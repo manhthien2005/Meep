@@ -29,6 +29,11 @@ import 'package:meep/features/profile/application/profile_controller.dart';
 import 'package:meep/features/profile/data/firebase_profile_repository.dart';
 import 'package:meep/features/settings/application/settings_controller.dart';
 import 'package:meep/features/settings/data/firebase_block_repository.dart';
+import 'package:meep/features/notification/application/notification_controller.dart';
+import 'package:meep/features/notification/application/notification_state.dart';
+import 'package:meep/features/notification/data/firebase_notification_repository.dart';
+import 'package:meep/features/notification/data/notification_preferences.dart';
+import 'package:meep/features/notification/presentation/widgets/notification_banner.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/firebase_space_repository.dart';
 import 'package:meep/features/widget/application/widget_data_service.dart';
@@ -106,6 +111,12 @@ void main() async {
         reactionRepositoryProvider.overrideWithValue(
           FirebaseReactionRepository(FirebaseFirestore.instance),
         ),
+        notificationRepositoryProvider.overrideWithValue(
+          FirebaseNotificationRepository(firestore: FirebaseFirestore.instance),
+        ),
+        notificationPreferencesProvider.overrideWithValue(
+          NotificationPreferences(prefs: prefs),
+        ),
       ],
       child: const MeepApp(),
     ),
@@ -120,6 +131,8 @@ class MeepApp extends ConsumerStatefulWidget {
 }
 
 class _MeepAppState extends ConsumerState<MeepApp> with WidgetsBindingObserver {
+  OverlayEntry? _bannerOverlay;
+
   @override
   void initState() {
     super.initState();
@@ -128,6 +141,7 @@ class _MeepAppState extends ConsumerState<MeepApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _bannerOverlay?.remove();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -162,6 +176,58 @@ class _MeepAppState extends ConsumerState<MeepApp> with WidgetsBindingObserver {
         ref.read(authRepositoryProvider).signOut();
       }
     });
+
+    // ── Notification: init FCM when user logs in ───────────────────────
+    ref.listen(currentUidProvider, (prevUid, nextUid) {
+      final uid = nextUid.valueOrNull;
+      if (uid != null && prevUid?.valueOrNull == null) {
+        ref.read(notificationControllerProvider.notifier).initFcm();
+      }
+    });
+
+    // ── Notification: foreground banner overlay ─────────────────────────
+    // The first `ref.listen` fire can happen before `MaterialApp.router`
+    // has mounted its `Navigator`/`Overlay`. Deferring via post-frame +
+    // `Overlay.maybeOf` keeps cold-start FCM from throwing
+    // `'No Overlay widget exists above this context'`.
+    ref.listen<NotificationState>(
+      notificationControllerProvider,
+      (prev, next) {
+        _bannerOverlay?.remove();
+        _bannerOverlay = null;
+
+        final payload = next.currentBanner;
+        if (payload == null) return;
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final overlay = Overlay.maybeOf(context, rootOverlay: true);
+          if (overlay == null) return;
+          // Bail if controller state moved on (suppress/timer) between the
+          // listener fire and post-frame.
+          if (ref.read(notificationControllerProvider).currentBanner !=
+              payload) {
+            return;
+          }
+          final entry = OverlayEntry(
+            builder: (_) => Positioned(
+              top: MediaQuery.of(context).padding.top + 10,
+              left: (MediaQuery.of(context).size.width - 364) / 2,
+              child: NotificationBanner(
+                payload: payload,
+                onSuppress: () {
+                  ref
+                      .read(notificationControllerProvider.notifier)
+                      .suppressBanner();
+                },
+              ),
+            ),
+          );
+          overlay.insert(entry);
+          _bannerOverlay = entry;
+        });
+      },
+    );
 
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
