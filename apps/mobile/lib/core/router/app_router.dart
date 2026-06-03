@@ -21,6 +21,7 @@ import 'package:meep/dev/widget_catalog_page.dart';
 import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
 import 'package:meep/features/diary/presentation/diary_create_screen.dart';
 import 'package:meep/features/diary/presentation/diary_list_screen.dart';
+import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/feed/presentation/capture_preview_args.dart';
 import 'package:meep/features/feed/presentation/capture_preview_screen.dart';
 import 'package:meep/features/feed/presentation/home_screen.dart';
@@ -310,10 +311,13 @@ GoRouter appRouter(Ref ref) {
         builder: (_, state) {
           final extra = state.extra;
           if (extra is Map<String, dynamic>) {
+            // ProfileScreen / FriendProfileScreen passes
+            // { 'posts': List<Post>, 'index': int }
+            final posts = extra['posts'];
             return PhotoDetailScreen(
               postId: state.pathParameters['postId'] ?? '',
               initialIndex: (extra['index'] as int?) ?? 0,
-              photos: (extra['photos'] as List?)?.cast<String>(),
+              posts: posts is List<Post> ? posts : null,
             );
           }
           return PhotoDetailScreen(
