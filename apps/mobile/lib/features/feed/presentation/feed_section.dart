@@ -318,9 +318,9 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
     final centerLocal = Offset(box.size.width / 2, box.size.height / 2);
     final centerGlobal = box.localToGlobal(centerLocal);
     final overlay = Overlay.of(context);
-    // 3 bubbles spawn delayed → wave effect kiểu Locket.
+    // 3 bubbles spawn delayed (150ms gap) → wave effect rõ kiểu Locket.
     for (var i = 0; i < 3; i++) {
-      Future.delayed(Duration(milliseconds: 90 * i), () {
+      Future.delayed(Duration(milliseconds: 150 * i), () {
         if (!mounted) return;
         late OverlayEntry entry;
         entry = OverlayEntry(
@@ -558,7 +558,7 @@ class _EmojiBubble extends StatefulWidget {
 class _EmojiBubbleState extends State<_EmojiBubble>
     with SingleTickerProviderStateMixin {
   static const _emojiSize = 32.0;
-  static const _riseDistance = 140.0;
+  static const _riseDistance = 160.0;
 
   late final AnimationController _ctrl;
 
@@ -567,7 +567,8 @@ class _EmojiBubbleState extends State<_EmojiBubble>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      // 2.4s — đủ thong thả để mắt theo dõi quỹ đạo, không cảm giác "vọt".
+      duration: const Duration(milliseconds: 2400),
     )
       ..forward()
       ..addStatusListener((s) {
@@ -587,14 +588,17 @@ class _EmojiBubbleState extends State<_EmojiBubble>
       animation: _ctrl,
       builder: (_, __) {
         final t = _ctrl.value;
-        // EaseOutCubic cho vertical rise — chậm dần khi lên cao.
-        final tEase = 1 - math.pow(1 - t, 3).toDouble();
+        // EaseOutQuad: 1 - (1-t)² — distribution đều hơn easeOutCubic.
+        // Tại t=0.5 đi 75% distance (vs cubic 87.5%) → mắt theo dõi
+        // mượt, không cảm giác "vọt lên rồi đứng".
+        final tEase = 1 - (1 - t) * (1 - t);
         final dy = -_riseDistance * tEase;
-        // Drift X áp dụng cubic ease — wobble subtle.
-        final dx = widget.driftX * tEase;
-        // Fade nhanh hơn ở cuối (60% mới bắt đầu fade rõ).
-        final opacity = (1.0 - math.max(0.0, (t - 0.4) / 0.6)).clamp(0.0, 1.0);
-        final scale = 1.0 + (0.25 * t);
+        // Drift X theo sine wave nhẹ — wobble bồng bềnh kiểu bong bóng.
+        final dx = widget.driftX * tEase + math.sin(t * math.pi * 2) * 6.0;
+        // Fade tuyến tính 30% → 100% → bubble vẫn nhìn thấy được suốt
+        // phần lớn animation, chỉ mờ dần ở cuối.
+        final opacity = (1.0 - math.max(0.0, (t - 0.3) / 0.7)).clamp(0.0, 1.0);
+        final scale = 1.0 + (0.2 * t);
 
         return Positioned(
           left: widget.startGlobal.dx - _emojiSize / 2 + dx,
@@ -604,9 +608,17 @@ class _EmojiBubbleState extends State<_EmojiBubble>
               opacity: opacity,
               child: Transform.scale(
                 scale: scale,
+                // Overlay không có DefaultTextStyle → Flutter debug fallback
+                // render Text với gạch chân vàng + chữ đỏ. Phải set explicit
+                // decoration + color + textDirection để tắt fallback đó.
                 child: Text(
                   widget.emoji,
-                  style: const TextStyle(fontSize: _emojiSize),
+                  textDirection: TextDirection.ltr,
+                  style: const TextStyle(
+                    fontSize: _emojiSize,
+                    decoration: TextDecoration.none,
+                    color: Colors.black,
+                  ),
                 ),
               ),
             ),
