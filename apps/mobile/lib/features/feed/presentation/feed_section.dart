@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -6,9 +7,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/hex_color.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/features/reaction/application/reaction_controller.dart';
+import 'package:meep/features/reaction/data/reaction.dart';
+import 'package:meep/features/reaction/presentation/emoji_picker_sheet.dart';
+import 'package:meep/features/reaction/presentation/reaction_list_sheet.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/post_card.dart';
@@ -148,53 +154,117 @@ class PostHeaderRow extends StatelessWidget {
   }
 }
 
-/// Activity pill — own posts only ("Chưa có hoạt động nào!"). Hug content,
-/// transparent rounded background. Centered in its parent.
-class ActivityPill extends StatelessWidget {
-  const ActivityPill({super.key});
+/// Activity pill — own posts only. Two states:
+/// - Empty: "Chưa có hoạt động nào!" (M2 fallback khi chưa có react)
+/// - Has reactions: "Hoạt động" + stacked avatars + ReactionListSheet on tap
+class ActivityPill extends ConsumerWidget {
+  const ActivityPill({super.key, required this.postId});
+
+  final String postId;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0x66252627),
-        borderRadius: BorderRadius.circular(40),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.auto_awesome_outlined,
-            color: AppColors.bw400,
-            size: 18,
-          ),
-          SizedBox(width: 10),
-          Text(
-            'Chưa có hoạt động nào!',
-            style: TextStyle(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(reactionControllerProvider(postId));
+    final reactions = state.reactions;
+    final isEmpty = reactions.isEmpty;
+
+    return GestureDetector(
+      onTap: isEmpty ? null : () => ReactionListSheet.show(context, postId),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0x66252627),
+          borderRadius: BorderRadius.circular(40),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.auto_awesome_outlined,
               color: AppColors.bw400,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              fontFamily: 'Nunito',
+              size: 18,
             ),
-          ),
-        ],
+            const SizedBox(width: 10),
+            Text(
+              isEmpty ? 'Chưa có hoạt động nào!' : 'Hoạt động',
+              style: TextStyle(
+                color: isEmpty ? AppColors.bw400 : AppColors.bw100,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Nunito',
+              ),
+            ),
+            if (!isEmpty) ...[
+              const SizedBox(width: 10),
+              _AvatarStack(reactions: reactions),
+            ],
+          ],
+        ),
       ),
     );
   }
 }
 
+/// Stacked avatars — max 3 first + "+N" badge if count > 3.
+/// Figma 472:2052 node 769:4494.
+class _AvatarStack extends StatelessWidget {
+  const _AvatarStack({required this.reactions});
+
+  final List<Reaction> reactions;
+
+  @override
+  Widget build(BuildContext context) {
+    final top3 = reactions.length <= 3
+        ? reactions
+        : reactions.sublist(0, 3); // already sorted DESC from State
+    final overflow = reactions.length - 3;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final r in top3)
+          Padding(
+            padding: const EdgeInsets.only(right: 2),
+            child: AppAvatar(
+              imageUrl: r.reactorAvatarUrl,
+              fallbackText: r.reactorName.isNotEmpty
+                  ? r.reactorName[0].toUpperCase()
+                  : '?',
+              size: 32,
+            ),
+          ),
+        if (overflow > 0)
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.bw300,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.bw100, width: 1),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '+$overflow',
+              style: const TextStyle(
+                color: AppColors.bw700,
+                fontSize: 14,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 /// Friend message bar — 2-state inline composer trên Feed:
-/// - **Collapsed** (mặc định): text "Gửi tin nhắn..." + 3 emoji quick-react +
-///   icon add-reaction. Tap vùng text trái → expand sang TextField.
+/// - **Collapsed** (mặc định): text "Gửi tin nhắn..." + 3 emoji quick-react
+///   (💙🤣🥰 — Figma 472:2252) + smile-plus picker. Tap text trái → expand
+///   sang modal composer. Tap emoji → `ReactionController.toggleReact`
+///   (optimistic + in-flight lock). Tap smile-plus → `EmojiPickerSheet`.
 /// - **Expanded:** TextField focused + send button. Tap-outside hoặc submit →
 ///   collapse. Submit gọi `ChatController.sendMessageFromFeed(postId, authorId)`
-///   để tạo/lookup direct conversation rồi append message. KHÔNG navigate —
-///   theo spec, user vẫn ở Feed sau khi gửi (input chỉ collapse).
-///
-/// Emoji quick-react ở collapsed state hiện chưa wire (chờ T5 reactions —
-/// `tasks/todo-chat.md`). Trong PR này chỉ wire text → send flow.
+///   để tạo/lookup direct conversation rồi append message.
 class FriendMessageBar extends ConsumerStatefulWidget {
   const FriendMessageBar({
     super.key,
@@ -203,7 +273,8 @@ class FriendMessageBar extends ConsumerStatefulWidget {
     this.spaceId,
   });
 
-  /// postId — context cho `sendMessageFromFeed` (lưu quotedPostId tương lai).
+  /// postId — context cho `sendMessageFromFeed` (lưu quotedPostId tương lai)
+  /// và cho `reactionControllerProvider(postId)`.
   final String postId;
 
   /// authorId — peer uid để `getOrCreateConversation` tính pairId.
@@ -222,6 +293,52 @@ class FriendMessageBar extends ConsumerStatefulWidget {
 
 class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
   bool _isSending = false;
+  final math.Random _rng = math.Random();
+
+  // 💙 (U+1F499) ổn định cross-Android; tránh 🩵 (U+1FA75 — Unicode 14.0) bị
+  // tofu trên Android < 12. Khớp chat_input_bar.quickEmojis default.
+  static const _defaultPresets = ['💙', '🤣', '🥰'];
+
+  // 1 GlobalKey per slot — dùng để lấy global position khi spawn bubble float
+  // animation (Overlay cần absolute position, không phải local của widget).
+  final List<GlobalKey> _slotKeys = List.generate(3, (_) => GlobalKey());
+  final GlobalKey _smilePlusKey = GlobalKey();
+
+  /// Nếu user đã pick emoji custom (qua EmojiPickerSheet, không thuộc 3
+  /// default presets), replace slot 0 (💙) bằng emoji đó. Giúp user thấy
+  /// rõ mình đã chọn gì — nếu không sẽ "lost" sau khi đóng picker.
+  List<String> _displayPresets(String? myEmoji) {
+    if (myEmoji == null || _defaultPresets.contains(myEmoji)) {
+      return _defaultPresets;
+    }
+    return [myEmoji, _defaultPresets[1], _defaultPresets[2]];
+  }
+
+  /// Spawn 3 emoji bubbles staggered từ vị trí button được tap, float lên
+  /// kiểu Locket. Mỗi bubble drift X random + fade out 1.5s.
+  void _spawnBubbles(String emoji, GlobalKey slotKey) {
+    final box = slotKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final centerLocal = Offset(box.size.width / 2, box.size.height / 2);
+    final centerGlobal = box.localToGlobal(centerLocal);
+    final overlay = Overlay.of(context);
+    // 3 bubbles spawn delayed (150ms gap) → wave effect rõ kiểu Locket.
+    for (var i = 0; i < 3; i++) {
+      Future.delayed(Duration(milliseconds: 150 * i), () {
+        if (!mounted) return;
+        late OverlayEntry entry;
+        entry = OverlayEntry(
+          builder: (_) => _EmojiBubble(
+            emoji: emoji,
+            startGlobal: centerGlobal,
+            driftX: (_rng.nextDouble() - 0.5) * 80, // -40 → +40
+            onComplete: () => entry.remove(),
+          ),
+        );
+        overlay.insert(entry);
+      });
+    }
+  }
 
   /// Mở modal bottom sheet composer thay vì inline TextField.
   ///
@@ -281,10 +398,64 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
     );
   }
 
+  /// Safe toggle reaction — spawn bubble animation trước (instant UX feedback,
+  /// không đợi network), rồi gọi controller toggle. Bắt lỗi → toast message.
+  ///
+  /// displayName + avatarUrl lấy từ UserProfile (Firestore /users/{uid}) thay
+  /// vì chỉ FirebaseAuth.currentUser — đảm bảo có data đúng cho mọi auth method
+  /// (Google / email signup). uid lấy từ currentUidProvider (auth abstraction)
+  /// thay vì FirebaseAuth.instance trực tiếp — giữ layering UI → repository.
+  void _toggleReaction(String emoji, [GlobalKey? sourceKey]) {
+    if (sourceKey != null) _spawnBubbles(emoji, sourceKey);
+    try {
+      final uid = ref.read(currentUidProvider).valueOrNull;
+      if (uid == null) return;
+      final profile = ref.read(currentUserProfileProvider).valueOrNull;
+      final displayName = (profile?.displayName.isNotEmpty ?? false)
+          ? profile!.displayName
+          : '';
+      final avatarUrl = profile?.avatarUrl;
+      ref.read(reactionControllerProvider(widget.postId).notifier).toggleReact(
+            uid: uid,
+            displayName: displayName,
+            avatarUrl: avatarUrl,
+            emoji: emoji,
+          );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Thả cảm xúc thất bại — thử lại'),
+          backgroundColor: AppColors.bw700,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenW = MediaQuery.sizeOf(context).width;
     final screenH = MediaQuery.sizeOf(context).height;
+    final reactionState = ref.watch(reactionControllerProvider(widget.postId));
+
+    // Show error toast nếu reaction controller có errorMessage.
+    if (reactionState.errorMessage != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(reactionState.errorMessage!),
+            backgroundColor: AppColors.bw700,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        ref
+            .read(reactionControllerProvider(widget.postId).notifier)
+            .clearError();
+      });
+    }
+
     return Container(
       height: screenH * 0.07,
       width: screenW * 0.8,
@@ -310,19 +481,164 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
               ),
             ),
           ),
-          const Text('💙', style: TextStyle(fontSize: 18)),
+          for (var i = 0; i < 3; i++)
+            _EmojiButton(
+              key: _slotKeys[i],
+              emoji: _displayPresets(reactionState.myEmoji)[i],
+              isActive: reactionState.myEmoji ==
+                  _displayPresets(reactionState.myEmoji)[i],
+              onTap: () => _toggleReaction(
+                _displayPresets(reactionState.myEmoji)[i],
+                _slotKeys[i],
+              ),
+            ),
           const SizedBox(width: 10),
-          const Text('😂', style: TextStyle(fontSize: 18)),
-          const SizedBox(width: 10),
-          const Text('🥰', style: TextStyle(fontSize: 18)),
-          const SizedBox(width: 10),
-          const Icon(
-            Icons.add_reaction_outlined,
-            color: AppColors.bw500,
-            size: 20,
+          GestureDetector(
+            key: _smilePlusKey,
+            onTap: () => EmojiPickerSheet.show(
+              context,
+              (emoji) => _toggleReaction(emoji, _smilePlusKey),
+            ),
+            child: const Icon(
+              Icons.add_reaction_outlined,
+              color: AppColors.bw500,
+              size: 20,
+            ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Emoji preset button — subtle opacity feedback active/inactive.
+/// Visual chính khi user thả reaction = bubble float animation
+/// (spawn từ _FriendMessageBarState._spawnBubbles), + replace slot 0 nếu
+/// emoji custom (xem _displayPresets).
+/// KHÔNG set fontFamily — để platform emoji font render glyph, tránh tofu
+/// (theo pattern chat_input_bar).
+class _EmojiButton extends StatelessWidget {
+  const _EmojiButton({
+    super.key,
+    required this.emoji,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  final String emoji;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: isActive ? 1.0 : 0.6,
+          child: Text(
+            emoji,
+            style: const TextStyle(fontSize: 22),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Locket-style bubble float — emoji nổi lên + drift X + scale + fade out.
+/// Spawn từ Overlay nên không bị clip bởi ActText container.
+/// Tự remove khỏi overlay khi animation complete (1.5s).
+class _EmojiBubble extends StatefulWidget {
+  const _EmojiBubble({
+    required this.emoji,
+    required this.startGlobal,
+    required this.driftX,
+    required this.onComplete,
+  });
+
+  final String emoji;
+  final Offset startGlobal;
+  final double driftX;
+  final VoidCallback onComplete;
+
+  @override
+  State<_EmojiBubble> createState() => _EmojiBubbleState();
+}
+
+class _EmojiBubbleState extends State<_EmojiBubble>
+    with SingleTickerProviderStateMixin {
+  static const _emojiSize = 32.0;
+  static const _riseDistance = 160.0;
+
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      // 2.4s — đủ thong thả để mắt theo dõi quỹ đạo, không cảm giác "vọt".
+      duration: const Duration(milliseconds: 3000),
+    )
+      ..forward()
+      ..addStatusListener((s) {
+        if (s == AnimationStatus.completed) widget.onComplete();
+      });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        final t = _ctrl.value;
+        // EaseOutQuad: 1 - (1-t)² — distribution đều hơn easeOutCubic.
+        // Tại t=0.5 đi 75% distance (vs cubic 87.5%) → mắt theo dõi
+        // mượt, không cảm giác "vọt lên rồi đứng".
+        final tEase = 1 - (1 - t) * (1 - t);
+        final dy = -_riseDistance * tEase;
+        // Drift X theo sine wave nhẹ — wobble bồng bềnh kiểu bong bóng.
+        final dx = widget.driftX * tEase + math.sin(t * math.pi * 2) * 6.0;
+        // Fade tuyến tính 30% → 100% → bubble vẫn nhìn thấy được suốt
+        // phần lớn animation, chỉ mờ dần ở cuối.
+        final opacity = (1.0 - math.max(0.0, (t - 0.3) / 0.7)).clamp(0.0, 1.0);
+        final scale = 1.0 + (0.2 * t);
+
+        return Positioned(
+          left: widget.startGlobal.dx - _emojiSize / 2 + dx,
+          top: widget.startGlobal.dy - _emojiSize / 2 + dy,
+          child: IgnorePointer(
+            child: Opacity(
+              opacity: opacity,
+              child: Transform.scale(
+                scale: scale,
+                // Overlay không có DefaultTextStyle → Flutter debug fallback
+                // render Text với gạch chân vàng + chữ đỏ. Phải set explicit
+                // decoration + color + textDirection để tắt fallback đó.
+                child: Text(
+                  widget.emoji,
+                  textDirection: TextDirection.ltr,
+                  style: const TextStyle(
+                    fontSize: _emojiSize,
+                    decoration: TextDecoration.none,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -502,7 +818,7 @@ class OwnPostFooter extends StatelessWidget {
       children: [
         PostHeaderRow(post: post, isOwn: true),
         const SizedBox(height: 12),
-        const ActivityPill(),
+        ActivityPill(postId: post.postId),
       ],
     );
   }
@@ -536,7 +852,7 @@ class OwnPostPage extends ConsumerWidget {
         const SizedBox(height: 8),
         PostHeaderRow(post: post, isOwn: true),
         const Spacer(),
-        const ActivityPill(),
+        ActivityPill(postId: post.postId),
         SizedBox(height: screenH * _bottomGapRatio),
       ],
     );

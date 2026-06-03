@@ -59,9 +59,13 @@ class ReactionController extends _$ReactionController {
   ///
   /// Optimistic update: state thay đổi ngay, rollback khi Firestore fail.
   /// In-flight lock: tap thứ 2 bị bỏ qua khi `isSubmitting`.
+  ///
+  /// [avatarUrl] denormalize từ UserProfile.avatarUrl — null OK (fallback
+  /// sang initials trong ReactionListSheet).
   Future<void> toggleReact({
     required String uid,
     required String displayName,
+    String? avatarUrl,
     required String emoji,
   }) async {
     if (state.isSubmitting) return; // in-flight lock
@@ -85,6 +89,7 @@ class ReactionController extends _$ReactionController {
       existing: existing,
       uid: uid,
       displayName: displayName,
+      avatarUrl: avatarUrl,
       emoji: emoji,
     );
     final newMyEmoji = (existing?.emoji == emoji) ? null : emoji;
@@ -103,6 +108,7 @@ class ReactionController extends _$ReactionController {
           postId: _postId,
           reactorUid: uid,
           reactorName: displayName,
+          reactorAvatarUrl: avatarUrl,
           emoji: emoji,
         );
       }
@@ -127,6 +133,7 @@ class ReactionController extends _$ReactionController {
     required Reaction? existing,
     required String uid,
     required String displayName,
+    String? avatarUrl,
     required String emoji,
   }) {
     if (existing == null) {
@@ -136,6 +143,7 @@ class ReactionController extends _$ReactionController {
         Reaction(
           reactorUid: uid,
           reactorName: displayName,
+          reactorAvatarUrl: avatarUrl,
           emoji: emoji,
           createdAt: DateTime.now(),
         ),

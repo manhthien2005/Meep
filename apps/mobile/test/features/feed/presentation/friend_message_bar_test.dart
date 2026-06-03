@@ -10,6 +10,8 @@ import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/chat/data/conversation.dart';
 import 'package:meep/features/chat/data/firebase_conversation_repository.dart';
 import 'package:meep/features/feed/presentation/feed_section.dart';
+import 'package:meep/features/reaction/application/reaction_controller.dart';
+import 'package:meep/features/reaction/data/firebase_reaction_repository.dart';
 
 void main() {
   const myUid = 'uid-me';
@@ -72,6 +74,8 @@ void main() {
         overrides: [
           conversationRepositoryProvider.overrideWithValue(repo),
           currentChatUidProvider.overrideWith((ref) => myUid),
+          reactionRepositoryProvider
+              .overrideWithValue(FirebaseReactionRepository(firestore)),
         ],
         child: MaterialApp.router(routerConfig: router),
       ),
@@ -85,7 +89,7 @@ void main() {
 
       expect(find.text('Gửi tin nhắn...'), findsOneWidget);
       expect(find.text('💙'), findsOneWidget);
-      expect(find.text('😂'), findsOneWidget);
+      expect(find.text('🤣'), findsOneWidget);
       expect(find.text('🥰'), findsOneWidget);
       expect(find.byIcon(Icons.add_reaction_outlined), findsOneWidget);
       // Composer chưa expand → KHÔNG có TextField.

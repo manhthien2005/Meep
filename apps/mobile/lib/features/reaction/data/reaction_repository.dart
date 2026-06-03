@@ -5,10 +5,13 @@ abstract class ReactionRepository {
   Stream<List<Reaction>> watchReactions(String postId);
 
   /// Create or replace the calling user's reaction on [postId].
+  /// [reactorAvatarUrl] denormalize từ UserProfile để ReactionListSheet
+  /// render avatar không cần extra read.
   Future<void> upsertReaction({
     required String postId,
     required String reactorUid,
     required String reactorName,
+    String? reactorAvatarUrl,
     required String emoji,
   });
 
