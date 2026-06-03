@@ -191,7 +191,7 @@ class WidgetSyncWorker(
     }
 
     private fun renderPlaceholder() {
-        pushRemoteViews { views ->
+        pushRemoteViews(null) { views ->
             views.setViewVisibility(R.id.widget_placeholder, View.VISIBLE)
             views.setViewVisibility(R.id.widget_photo, View.GONE)
             views.setViewVisibility(R.id.widget_avatar, View.GONE)
@@ -206,7 +206,7 @@ class WidgetSyncWorker(
         avatar: Bitmap?,
         unreadCount: Int,
     ) {
-        pushRemoteViews { views ->
+        pushRemoteViews(post.postId) { views ->
             views.setViewVisibility(R.id.widget_placeholder, View.GONE)
 
             views.setImageViewBitmap(R.id.widget_photo, photo)
@@ -238,13 +238,14 @@ class WidgetSyncWorker(
         }
     }
 
-    private fun pushRemoteViews(build: (RemoteViews) -> Unit) {
+    private fun pushRemoteViews(postId: String?, build: (RemoteViews) -> Unit) {
         val manager = AppWidgetManager.getInstance(applicationContext)
         val component = ComponentName(applicationContext, MeepWidget::class.java)
         val ids = manager.getAppWidgetIds(component)
         if (ids.isEmpty()) return
         val views = RemoteViews(applicationContext.packageName, R.layout.meep_widget)
         build(views)
+        MeepWidget.applyTapIntent(applicationContext, views, postId)
         ids.forEach { id -> manager.updateAppWidget(id, views) }
     }
 

@@ -1,8 +1,10 @@
 package dev.meep.meep
 
+import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
+import android.content.Intent
 import android.view.View
 import android.widget.RemoteViews
 
@@ -60,6 +62,7 @@ class MeepWidget : AppWidgetProvider() {
         } else {
             applyData(views, data)
         }
+        applyTapIntent(context, views, data?.postId)
         return views
     }
 
@@ -87,6 +90,36 @@ class MeepWidget : AppWidgetProvider() {
             views.setViewVisibility(R.id.widget_caption, View.VISIBLE)
         } else {
             views.setViewVisibility(R.id.widget_caption, View.GONE)
+        }
+    }
+
+    companion object {
+        /**
+         * Apply the tap-to-open PendingIntent on the widget root.
+         *
+         * When [postId] is non-null the intent carries extras so
+         * [MainActivity] deep-links to the corresponding post. When null
+         * (placeholder) the app opens at Home.
+         *
+         * Also called by [WidgetSyncWorker] so the PendingIntent is present
+         * on every RemoteViews update (not just the initial [onUpdate]).
+         */
+        fun applyTapIntent(context: Context, views: RemoteViews, postId: String?) {
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                if (postId != null) {
+                    putExtra("action", "OPEN_POST")
+                    putExtra("postId", postId)
+                }
+            }
+            val requestCode = postId?.hashCode() ?: 0
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                requestCode,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            views.setOnClickPendingIntent(R.id.meep_widget_root, pendingIntent)
         }
     }
 }

@@ -8,6 +8,7 @@ import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/notification/application/notification_controller.dart';
 import 'package:meep/features/settings/application/settings_state.dart';
 import 'package:meep/features/settings/data/block_repository.dart';
+import 'package:meep/features/widget/application/widget_data_service.dart';
 
 part 'settings_controller.g.dart';
 
@@ -88,6 +89,13 @@ class SettingsController extends _$SettingsController {
         await ref.read(notificationRepositoryProvider).deleteFcmToken(uid);
       } catch (_) {
         // Swallow: FCM cleanup là best-effort, không block logout.
+      }
+
+      // Clear widget cache — best-effort, không block logout.
+      try {
+        await ref.read(widgetDataServiceProvider).clearData();
+      } catch (_) {
+        // Swallow: widget cleanup is best-effort.
       }
     }
     try {

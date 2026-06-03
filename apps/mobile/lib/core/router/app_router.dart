@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -205,7 +206,13 @@ GoRouter appRouter(Ref ref) {
     },
     routes: [
       GoRoute(path: '/intro', builder: (_, __) => const IntroPage()),
-      GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
+      GoRoute(
+        path: '/home',
+        builder: (_, state) => HomeScreen(
+          spaceId: state.uri.queryParameters['spaceId'],
+          highlightPostId: state.uri.queryParameters['highlight'],
+        ),
+      ),
       GoRoute(
         path: '/signup/email',
         builder: (_, __) => const SignUpEmailPage(),
@@ -372,6 +379,30 @@ GoRouter appRouter(Ref ref) {
     ],
   );
 
-  ref.onDispose(notifier.dispose);
+  // Widget deep link: Kotlin MainActivity sends onWidgetTap events via
+  // this channel. Handler is registered after router creation so it can
+  // capture router in its closure — platform channels buffer calls until a
+  // handler is set, so even cold-start taps arrive correctly.
+  const channel = MethodChannel('meep/widget');
+  channel.setMethodCallHandler((call) async {
+    if (call.method != 'onWidgetTap') return;
+    // StandardMethodCodec decode `mapOf(...)` từ Kotlin thành
+    // Map<Object?, Object?> — không cast trực tiếp về Map<String, dynamic>
+    // (sẽ throw _TypeError và swallow silently). Type-check Map base rồi pluck.
+    final args = call.arguments;
+    final action = args is Map ? args['action'] as String? : null;
+    final postId = args is Map ? args['postId'] as String? : null;
+
+    if (action == 'OPEN_POST' && postId != null) {
+      router.go('/home?highlight=$postId');
+    } else {
+      router.go('/home');
+    }
+  });
+
+  ref.onDispose(() {
+    channel.setMethodCallHandler(null);
+    notifier.dispose();
+  });
   return router;
 }
