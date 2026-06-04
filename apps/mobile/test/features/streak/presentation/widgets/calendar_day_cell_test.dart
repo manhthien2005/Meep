@@ -46,9 +46,15 @@ void main() {
     expect(find.byType(CachedNetworkImage), findsOneWidget);
   });
 
-  testWidgets('isToday=true → render outline border', (tester) async {
+  testWidgets('isToday + có post → render outline border', (tester) async {
     await tester.pumpWidget(
-      host(const CalendarDayCell(isInMonth: true, isToday: true)),
+      host(
+        const CalendarDayCell(
+          isInMonth: true,
+          isToday: true,
+          imageUrl: 'https://cdn/p1.jpg',
+        ),
+      ),
     );
     // CalendarDayCell wrap content trong Stack với DecoratedBox overlay
     // chứa Border. Tìm bất kỳ widget nào có border non-null.
@@ -64,6 +70,36 @@ void main() {
       return false;
     });
     expect(hasBorder, findsAtLeast(1));
+  });
+
+  testWidgets('isToday + no post → render CTA icon add (turquoise block)',
+      (tester) async {
+    await tester.pumpWidget(
+      host(const CalendarDayCell(isInMonth: true, isToday: true)),
+    );
+    // Today CTA mode: turquoise block + Icons.add center, NO outline border
+    expect(find.byIcon(Icons.add), findsOneWidget);
+    expect(find.byType(CachedNetworkImage), findsNothing);
+  });
+
+  testWidgets('isToday + no post + onTap != null → tappable với CTA semantics',
+      (tester) async {
+    var tapped = false;
+    await tester.pumpWidget(
+      host(
+        CalendarDayCell(
+          isInMonth: true,
+          isToday: true,
+          onTap: () => tapped = true,
+        ),
+      ),
+    );
+    await tester.tap(find.byType(GestureDetector));
+    expect(tapped, isTrue);
+    expect(
+      find.bySemanticsLabel('Chụp khoảnh khắc hôm nay'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('onTap fire khi có post', (tester) async {
