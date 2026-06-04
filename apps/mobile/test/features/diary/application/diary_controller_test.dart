@@ -382,6 +382,78 @@ void main() {
     );
   });
 
+  group('updateEntryNoImage', () {
+    test('gọi repo.updateEntry + set currentEntry, không upload', () async {
+      when(() => repo.updateEntry(any())).thenAnswer((_) async {});
+
+      final c = makeContainer();
+      final updated = savedEntry('e-1').copyWith(moodCaption: 'New title');
+
+      await c
+          .read(diaryControllerProvider.notifier)
+          .updateEntryNoImage(updated);
+
+      verify(() => repo.updateEntry(updated)).called(1);
+      expect(storage.uploadCount, 0);
+      final state = c.read(diaryControllerProvider);
+      expect(state.currentEntry?.moodCaption, 'New title');
+      expect(state.isSaving, isFalse);
+    });
+
+    test('repo fail → errorMessage set', () async {
+      when(() => repo.updateEntry(any()))
+          .thenThrow(const NetworkError(message: 'mất mạng'));
+
+      final c = makeContainer();
+
+      await c
+          .read(diaryControllerProvider.notifier)
+          .updateEntryNoImage(savedEntry('e-1'));
+
+      final state = c.read(diaryControllerProvider);
+      expect(state.errorMessage, 'mất mạng');
+    });
+  });
+
+  group('loadEntry', () {
+    test('fetch entry + set currentEntry', () async {
+      when(() => repo.getEntry('e-1'))
+          .thenAnswer((_) async => savedEntry('e-1'));
+
+      final c = makeContainer();
+      await c.read(diaryControllerProvider.notifier).loadEntry('e-1');
+
+      verify(() => repo.getEntry('e-1')).called(1);
+      final state = c.read(diaryControllerProvider);
+      expect(state.currentEntry?.entryId, 'e-1');
+      expect(state.isLoading, isFalse);
+    });
+
+    test('entry null (not found) → currentEntry null, error set', () async {
+      when(() => repo.getEntry('missing')).thenAnswer((_) async => null);
+
+      final c = makeContainer();
+      await c.read(diaryControllerProvider.notifier).loadEntry('missing');
+
+      final state = c.read(diaryControllerProvider);
+      expect(state.currentEntry, isNull);
+      expect(state.errorMessage, 'Không tìm thấy nhật ký');
+      expect(state.isLoading, isFalse);
+    });
+
+    test('repo fail → errorMessage set', () async {
+      when(() => repo.getEntry('e-1'))
+          .thenThrow(const NetworkError(message: 'mất mạng'));
+
+      final c = makeContainer();
+      await c.read(diaryControllerProvider.notifier).loadEntry('e-1');
+
+      final state = c.read(diaryControllerProvider);
+      expect(state.errorMessage, 'mất mạng');
+      expect(state.currentEntry, isNull);
+    });
+  });
+
   group('deleteEntry', () {
     test('gọi repo.deleteEntry + clear currentEntry', () async {
       when(() => repo.deleteEntry('e-1')).thenAnswer((_) async {});

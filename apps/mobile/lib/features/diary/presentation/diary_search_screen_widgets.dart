@@ -2,20 +2,28 @@ part of 'diary_search_screen.dart';
 
 /// Result card — bg BW800 + image 54×53 + keyword highlight + date.
 class _ResultCard extends StatelessWidget {
-  const _ResultCard({required this.result, required this.query});
+  const _ResultCard({
+    required this.entry,
+    required this.query,
+    required this.onTap,
+  });
 
-  final _MockResult result;
+  final DiaryEntry entry;
   final String query;
+  final VoidCallback onTap;
+
+  String get _dateFull =>
+      '${entry.createdAt.day} tháng ${entry.createdAt.month} năm ${entry.createdAt.year}';
+
+  String get _moodAsset => 'assets/icons/bg_${entry.moodTemplate.name}.png';
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: '${result.title}, ${result.dateFull}',
+      label: '${entry.moodCaption}, $_dateFull',
       button: true,
       child: GestureDetector(
-        onTap: () {
-          // TODO(D/T5/HanDHG): navigate Canvas read mode với entryId
-        },
+        onTap: onTap,
         child: Container(
           height: 85,
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -31,10 +39,10 @@ class _ResultCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _HighlightedTitle(text: result.title, query: query),
+                    _HighlightedTitle(text: entry.moodCaption, query: query),
                     const SizedBox(height: 4),
                     Text(
-                      result.dateFull,
+                      _dateFull,
                       style: const TextStyle(
                         fontFamily: 'Nunito',
                         fontSize: 12,
@@ -51,7 +59,7 @@ class _ResultCard extends StatelessWidget {
               SizedBox(
                 width: 54,
                 height: 53,
-                child: Image.asset(result.moodAsset, fit: BoxFit.contain),
+                child: Image.asset(_moodAsset, fit: BoxFit.contain),
               ),
             ],
           ),

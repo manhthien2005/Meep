@@ -1,7 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:meep/core/theme/app_colors.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/diary/application/diary_controller.dart';
+import 'package:meep/features/diary/data/diary_content_block.dart';
 import 'package:meep/features/diary/data/diary_entry.dart';
+import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
 import 'package:meep/features/diary/presentation/widgets/diary_filter_sheet.dart';
 
 part 'diary_search_screen_widgets.dart';
@@ -14,24 +21,29 @@ part 'diary_search_screen_widgets.dart';
 /// Layout: search bar (BW700 bg) + filter icon → "N kết quả" label →
 /// list result cards (54×53 image circular + keyword highlight + date).
 /// Client-side filter (load all entries → filter in-memory).
-class DiarySearchScreen extends StatefulWidget {
+class DiarySearchScreen extends ConsumerStatefulWidget {
   const DiarySearchScreen({super.key});
 
   @override
-  State<DiarySearchScreen> createState() => _DiarySearchScreenState();
+  ConsumerState<DiarySearchScreen> createState() => _DiarySearchScreenState();
 }
 
-class _DiarySearchScreenState extends State<DiarySearchScreen> {
+class _DiarySearchScreenState extends ConsumerState<DiarySearchScreen> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
 
   /// Filter advanced — mood multi-select + date range. Default empty.
   DiaryFilterValue _filter = const DiaryFilterValue();
 
+  /// Debounce timer cho input — fire `controller.searchEntries` sau 300ms
+  /// kể từ lần gõ cuối (tránh spam Firestore read khi user gõ nhanh).
+  Timer? _debounce;
+  static const _debounceDuration = Duration(milliseconds: 300);
+
   @override
   void initState() {
     super.initState();
-    _controller.addListener(() => setState(() {}));
+    _controller.addListener(_onQueryChanged);
     // Autofocus + bật keyboard ngay khi mở.
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _focusNode.requestFocus(),
@@ -40,31 +52,56 @@ class _DiarySearchScreenState extends State<DiarySearchScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  /// Filter mock results theo query (case-insensitive) + advanced filter
-  /// (mood + date range).
-  List<_MockResult> get _results {
-    final query = _controller.text.trim().toLowerCase();
+  /// On input change — re-render (clear button hiện/ẩn) + debounce fire
+  /// `searchEntries(uid, query)`.
+  void _onQueryChanged() {
+    setState(() {}); // refresh clear button hiển thị
+    _debounce?.cancel();
+    _debounce = Timer(_debounceDuration, _fireSearch);
+  }
+
+  void _fireSearch() {
+    final uid = ref.read(currentUidProvider).valueOrNull;
+    if (uid == null) return;
+    final query = _controller.text.trim();
+    if (query.isEmpty) {
+      // Empty query → skip Firestore round-trip, reset searchResults local.
+      _resetSearchResults();
+      return;
+    }
+    ref
+        .read(diaryControllerProvider.notifier)
+        .searchEntries(authorUid: uid, query: query);
+  }
+
+  /// Clear searchResults trong state mà không qua repo. Dùng khi query empty.
+  void _resetSearchResults() {
+    final notifier = ref.read(diaryControllerProvider.notifier);
+    // Gọi searchEntries với uid không tồn tại sẽ tốn 1 read — tránh, set
+    // trực tiếp qua public method. Controller hiện chưa có setSearchResults
+    // nên dùng cách an toàn nhất: chỉ clear khi state đang có results.
+    if (ref.read(diaryControllerProvider).searchResults.isNotEmpty) {
+      notifier.clearSearchResults();
+    }
+  }
+
+  /// Post-filter Firestore results với mood + date range (advanced filter).
+  /// Query đã được Firestore filter ở repository (case-insensitive in-memory).
+  List<DiaryEntry> _applyAdvancedFilter(List<DiaryEntry> entries) {
     final from = _filter.from;
     final to = _filter.to;
-    return _mockResults.where((r) {
-      // Query: match title hoặc preview
-      if (query.isNotEmpty &&
-          !r.title.toLowerCase().contains(query) &&
-          !r.preview.toLowerCase().contains(query)) {
+    return entries.where((e) {
+      if (_filter.moods.isNotEmpty && !_filter.moods.contains(e.moodTemplate)) {
         return false;
       }
-      // Mood filter: nếu có chọn, result phải thuộc set
-      if (_filter.moods.isNotEmpty && !_filter.moods.contains(r.mood)) {
-        return false;
-      }
-      // Date range: from/to inclusive theo day-precision
-      if (from != null && r.date.isBefore(from)) return false;
-      if (to != null && r.date.isAfter(to)) return false;
+      if (from != null && e.createdAt.isBefore(from)) return false;
+      if (to != null && e.createdAt.isAfter(to)) return false;
       return true;
     }).toList();
   }
@@ -86,7 +123,8 @@ class _DiarySearchScreenState extends State<DiarySearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final results = _results;
+    final state = ref.watch(diaryControllerProvider);
+    final results = _applyAdvancedFilter(state.searchResults);
 
     return Scaffold(
       backgroundColor: AppColors.bw900, // #050F10
@@ -249,7 +287,7 @@ class _DiarySearchScreenState extends State<DiarySearchScreen> {
   }
 
   // ── Result cards list ──
-  Widget _buildResultsList(List<_MockResult> results) {
+  Widget _buildResultsList(List<DiaryEntry> results) {
     if (results.isEmpty) {
       return const Center(
         child: Text(
@@ -269,52 +307,39 @@ class _DiarySearchScreenState extends State<DiarySearchScreen> {
       itemCount: results.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (_, i) => _ResultCard(
-        result: results[i],
+        entry: results[i],
         query: _controller.text.trim(),
+        onTap: () => _openCanvasRead(results[i]),
+      ),
+    );
+  }
+
+  /// Open Canvas read mode với entry — controller sẽ loadEntry qua initState.
+  void _openCanvasRead(DiaryEntry entry) {
+    // Lấy text content từ block đầu tiên dạng text (placeholder cho T9b
+    // render đầy đủ block list).
+    final firstText = entry.content.firstWhere(
+      (b) => b.maybeWhen(text: (_, __) => true, orElse: () => false),
+      orElse: () => const DiaryContentBlock.text(value: ''),
+    );
+    final textValue = firstText.maybeWhen(
+      text: (value, _) => value,
+      orElse: () => '',
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DiaryCanvasScreen(
+          mode: DiaryCanvasMode.read,
+          entryId: entry.entryId,
+          moodTemplate: entry.moodTemplate,
+          initialCaption: entry.moodCaption,
+          initialContent: textValue,
+          initialImageUrl:
+              entry.coverImageUrl.isNotEmpty ? entry.coverImageUrl : null,
+          entryDate: entry.createdAt,
+        ),
       ),
     );
   }
 }
-
-// ── Mock data ──
-
-class _MockResult {
-  const _MockResult({
-    required this.title,
-    required this.preview,
-    required this.date,
-    required this.mood,
-  });
-
-  final String title;
-  final String preview;
-  final DateTime date;
-  final MoodTemplate mood;
-
-  /// "18 tháng 5 năm 2026" — derive từ date.
-  String get dateFull => '${date.day} tháng ${date.month} năm ${date.year}';
-
-  /// Asset path từ mood enum.
-  String get moodAsset => 'assets/icons/bg_${mood.name}.png';
-}
-
-final _mockResults = <_MockResult>[
-  _MockResult(
-    title: 'Đà lạt',
-    preview: 'Chuyến đi Đà Lạt cuối tuần đầy nắng',
-    date: DateTime(2026, 5, 18),
-    mood: MoodTemplate.happy,
-  ),
-  _MockResult(
-    title: 'Mệt mỏi quá',
-    preview: 'Hôm nay thật là một ngày dài',
-    date: DateTime(2026, 5, 20),
-    mood: MoodTemplate.tired,
-  ),
-  _MockResult(
-    title: 'Buồn vu vơ',
-    preview: 'Có những lúc chỉ muốn ở yên',
-    date: DateTime(2026, 5, 19),
-    mood: MoodTemplate.sad,
-  ),
-];

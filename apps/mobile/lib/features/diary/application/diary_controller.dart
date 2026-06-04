@@ -232,6 +232,45 @@ class DiaryController extends _$DiaryController {
     }
   }
 
+  /// Update entry fields KHÔNG đổi ảnh — dùng bởi `DiaryCanvasScreen` edit
+  /// mode khi user chỉ đổi text/caption/privacy. Tránh upload sequence
+  /// (caller path saveEntry yêu cầu coverBytes).
+  Future<void> updateEntryNoImage(DiaryEntry entry) async {
+    state = state.copyWith(isSaving: true, errorMessage: null);
+    try {
+      await ref.read(diaryRepositoryProvider).updateEntry(entry);
+      state = state.copyWith(
+        isSaving: false,
+        currentEntry: entry,
+      );
+    } catch (e) {
+      state = _afterFailure(e);
+    }
+  }
+
+  /// Fetch entry theo entryId → set vào [state.currentEntry].
+  /// Dùng bởi `DiaryCanvasScreen` read/edit mode khi push qua entryId.
+  Future<void> loadEntry(String entryId) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final entry = await ref.read(diaryRepositoryProvider).getEntry(entryId);
+      if (entry == null) {
+        state = state.copyWith(
+          isLoading: false,
+          currentEntry: null,
+          errorMessage: 'Không tìm thấy nhật ký',
+        );
+        return;
+      }
+      state = state.copyWith(
+        isLoading: false,
+        currentEntry: entry,
+      );
+    } catch (e) {
+      state = _afterFailure(e);
+    }
+  }
+
   /// Xoá entry + Storage assets (gọi repository.deleteEntry).
   Future<void> deleteEntry(String entryId) async {
     state = state.copyWith(isSaving: true, errorMessage: null);
@@ -249,6 +288,14 @@ class DiaryController extends _$DiaryController {
   void clearError() {
     if (state.errorMessage != null) {
       state = state.copyWith(errorMessage: null);
+    }
+  }
+
+  /// Reset `searchResults` về empty mà không qua repo. Dùng khi user xoá
+  /// query trong DiarySearchScreen — tránh Firestore round-trip thừa.
+  void clearSearchResults() {
+    if (state.searchResults.isNotEmpty) {
+      state = state.copyWith(searchResults: const []);
     }
   }
 
