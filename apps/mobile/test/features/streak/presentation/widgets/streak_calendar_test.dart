@@ -159,4 +159,48 @@ void main() {
     );
     expect(todayCells, findsOneWidget);
   });
+
+  testWidgets('today no-post + onTapToday → tap fires CTA callback',
+      (tester) async {
+    var ctaCalled = false;
+    await tester.pumpWidget(
+      host(
+        StreakCalendar(
+          viewingMonth: DateTime(2026, 5),
+          monthPosts: const [],
+          today: DateTime(2026, 5, 22),
+          onTapToday: () => ctaCalled = true,
+        ),
+      ),
+    );
+    final todayCell = find.byWidgetPredicate(
+      (w) => w is CalendarDayCell && w.isToday,
+    );
+    await tester.tap(todayCell);
+    expect(ctaCalled, isTrue);
+  });
+
+  testWidgets('today có post → tap mở photo detail (onTapDay), không CTA',
+      (tester) async {
+    var ctaCalled = false;
+    int? tappedIndex;
+    final posts = [makePost('p1', DateTime(2026, 5, 22, 14))];
+    await tester.pumpWidget(
+      host(
+        StreakCalendar(
+          viewingMonth: DateTime(2026, 5),
+          monthPosts: posts,
+          today: DateTime(2026, 5, 22),
+          onTapDay: (i) => tappedIndex = i,
+          onTapToday: () => ctaCalled = true,
+        ),
+      ),
+    );
+    final todayCell = find.byWidgetPredicate(
+      (w) => w is CalendarDayCell && w.isToday,
+    );
+    await tester.tap(todayCell);
+    expect(tappedIndex, 0);
+    expect(ctaCalled, isFalse);
+  });
 }

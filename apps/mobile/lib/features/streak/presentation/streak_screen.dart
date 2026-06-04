@@ -8,6 +8,7 @@ import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/streak/application/streak_controller.dart';
+import 'package:meep/features/settings/presentation/settings_sheet.dart';
 import 'package:meep/features/streak/presentation/widgets/empty_state_overlay.dart';
 import 'package:meep/features/streak/presentation/widgets/streak_calendar.dart';
 import 'package:meep/features/streak/presentation/widgets/streak_stats_pill.dart';
@@ -90,6 +91,7 @@ class _StreakScreenState extends ConsumerState<StreakScreen> {
                         monthPosts: state.monthPosts,
                         today: nowLocal,
                         onTapDay: (index) => _openPhotoDetail(context, index),
+                        onTapToday: () => context.go('/home'),
                         onSwipePrev: () => ref
                             .read(streakControllerProvider.notifier)
                             .swipePrev(),
@@ -230,7 +232,7 @@ class _TopAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final url = avatarUrl;
-    return Container(
+    final avatar = Container(
       width: 40,
       height: 40,
       decoration: const BoxDecoration(
@@ -246,6 +248,19 @@ class _TopAvatar extends StatelessWidget {
               placeholder: (_, __) => Container(color: _bgColor),
             )
           : _initialsFallback(),
+    );
+    return Semantics(
+      button: true,
+      label: 'Cài đặt',
+      child: GestureDetector(
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => const SettingsSheet(),
+        ),
+        child: avatar,
+      ),
     );
   }
 

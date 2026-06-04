@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 /// Pill stats bottom của StreakScreen — match Figma `269:1992`.
 ///
-/// Layout: " N Khoảnh khắc | Xd chuỗi"
+/// Layout: " N Meep | Xd chuỗi"
 /// - Số (N / Xd): WHITE Nunito Bold 12
-/// - Chữ (Khoảnh khắc / chuỗi): WHITE 48% alpha Nunito Bold 12
+/// - Chữ (Meep / chuỗi): WHITE 48% alpha Nunito Bold 12
 /// - Separator "|": Inter SemiBold 10 WHITE 48% alpha
 /// - Container: bg `#5857546e`, cornerRadius 12, padding 8/11
 class StreakStatsPill extends StatelessWidget {
@@ -46,7 +46,7 @@ class StreakStatsPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: '$totalMoments khoảnh khắc, chuỗi $currentStreak ngày',
+      label: '$totalMoments Meep, chuỗi $currentStreak ngày',
       child: Container(
         decoration: BoxDecoration(
           color: _bgFill,
@@ -58,7 +58,7 @@ class StreakStatsPill extends StatelessWidget {
             style: _numberStyle,
             children: [
               TextSpan(text: ' $totalMoments'),
-              const TextSpan(text: ' Khoảnh khắc ', style: _labelStyle),
+              const TextSpan(text: ' Meep ', style: _labelStyle),
               const TextSpan(text: '|', style: _sepStyle),
               TextSpan(text: ' ${currentStreak}d'),
               const TextSpan(text: ' chuỗi ', style: _labelStyle),

@@ -20,6 +20,7 @@ class StreakCalendar extends StatelessWidget {
     required this.monthPosts,
     required this.today,
     this.onTapDay,
+    this.onTapToday,
     this.onSwipePrev,
     this.onSwipeNext,
   });
@@ -37,6 +38,11 @@ class StreakCalendar extends StatelessWidget {
   /// Tap handler khi user tap ô có post. Receives index trong [monthPosts]
   /// (sort theo createdAt ASC). Null = no-op.
   final ValueChanged<int>? onTapDay;
+
+  /// Tap handler cho ô today khi hôm nay chưa post (CTA turquoise + dấu cộng).
+  /// Caller thường điều hướng về `/home` để mở camera. Null = ô today CTA
+  /// không tappable.
+  final VoidCallback? onTapToday;
 
   final VoidCallback? onSwipePrev;
   final VoidCallback? onSwipeNext;
@@ -108,6 +114,7 @@ class StreakCalendar extends StatelessWidget {
                 return monthPosts[i].coverImageUrl;
               },
               onTapDay: onTapDay,
+              onTapToday: onTapToday,
             ),
           ],
         ),
@@ -158,6 +165,7 @@ class _Grid extends StatelessWidget {
     required this.dayToPostIndex,
     required this.postsForDay,
     required this.onTapDay,
+    required this.onTapToday,
   });
 
   final int leadingEmpty;
@@ -166,6 +174,7 @@ class _Grid extends StatelessWidget {
   final Map<int, int> dayToPostIndex;
   final String? Function(int day) postsForDay;
   final ValueChanged<int>? onTapDay;
+  final VoidCallback? onTapToday;
 
   @override
   Widget build(BuildContext context) {
@@ -179,13 +188,19 @@ class _Grid extends StatelessWidget {
         final isInMonth = dayNumber >= 1 && dayNumber <= daysInMonth;
         final url = isInMonth ? postsForDay(dayNumber) : null;
         final postIndex = isInMonth ? dayToPostIndex[dayNumber] : null;
+        final isTodayCell = isInMonth && todayDay == dayNumber;
+        // Priority: post → today CTA → no-op. Today cell có post vẫn mở
+        // PhotoDetailScreen (postIndex non-null), chỉ today no-post mới CTA.
+        final VoidCallback? tapHandler = postIndex != null
+            ? () => onTapDay?.call(postIndex)
+            : (isTodayCell ? onTapToday : null);
 
         row.add(
           CalendarDayCell(
             isInMonth: isInMonth,
-            isToday: isInMonth && todayDay == dayNumber,
+            isToday: isTodayCell,
             imageUrl: url,
-            onTap: postIndex != null ? () => onTapDay?.call(postIndex) : null,
+            onTap: tapHandler,
           ),
         );
         if (j < StreakCalendar._columns - 1) {
