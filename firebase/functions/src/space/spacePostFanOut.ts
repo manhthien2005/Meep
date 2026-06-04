@@ -1,6 +1,6 @@
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { getMessaging } from 'firebase-admin/messaging';
 import { logger } from 'firebase-functions/v2';
+import { sendFcmToUser } from '../notification/_fcm.js';
 
 interface SpacePost {
   postId: string;
@@ -109,6 +109,12 @@ export async function spacePostFanOut(post: SpacePost): Promise<void> {
   );
 }
 
+/**
+ * Cùng lý do với feed/onPostCreated._sendFcmToRecipients: trước đây hàm này
+ * tự đọc `/users/{uid}/private/fcm` trong khi mobile save token vào
+ * `/users/{uid}/fcmTokens`. Đẩy hết FCM dispatch về `sendFcmToUser` để 1
+ * helper duy nhất giữ ownership chuyện token lookup + prune.
+ */
 async function sendFcmToSpaceMembers(
   db: FirebaseFirestore.Firestore,
   recipientUids: string[],
@@ -118,38 +124,19 @@ async function sendFcmToSpaceMembers(
   spaceId: string,
   spaceName: string,
 ): Promise<void> {
-  const tokenDocs = await Promise.all(
-    recipientUids.map((uid) =>
-      db.collection(`users/${uid}/private`).doc('fcm').get(),
-    ),
+  if (recipientUids.length === 0) return;
+  const payload = {
+    title: `${authorName} → ${spaceName}`,
+    body: 'Vừa chia sẻ ảnh mới trong Space',
+    data: {
+      type: 'new_space_post',
+      postId,
+      authorId,
+      spaceId,
+    },
+    channelId: 'posts',
+  };
+  await Promise.all(
+    recipientUids.map((uid) => sendFcmToUser(db, uid, payload)),
   );
-
-  const tokens: string[] = [];
-  for (const doc of tokenDocs) {
-    if (!doc.exists) continue;
-    const t: unknown = doc.data()?.token;
-    if (typeof t === 'string' && t.length > 0) tokens.push(t);
-  }
-  if (tokens.length === 0) return;
-
-  try {
-    await getMessaging().sendEachForMulticast({
-      tokens,
-      notification: {
-        title: `${authorName} → ${spaceName}`,
-        body: 'Vừa chia sẻ ảnh mới trong Space',
-      },
-      data: {
-        type: 'new_space_post',
-        postId,
-        authorId,
-        spaceId,
-      },
-      android: {
-        notification: { channelId: 'posts' },
-      },
-    });
-  } catch (e) {
-    logger.error('spacePostFanOut FCM failed', e);
-  }
 }
