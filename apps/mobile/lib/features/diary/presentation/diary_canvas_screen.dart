@@ -250,7 +250,10 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
       if (hasNewImages) {
         final draft = existingEntry.copyWith(
           moodCaption: caption,
-          content: _buildContentBlocks(contentText),
+          content: _buildContentBlocks(
+            contentText,
+            existingEntry: existingEntry,
+          ),
           privacy: _privacy,
           updatedAt: DateTime.now(),
         );
@@ -265,7 +268,10 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
       } else {
         final updated = existingEntry.copyWith(
           moodCaption: caption,
-          content: _buildContentBlocks(contentText),
+          content: _buildContentBlocks(
+            contentText,
+            existingEntry: existingEntry,
+          ),
           privacy: _privacy,
           updatedAt: DateTime.now(),
         );
@@ -309,14 +315,38 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
       return;
     }
 
+    // Clear inline bytes sau success — tránh re-upload nếu user back gesture
+    // cancel pop rồi tap check lại (duplicate upload + content blocks).
+    _inlineImageBytes.clear();
     unawaited(Navigator.of(context).maybePop());
   }
 
-  /// Build content blocks: text block + ImageBlock cho mỗi inline ảnh đã pick.
-  List<DiaryContentBlock> _buildContentBlocks(String text) {
+  /// Build content blocks: text block + ImageBlock cho mỗi inline ảnh.
+  ///
+  /// Edit mode: preserve existing ImageBlocks từ `existingEntry.content`
+  /// (URL đã có trên Firestore), append placeholder cho ảnh mới pick.
+  /// Create mode: chỉ text + placeholder ảnh mới.
+  ///
+  /// Lý do tách: `_syncFromEntry` chỉ load text + caption, image blocks
+  /// không đẩy vào controllers — nếu rebuild blocks chỉ từ text, image
+  /// cũ sẽ bị mất khi save edit.
+  List<DiaryContentBlock> _buildContentBlocks(
+    String text, {
+    DiaryEntry? existingEntry,
+  }) {
     final blocks = <DiaryContentBlock>[
       DiaryContentBlock.text(value: text),
     ];
+    // Preserve existing image blocks (edit mode).
+    if (existingEntry != null) {
+      for (final b in existingEntry.content) {
+        b.maybeWhen(
+          image: (url) => blocks.add(DiaryContentBlock.image(imageUrl: url)),
+          orElse: () {},
+        );
+      }
+    }
+    // Append placeholder cho ảnh mới pick.
     for (var i = 0; i < _inlineImageBytes.length; i++) {
       blocks.add(DiaryContentBlock.image(imageUrl: 'placeholder:$i'));
     }
@@ -324,8 +354,18 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
   }
 
   /// Open gallery → pick + compress → lưu bytes vào `_inlineImageBytes`.
+  /// Max 5 ảnh tổng (existing entry image blocks + new picks) — tránh vượt
+  /// Firestore rule cap (content.size() ≤ 20 mixed blocks, 5 images per spec).
   Future<void> _pickInlineImage() async {
-    if (_inlineImageBytes.length >= 5) {
+    final existing = ref
+            .read(diaryControllerProvider)
+            .currentEntry
+            ?.content
+            .where((b) => b.maybeWhen(image: (_) => true, orElse: () => false))
+            .length ??
+        0;
+    final total = existing + _inlineImageBytes.length;
+    if (total >= 5) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Tối đa 5 ảnh inline')),
       );

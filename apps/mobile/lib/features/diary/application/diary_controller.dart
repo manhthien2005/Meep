@@ -148,9 +148,9 @@ class DiaryController extends _$DiaryController {
 
       // Bước 3 — build entry với URLs thật + Firestore write.
       //
-      // Inline image URL mapping: controller replace ImageBlock placeholder
-      // theo thứ tự — block ảnh thứ N nhận `inlineUrls[N-1]`. PR4 wire UI
-      // sẽ define convention rõ ràng cho UI gọi.
+      // Inline image URL mapping: chỉ replace ImageBlock có sentinel
+      // `placeholder:` (UI mới pick). ImageBlock với URL Firestore cũ giữ
+      // nguyên — tránh edit mode ghi đè URL hợp lệ bằng URL mới (mất ảnh).
       var inlineIdx = 0;
       final contentBlocks = draft.content.map((b) {
         return b.when(
@@ -158,10 +158,14 @@ class DiaryController extends _$DiaryController {
             value: value,
             style: style,
           ),
-          image: (_) {
-            final url =
-                inlineIdx < inlineUrls.length ? inlineUrls[inlineIdx++] : '';
-            return DiaryContentBlock.image(imageUrl: url);
+          image: (existingUrl) {
+            if (existingUrl.startsWith('placeholder:')) {
+              final url =
+                  inlineIdx < inlineUrls.length ? inlineUrls[inlineIdx++] : '';
+              return DiaryContentBlock.image(imageUrl: url);
+            }
+            // URL Firestore cũ — giữ nguyên.
+            return DiaryContentBlock.image(imageUrl: existingUrl);
           },
         );
       }).toList();

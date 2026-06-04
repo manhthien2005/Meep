@@ -273,6 +273,58 @@ void main() {
     });
   });
 
+  group('saveEntry — preserve existing image URLs (edit)', () {
+    test(
+      'image block với URL Firestore cũ KHÔNG bị ghi đè bởi inlineUrls',
+      () async {
+        storage.urls = ['https://cdn/new_img.jpg'];
+        when(() => repo.updateEntry(any())).thenAnswer((_) async {});
+
+        final c = makeContainer();
+        c.read(diaryControllerProvider.notifier).setMode(DiaryCanvasMode.edit);
+
+        // Draft: 1 text + 1 image cũ (URL) + 1 placeholder (ảnh mới pick).
+        await c.read(diaryControllerProvider.notifier).saveEntry(
+          draft: draftEntry(
+            entryId: 'e-existing',
+            content: const [
+              DiaryContentBlock.text(value: 'Nội dung'),
+              DiaryContentBlock.image(imageUrl: 'https://cdn/old_img.jpg'),
+              DiaryContentBlock.image(imageUrl: 'placeholder:0'),
+            ],
+          ),
+          inlineImageBytes: [Uint8List(50)],
+        );
+
+        // Verify chỉ 1 upload (cho placeholder), không upload cho URL cũ.
+        expect(storage.uploadCount, 1);
+
+        // Verify updateEntry nhận đúng content: URL cũ giữ + placeholder
+        // thay bằng URL mới.
+        final captured = verify(() => repo.updateEntry(captureAny()))
+            .captured
+            .single as DiaryEntry;
+        expect(captured.content.length, 3);
+        expect(
+          captured.content[1].maybeWhen(
+            image: (url) => url,
+            orElse: () => '',
+          ),
+          'https://cdn/old_img.jpg',
+          reason: 'URL cũ giữ nguyên',
+        );
+        expect(
+          captured.content[2].maybeWhen(
+            image: (url) => url,
+            orElse: () => '',
+          ),
+          'https://cdn/new_img.jpg',
+          reason: 'placeholder được thay bằng URL mới upload',
+        );
+      },
+    );
+  });
+
   group('saveEntry — edit mode', () {
     test('mode=edit → gọi updateEntry, KHÔNG gọi createEntry', () async {
       storage.urls = ['https://cdn/cover.jpg'];
