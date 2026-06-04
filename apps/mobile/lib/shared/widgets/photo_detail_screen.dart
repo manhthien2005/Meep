@@ -4,14 +4,18 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/feed/data/post.dart';
-import 'package:meep/features/profile/presentation/widgets/share_photo_sheet.dart';
+import 'package:meep/shared/widgets/share_photo_sheet.dart';
 
 /// Full-screen photo viewer with PageView swipe + thumbnail strip.
 ///
-/// Per spec (docs/specs/2026-05-22-profile.md §Photo detail):
+/// Shared widget — reused bởi:
+/// - Profile module: docs/specs/2026-05-22-profile.md §Photo detail
+/// - Streak module: docs/specs/2026-05-22-streak.md §Streak_2
+///
+/// Behavior:
 /// - Swipe trái = ảnh cũ hơn (createdAt nhỏ hơn); swipe phải = ảnh mới hơn
-/// - Caption: pill trắng OVERLAY trên ảnh (chỉ khi non-null)
-/// - Time: hiển thị riêng dưới ảnh ("17:03")
+/// - Caption: pill OVERLAY trên ảnh (chỉ khi non-null), bg [captionPillColor]
+/// - Time: hiển thị riêng dưới ảnh ("17:03"), color [timeColor]
 /// - Date format Vietnamese ("Ngày 1 tháng 5")
 class PhotoDetailScreen extends StatefulWidget {
   const PhotoDetailScreen({
@@ -19,14 +23,29 @@ class PhotoDetailScreen extends StatefulWidget {
     required this.postId,
     this.initialIndex = 0,
     this.posts,
+    this.captionPillColor = const Color(0x80000000),
+    this.timeColor = AppColors.bw100,
+    this.onShareTap,
   });
 
   final String postId;
   final int initialIndex;
 
   /// Posts list (already sorted createdAt DESC). Null = empty list → navigate
-  /// back immediately. Caller (ProfileScreen) phải pass danh sách thật.
+  /// back immediately. Caller phải pass danh sách thật.
   final List<Post>? posts;
+
+  /// Caption pill background color.
+  /// Default: black 50% (Profile spec). Streak override: `Color(0x66394041)`.
+  final Color captionPillColor;
+
+  /// Time tag text color.
+  /// Default: BW100 (Profile spec). Streak override: `AppColors.bw600`.
+  final Color timeColor;
+
+  /// Share button tap handler. Default: open [SharePhotoSheet] với
+  /// `isAuthor: true`. Pass override để customize behavior per caller.
+  final ValueChanged<Post>? onShareTap;
 
   @override
   State<PhotoDetailScreen> createState() => _PhotoDetailScreenState();
@@ -82,6 +101,17 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
     );
   }
 
+  void _handleShare(Post post) {
+    final handler = widget.onShareTap;
+    if (handler != null) {
+      handler(post);
+      return;
+    }
+    // Default: open SharePhotoSheet với isAuthor=true (Profile behavior:
+    // chỉ user xem ảnh của mình mới mở Photo detail).
+    SharePhotoSheet.show(context, post: post, isAuthor: true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final posts = widget.posts ?? const <Post>[];
@@ -106,7 +136,7 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
               year: currentPost.createdAt.year.toString(),
               date: _formatDateVi(currentPost.createdAt),
               onClose: () => Navigator.of(context).pop(),
-              onShare: () => SharePhotoSheet.show(context),
+              onShare: () => _handleShare(currentPost),
             ),
             const Spacer(),
             Stack(
@@ -123,13 +153,19 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                     left: 0,
                     right: 0,
                     child: Center(
-                      child: _NotePill(text: currentPost.caption!),
+                      child: _NotePill(
+                        text: currentPost.caption!,
+                        backgroundColor: widget.captionPillColor,
+                      ),
                     ),
                   ),
               ],
             ),
             const SizedBox(height: 8),
-            _TimeTag(time: _formatTime(currentPost.createdAt)),
+            _TimeTag(
+              time: _formatTime(currentPost.createdAt),
+              color: widget.timeColor,
+            ),
             const Spacer(),
             _ThumbnailStrip(
               posts: posts,
@@ -319,16 +355,20 @@ class _PhotoCarousel extends StatelessWidget {
 // ─── Note pill ────────────────────────────────────────────────────────────────
 
 class _NotePill extends StatelessWidget {
-  const _NotePill({required this.text});
+  const _NotePill({
+    required this.text,
+    required this.backgroundColor,
+  });
 
   final String text;
+  final Color backgroundColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0x80000000),
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(30),
       ),
       child: Row(
@@ -355,15 +395,16 @@ class _NotePill extends StatelessWidget {
 // ─── Time tag ─────────────────────────────────────────────────────────────────
 
 class _TimeTag extends StatelessWidget {
-  const _TimeTag({required this.time});
+  const _TimeTag({required this.time, required this.color});
 
   final String time;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Text(
       time,
-      style: AppTextStyles.lgBold.copyWith(color: AppColors.bw100),
+      style: AppTextStyles.lgBold.copyWith(color: color),
     );
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meep/features/feed/data/post.dart';
-import 'package:meep/features/profile/presentation/photo_detail_screen.dart';
+import 'package:meep/shared/widgets/photo_detail_screen.dart';
 
 void main() {
   Post post({

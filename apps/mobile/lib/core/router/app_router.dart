@@ -30,8 +30,8 @@ import 'package:meep/features/feed/presentation/home_screen.dart';
 import 'package:meep/features/home/presentation/home_page.dart';
 import 'package:meep/features/profile/presentation/edit_profile_screen.dart';
 import 'package:meep/features/profile/presentation/friend_profile_screen.dart';
-import 'package:meep/features/profile/presentation/photo_detail_screen.dart';
 import 'package:meep/features/profile/presentation/profile_screen.dart';
+import 'package:meep/shared/widgets/photo_detail_screen.dart';
 import 'package:meep/features/space/presentation/space_create_sheet.dart';
 import 'package:meep/features/streak/presentation/streak_screen.dart';
 
