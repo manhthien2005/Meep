@@ -81,6 +81,10 @@ export { onFriendRequestCreated } from './notification/onFriendRequestCreated.js
 export { onFriendRequestAccepted } from './notification/onFriendRequestAccepted.js';
 export { onReactionCreated } from './notification/onReactionCreated.js';
 
+// ===== Chat module =====
+
+export { onMessageCreated } from './chat/onMessageCreated.js';
+
 // ===== Space module =====
 
 export { createSpace } from './space/createSpace.js';

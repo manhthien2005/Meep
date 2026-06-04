@@ -1,7 +1,6 @@
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { getMessaging } from 'firebase-admin/messaging';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
-import { logger } from 'firebase-functions/v2';
+import { sendFcmToUser } from '../notification/_fcm.js';
 import { spacePostFanOut } from '../space/spacePostFanOut.js';
 
 interface PostData {
@@ -125,6 +124,14 @@ async function _getFriendUids(
   });
 }
 
+/**
+ * Delegate per-recipient FCM dispatch sang `sendFcmToUser`, vốn đọc token từ
+ * `/users/{uid}/fcmTokens` — đúng path mobile save vào
+ * (firebase_notification_repository.dart:saveFcmToken). Trước đây hàm này tự
+ * đọc `/users/{uid}/private/fcm` → token luôn rỗng → post notification không
+ * bao giờ tới friend. Để 1 helper duy nhất quản lý token lookup + prune token
+ * chết, tránh path bị lệch khi mobile đổi format trong tương lai.
+ */
 async function _sendFcmToRecipients(
   db: FirebaseFirestore.Firestore,
   recipientUids: string[],
@@ -132,38 +139,18 @@ async function _sendFcmToRecipients(
   authorName: string,
   postId: string,
 ): Promise<void> {
-  // Batch load FCM tokens
-  const tokenPromises = recipientUids.map((uid) =>
-    db.collection(`users/${uid}/private`).doc('fcm').get(),
+  if (recipientUids.length === 0) return;
+  const payload = {
+    title: authorName,
+    body: 'Vừa đăng một ảnh mới',
+    data: {
+      type: 'new_post',
+      postId,
+      authorId,
+    },
+    channelId: 'posts',
+  };
+  await Promise.all(
+    recipientUids.map((uid) => sendFcmToUser(db, uid, payload)),
   );
-  const tokenDocs = await Promise.all(tokenPromises);
-
-  const tokens: string[] = [];
-  for (const doc of tokenDocs) {
-    if (!doc.exists) continue;
-    const t = doc.data()?.token as string | undefined;
-    if (t != null && t !== '') tokens.push(t);
-  }
-
-  if (tokens.length === 0) return;
-
-  try {
-    await getMessaging().sendEachForMulticast({
-      tokens,
-      notification: {
-        title: authorName,
-        body: 'Vừa đăng một ảnh mới',
-      },
-      data: {
-        type: 'new_post',
-        postId,
-        authorId,
-      },
-      android: {
-        notification: { channelId: 'posts' },
-      },
-    });
-  } catch (e) {
-    logger.error('FCM multicast failed', e);
-  }
 }
