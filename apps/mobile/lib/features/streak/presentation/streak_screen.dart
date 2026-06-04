@@ -1,14 +1,17 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/streak/application/streak_controller.dart';
 import 'package:meep/features/streak/presentation/widgets/empty_state_overlay.dart';
 import 'package:meep/features/streak/presentation/widgets/streak_calendar.dart';
 import 'package:meep/features/streak/presentation/widgets/streak_stats_pill.dart';
+import 'package:meep/shared/widgets/app_taskbar.dart';
 import 'package:meep/shared/widgets/photo_detail_screen.dart';
 import 'package:meep/shared/widgets/share_photo_sheet.dart';
 
@@ -49,6 +52,9 @@ class _StreakScreenState extends ConsumerState<StreakScreen> {
         profileAsync.valueOrNull?.postCount ?? state.allPostDates.length;
     final displayName = profileAsync.valueOrNull?.displayName ?? '';
     final avatarUrl = profileAsync.valueOrNull?.avatarUrl;
+    final unreadCounts = ref.watch(unreadCountsProvider);
+    final totalUnread =
+        unreadCounts.values.fold<int>(0, (sum, val) => sum + val);
 
     final hasNoPosts = state.allPostDates.isEmpty;
     final viewingMonth = state.viewingMonth ?? _startOfThisMonth();
@@ -56,53 +62,92 @@ class _StreakScreenState extends ConsumerState<StreakScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0D0804),
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const NeverScrollableScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: MediaQuery.of(context).size.height -
-                  MediaQuery.of(context).padding.vertical,
-            ),
-            child: Column(
-              children: [
-                _Topbar(displayName: displayName, avatarUrl: avatarUrl),
-                if (state.errorMessage != null)
-                  _ErrorBanner(message: state.errorMessage!),
-                if (hasNoPosts) ...[
-                  const SizedBox(height: 36),
-                  const EmptyStateOverlay(),
-                ] else
-                  const SizedBox(height: 90),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 41),
-                  child: StreakCalendar(
-                    viewingMonth: viewingMonth,
-                    monthPosts: state.monthPosts,
-                    today: DateTime.now(),
-                    onTapDay: (index) => _openPhotoDetail(context, index),
-                    onSwipePrev: () =>
-                        ref.read(streakControllerProvider.notifier).swipePrev(),
-                    onSwipeNext: () =>
-                        ref.read(streakControllerProvider.notifier).swipeNext(),
-                  ),
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).padding.vertical,
                 ),
-                if (hasNoPosts) ...[
-                  const SizedBox(height: 16),
-                  const StreakArrowDown(),
-                  const SizedBox(height: 16),
-                ] else
-                  const SizedBox(height: 28),
-                StreakStatsPill(
-                  totalMoments: totalMoments,
-                  currentStreak: state.currentStreak,
+                child: Column(
+                  children: [
+                    _Topbar(displayName: displayName, avatarUrl: avatarUrl),
+                    if (state.errorMessage != null)
+                      _ErrorBanner(message: state.errorMessage!),
+                    if (hasNoPosts) ...[
+                      const SizedBox(height: 36),
+                      const EmptyStateOverlay(),
+                    ] else
+                      const SizedBox(height: 90),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 41),
+                      child: StreakCalendar(
+                        viewingMonth: viewingMonth,
+                        monthPosts: state.monthPosts,
+                        today: DateTime.now(),
+                        onTapDay: (index) => _openPhotoDetail(context, index),
+                        onSwipePrev: () => ref
+                            .read(streakControllerProvider.notifier)
+                            .swipePrev(),
+                        onSwipeNext: () => ref
+                            .read(streakControllerProvider.notifier)
+                            .swipeNext(),
+                      ),
+                    ),
+                    if (hasNoPosts) ...[
+                      const SizedBox(height: 16),
+                      const StreakArrowDown(),
+                      const SizedBox(height: 16),
+                    ] else
+                      const SizedBox(height: 28),
+                    StreakStatsPill(
+                      totalMoments: totalMoments,
+                      currentStreak: state.currentStreak,
+                    ),
+                    // Spacer cuối để Taskbar floating không đè lên pill
+                    const SizedBox(height: 100),
+                  ],
                 ),
-                const SizedBox(height: 40),
-              ],
+              ),
             ),
-          ),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).size.height * 0.045,
+                ),
+                child: AppTaskbar(
+                  activeTab: TaskbarTab.streak,
+                  chatBadgeCount: totalUnread,
+                  onTabSelected: _onTabSelected,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  void _onTabSelected(TaskbarTab tab) {
+    switch (tab) {
+      case TaskbarTab.streak:
+        // Đã ở Streak → no-op
+        break;
+      case TaskbarTab.diary:
+        context.go('/diary');
+      case TaskbarTab.home:
+        context.go('/home');
+      case TaskbarTab.chat:
+        context.go('/inbox');
+      case TaskbarTab.profile:
+        final uid = ref.read(currentUidProvider).valueOrNull;
+        if (uid != null) {
+          context.go('/profile', extra: uid);
+        }
+    }
   }
 
   void _openPhotoDetail(BuildContext context, int initialIndex) {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/feed/data/post.dart';
@@ -12,6 +13,7 @@ import 'package:meep/features/streak/presentation/streak_screen.dart';
 import 'package:meep/features/streak/presentation/widgets/empty_state_overlay.dart';
 import 'package:meep/features/streak/presentation/widgets/streak_calendar.dart';
 import 'package:meep/features/streak/presentation/widgets/streak_stats_pill.dart';
+import 'package:meep/shared/widgets/app_taskbar.dart';
 
 class FakeStreakRepo implements StreakRepository {
   FakeStreakRepo({this.allDates = const [], this.monthPostsMap = const {}});
@@ -168,5 +170,94 @@ void main() {
 
     final pill = tester.widget<StreakStatsPill>(find.byType(StreakStatsPill));
     expect(pill.totalMoments, 2);
+  });
+
+  // ── E2E: Taskbar wired ──────────────────────────────────────────────────
+
+  testWidgets('Taskbar visible với active tab = streak', (tester) async {
+    await tester.pumpWidget(
+      host(repo: FakeStreakRepo(), profile: fakeProfile()),
+    );
+    await pumpUntilSettled(tester);
+
+    final taskbar = tester.widget<AppTaskbar>(find.byType(AppTaskbar));
+    expect(taskbar.activeTab, TaskbarTab.streak);
+  });
+
+  // Navigate từ Taskbar trong GoRouter — verify onTabSelected dispatch.
+  // Chỉ test navigation logic, không test render màn destination (dest cần
+  // providers module khác → out-of-scope).
+  testWidgets('tap Taskbar home tab → navigate /home (không còn ở Streak)',
+      (tester) async {
+    final router = GoRouter(
+      initialLocation: '/streak',
+      routes: [
+        GoRoute(path: '/streak', builder: (_, __) => const StreakScreen()),
+        GoRoute(
+          path: '/home',
+          builder: (_, __) => const Scaffold(body: Text('HOME_MARKER')),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          streakRepositoryProvider.overrideWithValue(FakeStreakRepo()),
+          currentUidProvider.overrideWith((ref) async* {
+            yield 'uid-alice';
+          }),
+          currentUserProfileProvider.overrideWith((ref) async* {
+            yield fakeProfile();
+          }),
+          nowProvider.overrideWithValue(
+            () => DateTime(2026, 5, 22),
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await pumpUntilSettled(tester);
+
+    await tester.tap(find.bySemanticsLabel('Trang chủ'));
+    await pumpUntilSettled(tester);
+
+    expect(find.text('HOME_MARKER'), findsOneWidget);
+  });
+
+  testWidgets(
+      'tap Taskbar streak tab khi đang ở /streak → no-op (vẫn ở Streak)',
+      (tester) async {
+    final router = GoRouter(
+      initialLocation: '/streak',
+      routes: [
+        GoRoute(path: '/streak', builder: (_, __) => const StreakScreen()),
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          streakRepositoryProvider.overrideWithValue(FakeStreakRepo()),
+          currentUidProvider.overrideWith((ref) async* {
+            yield 'uid-alice';
+          }),
+          currentUserProfileProvider.overrideWith((ref) async* {
+            yield fakeProfile();
+          }),
+          nowProvider.overrideWithValue(
+            () => DateTime(2026, 5, 22),
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await pumpUntilSettled(tester);
+
+    // Tap streak tab (Semantics label "Kỷ niệm" trên Taskbar)
+    // .last vì topbar title cũng có text "Kỷ niệm"
+    await tester.tap(find.bySemanticsLabel('Kỷ niệm').last);
+    await pumpUntilSettled(tester);
+
+    // Vẫn ở StreakScreen
+    expect(find.byType(StreakScreen), findsOneWidget);
   });
 }
