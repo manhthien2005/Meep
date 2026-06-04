@@ -235,6 +235,11 @@ class _MeepAppState extends ConsumerState<MeepApp> with WidgetsBindingObserver {
               left: (MediaQuery.of(context).size.width - 364) / 2,
               child: NotificationBanner(
                 payload: payload,
+                onTap: () {
+                  ref
+                      .read(notificationControllerProvider.notifier)
+                      .openBannerAsTap();
+                },
                 onSuppress: () {
                   ref
                       .read(notificationControllerProvider.notifier)

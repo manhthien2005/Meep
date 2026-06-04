@@ -122,6 +122,22 @@ void main() {
     });
   });
 
+  group('openBannerAsTap', () {
+    test('is a no-op when no banner is showing', () {
+      // Happy path (có banner → emit lastOpenedApp) test gián tiếp qua
+      // notification_banner_test (tap banner → onTap fires); set
+      // `currentBanner` từ test cần mock FirebaseMessaging.onMessage stream
+      // — bỏ qua đến khi có refactor cho phép inject banner trực tiếp.
+      final controller =
+          container.read(notificationControllerProvider.notifier);
+      controller.openBannerAsTap();
+
+      final state = container.read(notificationControllerProvider);
+      expect(state.currentBanner, isNull);
+      expect(state.lastOpenedApp, isNull);
+    });
+  });
+
   group('handleOpenedApp', () {
     // RemoteMessage constructor accepts arbitrary data and an explicit
     // messageId, so the tap path is testable without mocking the FCM
