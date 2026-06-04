@@ -43,7 +43,10 @@ class StreakController extends _$StreakController {
   /// Gọi từ `StreakScreen.initState` hoặc `ref.read(...notifier).init()` khi
   /// user mở Streak tab lần đầu.
   Future<void> init() async {
-    final uid = ref.read(currentUidProvider).valueOrNull;
+    // Use `.future` thay vì `.valueOrNull` để chờ Stream emit lần đầu.
+    // valueOrNull return null nếu provider chưa subscribe → race condition
+    // khi controller init trước UI watch currentUidProvider.
+    final uid = await ref.read(currentUidProvider.future);
     if (uid == null) {
       state = state.copyWith(
         errorMessage: 'Bạn cần đăng nhập để xem Kỷ niệm',
@@ -78,7 +81,7 @@ class StreakController extends _$StreakController {
   Future<void> swipePrev() async {
     final current = state.viewingMonth;
     if (current == null) return; // chưa init
-    final uid = ref.read(currentUidProvider).valueOrNull;
+    final uid = await ref.read(currentUidProvider.future);
     if (uid == null) return;
 
     final prevMonth = DateTime(current.year, current.month - 1);
@@ -95,7 +98,7 @@ class StreakController extends _$StreakController {
   Future<void> swipeNext() async {
     final current = state.viewingMonth;
     if (current == null) return;
-    final uid = ref.read(currentUidProvider).valueOrNull;
+    final uid = await ref.read(currentUidProvider.future);
     if (uid == null) return;
 
     final nowLocal = ref.read(nowProvider)();
