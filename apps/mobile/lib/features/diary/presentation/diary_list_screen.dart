@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -11,6 +13,8 @@ import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
 import 'package:meep/features/diary/presentation/diary_search_screen.dart';
 import 'package:meep/features/diary/presentation/widgets/diary_list_card.dart';
 import 'package:meep/features/diary/presentation/widgets/diary_mood_card.dart';
+import 'package:meep/features/settings/presentation/settings_sheet.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 
 part 'diary_list_screen_mood_picker.dart';
@@ -45,6 +49,11 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   /// nhiều lần (vd auth state stream replay).
   String? _loadedForUid;
 
+  /// Track thời điểm `loadEntries` được gọi — nếu loading kéo dài > 5s
+  /// (vd indexes chưa deploy → Firestore reject silent), hiển thị retry
+  /// button thay vì spinner vĩnh cửu.
+  DateTime? _loadingStartAt;
+
   @override
   void initState() {
     super.initState();
@@ -57,10 +66,19 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
         final uid = next.valueOrNull;
         if (uid == null || _loadedForUid == uid) return;
         _loadedForUid = uid;
+        _loadingStartAt = DateTime.now();
         ref.read(diaryControllerProvider.notifier).loadEntries(uid);
       },
       fireImmediately: true,
     );
+  }
+
+  void _retryLoad() {
+    final uid = ref.read(currentUidProvider).valueOrNull;
+    if (uid == null) return;
+    setState(() {}); // force rebuild, reset timeout visual
+    _loadingStartAt = DateTime.now();
+    ref.read(diaryControllerProvider.notifier).loadEntries(uid);
   }
 
   void _togglePicker() => setState(() => _pickerOpen = !_pickerOpen);
@@ -231,14 +249,24 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             ),
           ),
 
-          // Avatar placeholder
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color:
-                  AppColors.bw600, // Avatar placeholder — match Figma BW dark
+          // Avatar — load từ profile, tap → SettingsSheet
+          Semantics(
+            button: true,
+            label: 'Cài đặt',
+            child: GestureDetector(
+              onTap: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const SettingsSheet(),
+              ),
+              child: AppAvatar(
+                imageUrl: ref
+                    .watch(currentUserProfileProvider)
+                    .valueOrNull
+                    ?.avatarUrl,
+                size: 40,
+              ),
             ),
           ),
         ],
@@ -302,9 +330,49 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     final state = ref.watch(diaryControllerProvider);
 
     if (state.isLoading && state.entries.isEmpty) {
+      // Sau 5s loading không response → timeout (vd indexes chưa deploy).
+      final elapsed = _loadingStartAt != null
+          ? DateTime.now().difference(_loadingStartAt!).inSeconds
+          : 0;
+      if (elapsed >= 5) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Không thể tải nhật ký',
+                style: TextStyle(
+                  fontFamily: 'Nunito',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.bw500,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: _retryLoad,
+                child: const Text(
+                  'Thử lại',
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.turquoise500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
       return const Center(
         child: CircularProgressIndicator(color: AppColors.turquoise500),
       );
+    }
+
+    // Reset timeout khi load done.
+    if (_loadingStartAt != null && !state.isLoading) {
+      _loadingStartAt = null;
     }
 
     if (state.errorMessage != null && state.entries.isEmpty) {

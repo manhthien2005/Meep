@@ -194,6 +194,31 @@ void main() {
       expect(state.currentEntry?.entryId, 'e-new');
     });
 
+    test('coverBytes null → skip cover upload, chỉ upload inline', () async {
+      storage.urls = ['https://cdn/img1.jpg'];
+      when(() => repo.createEntry(any()))
+          .thenAnswer((_) async => savedEntry('e-new'));
+
+      final c = makeContainer();
+      await c.read(diaryControllerProvider.notifier).saveEntry(
+        draft: draftEntry(
+          content: const [DiaryContentBlock.image(imageUrl: 'placeholder:0')],
+        ),
+        coverBytes: null,
+        inlineImageBytes: [Uint8List.fromList(List.filled(50, 0xCD))],
+      );
+
+      expect(storage.uploadCount, 1);
+      expect(
+        storage.uploads[0]['fileName'],
+        'img_1.jpg',
+        reason: 'cover upload bị skip, chỉ upload inline',
+      );
+      verify(() => repo.createEntry(any())).called(1);
+      final state = c.read(diaryControllerProvider);
+      expect(state.currentEntry?.entryId, 'e-new');
+    });
+
     test('cover upload fail → KHÔNG gọi inline upload, KHÔNG tạo Firestore doc',
         () async {
       storage.urls = const [null]; // cover fail

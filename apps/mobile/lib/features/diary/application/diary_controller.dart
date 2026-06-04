@@ -94,7 +94,7 @@ class DiaryController extends _$DiaryController {
   /// Upload fail bất kỳ bước → KHÔNG tạo/update Firestore doc.
   Future<void> saveEntry({
     required DiaryEntry draft,
-    required Uint8List coverBytes,
+    Uint8List? coverBytes,
     List<Uint8List> inlineImageBytes = const [],
   }) async {
     state = state.copyWith(isSaving: true, errorMessage: null);
@@ -111,19 +111,21 @@ class DiaryController extends _$DiaryController {
           ? repo.reserveEntryId()
           : draft.entryId;
 
-      // Bước 1 — upload cover
-      String coverUrl;
-      try {
-        coverUrl = await storage.upload(
-          uid: uid,
-          entryId: entryId,
-          fileName: 'cover.jpg',
-          bytes: coverBytes,
-          contentType: 'image/jpeg',
-        );
-      } catch (e) {
-        state = _afterFailure(e, fallback: 'Tải ảnh bìa thất bại');
-        return;
+      // Bước 1 — upload cover (skip nếu không đổi ảnh cover)
+      String coverUrl = draft.coverImageUrl;
+      if (coverBytes != null) {
+        try {
+          coverUrl = await storage.upload(
+            uid: uid,
+            entryId: entryId,
+            fileName: 'cover.jpg',
+            bytes: coverBytes,
+            contentType: 'image/jpeg',
+          );
+        } catch (e) {
+          state = _afterFailure(e, fallback: 'Tải ảnh bìa thất bại');
+          return;
+        }
       }
 
       // Bước 2 — upload inline images tuần tự
