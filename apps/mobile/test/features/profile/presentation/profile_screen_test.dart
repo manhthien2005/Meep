@@ -155,4 +155,22 @@ void main() {
     // username 'alice' single-word → first char 'A'
     expect(find.text('A'), findsOneWidget);
   });
+
+  testWidgets('counter âm (Firestore drift) → clamp về 0 trên UI',
+      (tester) async {
+    // Task 4A: postCount âm do CF race / miss. Display layer clamp về 0 để
+    // user không thấy "-1 Khoảnh khắc". Root cause fix ở Path C (PR riêng).
+    final driftProfile = aliceProfile.copyWith(
+      postCount: -2,
+      friendCount: -1,
+      spaceCount: 5,
+    );
+    await tester.pumpWidget(makeApp(profile: driftProfile));
+    await tester.pumpAndSettle();
+
+    expect(find.text('-2'), findsNothing);
+    expect(find.text('-1'), findsNothing);
+    expect(find.text('0'), findsNWidgets(2)); // postCount + friendCount
+    expect(find.text('5'), findsOneWidget); // spaceCount giữ nguyên
+  });
 }

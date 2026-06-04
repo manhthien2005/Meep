@@ -157,20 +157,18 @@ class _FriendProfileBody extends ConsumerWidget {
                       const SizedBox(width: 25),
                       // Friend profile chỉ hiện Khoảnh khắc + Bạn bè per spec —
                       // Space ẩn (không gọi từ profile.spaceCount).
-                      _StatsRow(
-                        postCount: profile.postCount,
-                        friendCount: profile.friendCount,
+                      Expanded(
+                        child: _StatsRow(
+                          postCount: profile.postCount,
+                          friendCount: profile.friendCount,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
                   Text(
                     profile.username,
-                    style: const TextStyle(
-                      fontFamily: 'Nunito',
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      height: 28 / 20,
+                    style: AppTextStyles.lgSemiBold.copyWith(
                       color: AppColors.bw100,
                     ),
                   ),
@@ -366,11 +364,10 @@ class _StatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _StatItem(count: postCount, label: 'Khoảnh khắc'),
-        const SizedBox(width: 30),
-        _StatItem(count: friendCount, label: 'Bạn bè'),
+        Flexible(child: _StatItem(count: postCount, label: 'Khoảnh khắc')),
+        Flexible(child: _StatItem(count: friendCount, label: 'Bạn bè')),
       ],
     );
   }
@@ -382,26 +379,26 @@ class _StatItem extends StatelessWidget {
   final int count;
   final String label;
 
+  // Counter trên Firestore có thể drift âm — xem note tại
+  // profile_screen.dart `_StatItem._safeCount`.
+  int get _safeCount => count < 0 ? 0 : count;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          '$count',
-          style: const TextStyle(
-            fontFamily: 'Nunito',
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            height: 24 / 18,
-            color: AppColors.bw100,
-          ),
+          '$_safeCount',
+          style: AppTextStyles.baseSemiBold.copyWith(color: AppColors.bw100),
           textAlign: TextAlign.center,
         ),
         Text(
           label,
           style: AppTextStyles.smMedium.copyWith(color: AppColors.bw100),
           textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );

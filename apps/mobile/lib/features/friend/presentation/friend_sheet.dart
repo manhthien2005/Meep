@@ -313,12 +313,14 @@ class _FriendSheetState extends ConsumerState<FriendSheet> {
       );
     }
 
-    // Collapsed search bar
+    // Collapsed search bar — horizontal padding nhỏ để Row center tự nhiên
+    // chứa icon + text "Thêm một người bạn mới" (~210dp) không overflow trên
+    // Android 360dp. MainAxisAlignment.center đã tự căn giữa.
     return GestureDetector(
       onTap: _expandSearch,
       child: Container(
         height: 54,
-        padding: const EdgeInsets.symmetric(horizontal: 70),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
           color: AppColors.bw700,
           borderRadius: BorderRadius.circular(15),
@@ -336,10 +338,14 @@ class _FriendSheetState extends ConsumerState<FriendSheet> {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              'Thêm một người bạn mới',
-              style: AppTextStyles.baseBold.copyWith(
-                color: AppColors.bw200,
+            Flexible(
+              child: Text(
+                'Thêm một người bạn mới',
+                style: AppTextStyles.baseBold.copyWith(
+                  color: AppColors.bw200,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

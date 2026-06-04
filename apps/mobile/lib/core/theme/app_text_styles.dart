@@ -38,6 +38,12 @@ abstract final class AppTextStyles {
   );
 
   // text-base — 18px
+  static const baseSemiBold = TextStyle(
+    fontFamily: _family,
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+    height: 24 / 18,
+  );
   static const baseBold = TextStyle(
     fontFamily: _family,
     fontSize: 18,
@@ -66,6 +72,12 @@ abstract final class AppTextStyles {
   );
 
   // text-lg — 20px
+  static const lgSemiBold = TextStyle(
+    fontFamily: _family,
+    fontSize: 20,
+    fontWeight: FontWeight.w600,
+    height: 28 / 20,
+  );
   static const lgBold = TextStyle(
     fontFamily: _family,
     fontSize: 20,
