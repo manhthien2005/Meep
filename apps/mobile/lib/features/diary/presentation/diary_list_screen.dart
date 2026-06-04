@@ -344,6 +344,19 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
 
   // ── Body: render theo controller state ──
   Widget _buildBody() {
+    // Auth init đang chạy — uid chưa ready. Show loading thay vì blank.
+    // Lần đầu cold start FirebaseAuth revalidateSession có thể mất 2-8s
+    // trên mobile network. Nếu không show spinner → user thấy màn trống.
+    //
+    // ⚠️ KHÔNG để ngoài _buildBody: ref.watch trong ConsumerState build()
+    // vẫn OK (Riverpod best practice là gọi watch trong build method).
+    final uid = ref.watch(currentUidProvider).valueOrNull;
+    if (uid == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.turquoise500),
+      );
+    }
+
     final state = ref.watch(diaryControllerProvider);
 
     if (state.isLoading && state.entries.isEmpty) {
