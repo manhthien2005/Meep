@@ -1,34 +1,18 @@
 import 'dart:async';
 
-import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:meep/core/error/app_error.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/features/streak/application/calculate_streak.dart';
+import 'package:meep/features/streak/application/streak_state.dart';
 import 'package:meep/features/streak/data/streak_repository.dart';
 
-part 'streak_controller.freezed.dart';
+export 'package:meep/features/streak/application/streak_state.dart';
+
 part 'streak_controller.g.dart';
-
-@freezed
-class StreakState with _$StreakState {
-  const factory StreakState({
-    /// Posts của tháng đang xem (sort createdAt ASC).
-    @Default([]) List<Post> monthPosts,
-
-    /// Tất cả ngày đã post (local timezone, dedupe per day).
-    /// Dùng cho `calculateStreak` + Calendar render dot ngày có post.
-    @Default([]) List<DateTime> allPostDates,
-
-    /// Tháng đang xem (startOfMonthLocal). Null = chưa init.
-    DateTime? viewingMonth,
-
-    /// Số ngày liên tiếp từ hôm nay trở về (toàn cục, không đổi khi swipe tháng).
-    @Default(0) int currentStreak,
-    @Default(false) bool isLoading,
-    String? errorMessage,
-  }) = _StreakState;
-}
 
 @Riverpod(keepAlive: true)
 StreakRepository streakRepository(Ref ref) => throw UnimplementedError(
@@ -36,35 +20,125 @@ StreakRepository streakRepository(Ref ref) => throw UnimplementedError(
       'wire FirebaseStreakRepository in main.dart (TODO: ST/ST1/HanDHG)',
     );
 
-@riverpod
+/// Inject `DateTime.now` để test deterministic. Override trong test
+/// `nowProvider.overrideWithValue(() => fixedNow)`.
+@Riverpod(keepAlive: true)
+DateTime Function() now(Ref ref) => DateTime.now;
+
+/// `keepAlive: true` để state survive cross route transitions (user navigate
+/// Streak → Photo detail → back). Pattern AUTH #6 (keepAlive cho controllers
+/// xuyên route).
+@Riverpod(keepAlive: true)
 class StreakController extends _$StreakController {
+  StreamSubscription<List<Post>>? _monthSub;
+
   @override
   StreakState build() {
-    // TODO(ST/ST2/HanDHG): subscribe watchUserMonth, fetch allPostDates,
-    // compute currentStreak. See docs/plans/2026-05-23-streak.md §ST2.
+    ref.onDispose(() => _monthSub?.cancel());
     return const StreakState();
   }
 
-  /// Initialize: set viewingMonth = startOfCurrentMonthLocal, subscribe
-  /// watchUserMonth, fetch getUserAllDates once, compute currentStreak.
-  Future<void> init() {
-    throw UnimplementedError('init — TODO: ST/ST2/HanDHG');
+  /// Load tháng hiện tại + allPostDates + compute currentStreak.
+  ///
+  /// Gọi từ `StreakScreen.initState` hoặc `ref.read(...notifier).init()` khi
+  /// user mở Streak tab lần đầu.
+  Future<void> init() async {
+    final uid = ref.read(currentUidProvider).valueOrNull;
+    if (uid == null) {
+      state = state.copyWith(
+        errorMessage: 'Bạn cần đăng nhập để xem Kỷ niệm',
+      );
+      return;
+    }
+
+    final nowLocal = ref.read(nowProvider)();
+    final currentMonth = DateTime(nowLocal.year, nowLocal.month);
+    state = state.copyWith(
+      isLoading: true,
+      errorMessage: null,
+      viewingMonth: currentMonth,
+    );
+
+    try {
+      final repo = ref.read(streakRepositoryProvider);
+      final allDates = await repo.getUserAllDates(uid);
+      final streak = calculateStreak(allDates, nowLocal);
+      state = state.copyWith(
+        allPostDates: allDates,
+        currentStreak: streak,
+      );
+      _subscribeMonth(uid, currentMonth);
+    } catch (e) {
+      state = _afterFailure(e);
+    }
   }
 
-  /// Decrement viewingMonth 1 tháng. currentStreak + allPostDates KHÔNG đổi.
-  Future<void> swipePrev() {
-    throw UnimplementedError('swipePrev — TODO: ST/ST2/HanDHG');
+  /// Decrement viewingMonth 1 tháng. Stream re-subscribe cho tháng mới.
+  /// `currentStreak` + `allPostDates` KHÔNG đổi (toàn cục).
+  Future<void> swipePrev() async {
+    final current = state.viewingMonth;
+    if (current == null) return; // chưa init
+    final uid = ref.read(currentUidProvider).valueOrNull;
+    if (uid == null) return;
+
+    final prevMonth = DateTime(current.year, current.month - 1);
+    state = state.copyWith(
+      viewingMonth: prevMonth,
+      monthPosts: const [],
+      isLoading: true,
+      errorMessage: null,
+    );
+    _subscribeMonth(uid, prevMonth);
   }
 
-  /// Increment viewingMonth 1 tháng. Early-return (no-op) nếu đang viewing
-  /// tháng hiện tại — cap tại tháng hiện tại (UI bounce animation).
-  Future<void> swipeNext() {
-    throw UnimplementedError('swipeNext — TODO: ST/ST2/HanDHG');
+  /// Increment viewingMonth 1 tháng. Cap tại tháng hiện tại — early return.
+  Future<void> swipeNext() async {
+    final current = state.viewingMonth;
+    if (current == null) return;
+    final uid = ref.read(currentUidProvider).valueOrNull;
+    if (uid == null) return;
+
+    final nowLocal = ref.read(nowProvider)();
+    final currentMonth = DateTime(nowLocal.year, nowLocal.month);
+
+    // Cap: không vượt tháng hiện tại
+    if (!current.isBefore(currentMonth)) return;
+
+    final nextMonth = DateTime(current.year, current.month + 1);
+    state = state.copyWith(
+      viewingMonth: nextMonth,
+      monthPosts: const [],
+      isLoading: true,
+      errorMessage: null,
+    );
+    _subscribeMonth(uid, nextMonth);
   }
 
   void clearError() {
     if (state.errorMessage != null) {
       state = state.copyWith(errorMessage: null);
     }
+  }
+
+  void _subscribeMonth(String uid, DateTime month) {
+    _monthSub?.cancel();
+    final repo = ref.read(streakRepositoryProvider);
+    _monthSub = repo.watchUserMonth(uid, month).listen(
+      (posts) {
+        state = state.copyWith(monthPosts: posts, isLoading: false);
+      },
+      onError: (Object e) {
+        state = _afterFailure(e);
+      },
+    );
+  }
+
+  /// Reset isLoading + map error to message (pattern AUTH #4).
+  StreakState _afterFailure(Object e) {
+    final err = AppError.fromUnknown(e, fallback: 'Không thể tải Kỷ niệm');
+    return state.copyWith(
+      isLoading: false,
+      errorMessage: err is OperationCancelledError ? null : err.message,
+    );
   }
 }
