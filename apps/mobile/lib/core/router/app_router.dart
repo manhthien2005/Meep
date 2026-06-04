@@ -115,6 +115,7 @@ String? authRedirect({
 ///   friend_request / friend_accepted → /home?openFriendSheet=1
 ///   reaction                         → /home?highlight=`postId`
 ///   new_post                         → /home
+///   chat_message                     → /chat/`conversationId`
 ///   unknown / missing type           → /home
 ///
 /// Missing postId for `reaction` falls back to `/home` — the source push
@@ -122,6 +123,11 @@ String? authRedirect({
 /// the user shouldn't see a broken highlight for. HomeScreen already
 /// renders the "post no longer exists" toast when the postId can't be
 /// resolved to a Post, so unknown postIds reuse that path.
+///
+/// Missing conversationId for `chat_message` cũng fallback `/home` —
+/// payload từ Cloud Function (chat/onMessageCreated.ts) luôn set field này,
+/// nếu rỗng nghĩa là payload bị malformed nên đừng đưa user vào chat screen
+/// trống không load được.
 String routeForNotification(Map<String, String> data) {
   final type = data['type'];
   switch (type) {
@@ -134,6 +140,10 @@ String routeForNotification(Map<String, String> data) {
       return '/home?highlight=${Uri.encodeQueryComponent(postId)}';
     case 'new_post':
       return '/home';
+    case 'chat_message':
+      final conversationId = data['conversationId'];
+      if (conversationId == null || conversationId.isEmpty) return '/home';
+      return '/chat/${Uri.encodeComponent(conversationId)}';
     default:
       return '/home';
   }
