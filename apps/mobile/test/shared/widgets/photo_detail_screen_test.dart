@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/shared/widgets/photo_detail_screen.dart';
@@ -20,7 +21,7 @@ void main() {
     );
   }
 
-  Widget host(Widget child) => MaterialApp(home: child);
+  Widget host(Widget child) => ProviderScope(child: MaterialApp(home: child));
 
   testWidgets('empty posts → navigate back gracefully', (tester) async {
     final navigatorKey = GlobalKey<NavigatorState>();
@@ -91,6 +92,61 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Feeling toasty!'), findsOneWidget);
+  });
+
+  testWidgets('borderColorFor non-null → render border quanh ảnh active',
+      (tester) async {
+    await tester.pumpWidget(
+      host(
+        PhotoDetailScreen(
+          postId: 'p1',
+          posts: [post(id: 'p1')],
+          borderColorFor: (_, __) => const Color(0xFFFF00FF),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Tìm Container có Border.all màu magenta — chỉ vẽ khi borderColorFor
+    // trả non-null cho post active.
+    final containers = tester.widgetList<Container>(find.byType(Container));
+    final hasBorder = containers.any((c) {
+      final dec = c.decoration;
+      if (dec is! BoxDecoration) return false;
+      final border = dec.border;
+      if (border is! Border) return false;
+      return border.top.color == const Color(0xFFFF00FF);
+    });
+    expect(
+      hasBorder,
+      isTrue,
+      reason: 'Border màu magenta phải render quanh ảnh active',
+    );
+  });
+
+  testWidgets('borderColorFor return null → không render border',
+      (tester) async {
+    await tester.pumpWidget(
+      host(
+        PhotoDetailScreen(
+          postId: 'p1',
+          posts: [post(id: 'p1')],
+          borderColorFor: (_, __) => null,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final containers = tester.widgetList<Container>(find.byType(Container));
+    final anyHasBorder = containers.any((c) {
+      final dec = c.decoration;
+      return dec is BoxDecoration && dec.border != null;
+    });
+    expect(
+      anyHasBorder,
+      isFalse,
+      reason: 'Callback null → không có Container border nào trong tree',
+    );
   });
 
   testWidgets('initialIndex selects đúng post', (tester) async {

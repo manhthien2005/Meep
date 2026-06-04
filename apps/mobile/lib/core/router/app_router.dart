@@ -22,16 +22,19 @@ import 'package:meep/dev/widget_catalog_page.dart';
 import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
 import 'package:meep/features/diary/presentation/diary_create_screen.dart';
 import 'package:meep/features/diary/presentation/diary_list_screen.dart';
+import 'package:meep/core/theme/hex_color.dart';
 import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/feed/presentation/capture_preview_args.dart';
 import 'package:meep/features/feed/presentation/capture_preview_screen.dart';
 import 'package:meep/features/feed/presentation/grid_view_screen.dart';
 import 'package:meep/features/feed/presentation/home_screen.dart';
+import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/home/presentation/home_page.dart';
 import 'package:meep/features/profile/presentation/edit_profile_screen.dart';
 import 'package:meep/features/profile/presentation/friend_profile_screen.dart';
 import 'package:meep/features/profile/presentation/profile_screen.dart';
 import 'package:meep/shared/widgets/photo_detail_screen.dart';
+import 'package:meep/shared/widgets/share_modal.dart';
 import 'package:meep/features/space/presentation/space_create_sheet.dart';
 import 'package:meep/features/streak/presentation/streak_screen.dart';
 
@@ -333,6 +336,30 @@ GoRouter appRouter(Ref ref) {
           );
         },
       ),
+      // Grid view (HomeScreen Taskbar) → tap photo → mở PhotoDetailScreen với
+      // viền màu Space khi post thuộc Space. Khác `/profile/photo/:postId` ở
+      // chỗ: compute borderColor từ spaceByIdProvider — Profile route giữ
+      // nguyên không border (Profile feed mixed, không có Space context).
+      GoRoute(
+        path: '/grid/photo/:postId',
+        builder: (_, state) {
+          final extra = state.extra;
+          if (extra is Map<String, dynamic>) {
+            final posts = extra['posts'];
+            final index = (extra['index'] as int?) ?? 0;
+            return _GridPhotoDetailRoute(
+              postId: state.pathParameters['postId'] ?? '',
+              posts: posts is List<Post> ? posts : const [],
+              initialIndex: index,
+            );
+          }
+          return _GridPhotoDetailRoute(
+            postId: state.pathParameters['postId'] ?? '',
+            posts: const [],
+            initialIndex: (extra as int?) ?? 0,
+          );
+        },
+      ),
       GoRoute(
         path: '/friend-profile/:uid',
         builder: (_, state) =>
@@ -399,4 +426,51 @@ GoRouter appRouter(Ref ref) {
     notifier.dispose();
   });
   return router;
+}
+
+/// Route widget cho `/grid/photo/:postId`. Compute border color per-post từ
+/// Space đầu tiên (pattern `_postBorderColor` feed_section). Share button mở
+/// [ShareModal] với `isAuthor` tính từ `currentUidProvider`, match behavior
+/// cũ của `_PostDetailSheet` trong [GridViewScreen].
+class _GridPhotoDetailRoute extends ConsumerWidget {
+  const _GridPhotoDetailRoute({
+    required this.postId,
+    required this.posts,
+    required this.initialIndex,
+  });
+
+  final String postId;
+  final List<Post> posts;
+  final int initialIndex;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (posts.isEmpty) {
+      return PhotoDetailScreen(postId: postId, initialIndex: initialIndex);
+    }
+    final currentUid = ref.watch(currentUidProvider).valueOrNull;
+
+    return PhotoDetailScreen(
+      postId: postId,
+      posts: posts,
+      initialIndex: initialIndex,
+      borderColorFor: (post, itemRef) {
+        if (post.spaceIds.isEmpty) return null;
+        final space =
+            itemRef.watch(spaceByIdProvider(post.spaceIds.first)).valueOrNull;
+        if (space == null) return null;
+        return hexToColor(space.colorHex);
+      },
+      onShareTap: (post) {
+        showModalBottomSheet<void>(
+          context: context,
+          backgroundColor: Colors.transparent,
+          builder: (_) => ShareModal(
+            post: post,
+            isAuthor: post.authorId == currentUid,
+          ),
+        );
+      },
+    );
+  }
 }

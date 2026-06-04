@@ -1,6 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_proportions.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
@@ -9,10 +9,8 @@ import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/application/feed_filter_controller.dart';
 import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/feed/presentation/feed_filter_dropdown.dart';
-import 'package:meep/features/feed/presentation/feed_section.dart';
 import 'package:meep/features/feed/presentation/grid_photo_tile.dart';
 import 'package:meep/features/space/application/space_controller.dart';
-import 'package:meep/shared/widgets/share_modal.dart';
 
 /// Grid view 3-cột tất cả ảnh đã post của filter hiện tại. Mở từ nút
 /// grid trên Taskbar feed (HomeScreen embedded). Filter (Mọi người / Bạn /
@@ -114,17 +112,22 @@ class _Grid extends StatelessWidget {
       itemCount: posts.length,
       itemBuilder: (_, i) => GridPhotoTile(
         post: posts[i],
-        onTap: () => _showDetail(context, posts[i]),
+        onTap: () => _openDetail(context, i),
       ),
     );
   }
 
-  void _showDetail(BuildContext context, Post post) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _PostDetailSheet(post: post),
+  // Push sang PhotoDetailScreen full-screen (shared widget). Route
+  // `/grid/photo/:postId` wire borderColor từ Space + onShareTap mở
+  // ShareModal — xem `_GridPhotoDetailRoute` trong app_router.dart.
+  void _openDetail(BuildContext context, int index) {
+    final post = posts[index];
+    context.push(
+      '/grid/photo/${post.postId}',
+      extra: <String, Object>{
+        'posts': posts,
+        'index': index,
+      },
     );
   }
 }
@@ -217,81 +220,6 @@ class _GridTopBar extends ConsumerWidget {
           // Symmetric spacer — same width as back icon (24) + room for tap area.
           const SizedBox(width: 36),
         ],
-      ),
-    );
-  }
-}
-
-class _PostDetailSheet extends StatelessWidget {
-  const _PostDetailSheet({required this.post});
-
-  final Post post;
-
-  @override
-  Widget build(BuildContext context) {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
-    return DraggableScrollableSheet(
-      initialChildSize: 0.9,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (_, ctrl) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.bw900,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: SingleChildScrollView(
-          controller: ctrl,
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.bw600,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              post.authorId == currentUid
-                  ? OwnPostCard(post: post)
-                  : FriendPostCard(post: post),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    showModalBottomSheet<void>(
-                      context: context,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => ShareModal(
-                        post: post,
-                        isAuthor: post.authorId == currentUid,
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.bw800,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.ios_share, color: AppColors.bw100, size: 18),
-                      SizedBox(width: 8),
-                      Text('Chia sẻ', style: TextStyle(color: AppColors.bw100)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-            ],
-          ),
-        ),
       ),
     );
   }

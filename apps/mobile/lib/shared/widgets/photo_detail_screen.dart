@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
@@ -26,6 +27,7 @@ class PhotoDetailScreen extends StatefulWidget {
     this.captionPillColor = const Color(0x80000000),
     this.timeColor = AppColors.bw100,
     this.onShareTap,
+    this.borderColorFor,
   });
 
   final String postId;
@@ -46,6 +48,12 @@ class PhotoDetailScreen extends StatefulWidget {
   /// Share button tap handler. Default: open [SharePhotoSheet] với
   /// `isAuthor: true`. Pass override để customize behavior per caller.
   final ValueChanged<Post>? onShareTap;
+
+  /// Per-post border color resolver. Gọi với post hiện tại + ref để caller
+  /// có thể watch provider (vd `spaceByIdProvider` cho Space post). Return
+  /// `null` = no border cho post đó. `null` callback = no border bao giờ.
+  /// Pattern match [AppPhotoFrame] cho consistency với feed home.
+  final Color? Function(Post post, WidgetRef ref)? borderColorFor;
 
   @override
   State<PhotoDetailScreen> createState() => _PhotoDetailScreenState();
@@ -146,6 +154,7 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                   controller: _pageController,
                   currentIndex: _currentIndex,
                   onPageChanged: _onPageChanged,
+                  borderColorFor: widget.borderColorFor,
                 ),
                 if ((currentPost.caption ?? '').isNotEmpty)
                   Positioned(
@@ -304,12 +313,18 @@ class _PhotoCarousel extends StatelessWidget {
     required this.controller,
     required this.currentIndex,
     required this.onPageChanged,
+    this.borderColorFor,
   });
 
   final List<Post> posts;
   final PageController controller;
   final int currentIndex;
   final ValueChanged<int> onPageChanged;
+  final Color? Function(Post post, WidgetRef ref)? borderColorFor;
+
+  // Match [AppPhotoFrame] feed pattern — 3px border quanh ảnh active.
+  static const double _borderWidth = 3.0;
+  static const double _cornerRadius = 50.0;
 
   @override
   Widget build(BuildContext context) {
@@ -323,6 +338,16 @@ class _PhotoCarousel extends StatelessWidget {
           final isActive = index == currentIndex;
           final size = isActive ? 350.0 : 260.0;
           final opacity = isActive ? 1.0 : 0.15;
+          final post = posts[index];
+          final image = ClipRRect(
+            borderRadius: BorderRadius.circular(_cornerRadius),
+            child: CachedNetworkImage(
+              imageUrl: post.coverImageUrl,
+              fit: BoxFit.cover,
+              errorWidget: (_, __, ___) => Container(color: AppColors.bw700),
+              placeholder: (_, __) => Container(color: AppColors.bw800),
+            ),
+          );
           return AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             margin: EdgeInsets.symmetric(
@@ -334,16 +359,32 @@ class _PhotoCarousel extends StatelessWidget {
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 200),
               opacity: opacity,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(50),
-                child: CachedNetworkImage(
-                  imageUrl: posts[index].coverImageUrl,
-                  fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) =>
-                      Container(color: AppColors.bw700),
-                  placeholder: (_, __) => Container(color: AppColors.bw800),
-                ),
-              ),
+              // Border chỉ render cho ảnh active — ảnh inactive opacity 0.15
+              // + size 260, thêm border sẽ noise. Match feed pattern. Mỗi
+              // item wrap Consumer riêng để callback ref.watch reactive theo
+              // post (vd swipe sang Space khác → border đổi màu).
+              child: (isActive && borderColorFor != null)
+                  ? Consumer(
+                      builder: (_, ref, __) {
+                        final color = borderColorFor!(post, ref);
+                        if (color == null) return image;
+                        return Container(
+                          decoration: BoxDecoration(
+                            // Outer radius = inner + borderWidth để bo trùng
+                            // (match [AppPhotoFrame]).
+                            borderRadius: BorderRadius.circular(
+                              _cornerRadius + _borderWidth,
+                            ),
+                            border: Border.all(
+                              color: color,
+                              width: _borderWidth,
+                            ),
+                          ),
+                          child: image,
+                        );
+                      },
+                    )
+                  : image,
             ),
           );
         },
