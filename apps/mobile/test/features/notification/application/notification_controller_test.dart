@@ -1,3 +1,4 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -118,6 +119,124 @@ void main() {
 
       final state = container.read(notificationControllerProvider);
       expect(state.currentBanner, isNull);
+    });
+  });
+
+  group('handleOpenedApp', () {
+    // RemoteMessage constructor accepts arbitrary data and an explicit
+    // messageId, so the tap path is testable without mocking the FCM
+    // stream itself.
+
+    test('writes a payload with FCM messageId + data to state', () {
+      final controller =
+          container.read(notificationControllerProvider.notifier);
+
+      controller.handleOpenedApp(
+        const RemoteMessage(
+          messageId: 'fcm-msg-1',
+          data: {'type': 'friend_request', 'requestId': 'req-9'},
+        ),
+      );
+
+      final state = container.read(notificationControllerProvider);
+      expect(state.lastOpenedApp, isNotNull);
+      expect(state.lastOpenedApp!.messageId, 'fcm-msg-1');
+      expect(state.lastOpenedApp!.data, {
+        'type': 'friend_request',
+        'requestId': 'req-9',
+      });
+    });
+
+    test('synthesises an id when FCM did not supply messageId', () {
+      final controller =
+          container.read(notificationControllerProvider.notifier);
+
+      controller.handleOpenedApp(
+        const RemoteMessage(data: {'type': 'new_post'}),
+      );
+
+      final state = container.read(notificationControllerProvider);
+      expect(state.lastOpenedApp, isNotNull);
+      expect(
+        state.lastOpenedApp!.messageId,
+        startsWith('no-id-'),
+        reason: 'fallback id keeps the payload distinct from later taps',
+      );
+    });
+
+    test('coerces non-string data values to strings', () {
+      // FCM data payload is `Map<String, dynamic>` on the wire even though
+      // the contract is string-string. Real backends sometimes send
+      // numeric values — the wrapper must not throw a TypeError.
+      final controller =
+          container.read(notificationControllerProvider.notifier);
+
+      controller.handleOpenedApp(
+        const RemoteMessage(
+          messageId: 'm1',
+          data: {'type': 'reaction', 'postId': 12345},
+        ),
+      );
+
+      final state = container.read(notificationControllerProvider);
+      expect(state.lastOpenedApp!.data, {
+        'type': 'reaction',
+        'postId': '12345',
+      });
+    });
+
+    test('a second tap overwrites the previous payload', () {
+      final controller =
+          container.read(notificationControllerProvider.notifier);
+
+      controller.handleOpenedApp(
+        const RemoteMessage(messageId: 'm1', data: {'type': 'new_post'}),
+      );
+      controller.handleOpenedApp(
+        const RemoteMessage(
+          messageId: 'm2',
+          data: {'type': 'reaction', 'postId': 'p1'},
+        ),
+      );
+
+      final state = container.read(notificationControllerProvider);
+      expect(state.lastOpenedApp!.messageId, 'm2');
+      expect(state.lastOpenedApp!.data['type'], 'reaction');
+    });
+  });
+
+  group('consumeOpenedAppMessage', () {
+    test('clears lastOpenedApp after a tap has been routed', () {
+      final controller =
+          container.read(notificationControllerProvider.notifier);
+
+      controller.handleOpenedApp(
+        const RemoteMessage(messageId: 'm1', data: {'type': 'new_post'}),
+      );
+      expect(
+        container.read(notificationControllerProvider).lastOpenedApp,
+        isNotNull,
+      );
+
+      controller.consumeOpenedAppMessage();
+
+      expect(
+        container.read(notificationControllerProvider).lastOpenedApp,
+        isNull,
+      );
+    });
+
+    test('is a no-op when nothing is pending', () {
+      final controller =
+          container.read(notificationControllerProvider.notifier);
+
+      controller.consumeOpenedAppMessage();
+      controller.consumeOpenedAppMessage();
+
+      expect(
+        container.read(notificationControllerProvider).lastOpenedApp,
+        isNull,
+      );
     });
   });
 }
