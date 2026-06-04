@@ -43,6 +43,12 @@ class WidgetDataService {
   /// Nullable fields are removed from prefs when absent — Kotlin's
   /// WidgetDataStore.read() uses `takeIf { it.isNotBlank() }` and treats
   /// missing keys the same as empty strings.
+  ///
+  /// IMPORTANT — does NOT touch `lastViewedAt`. The unread badge is reset
+  /// only via [recordLastViewedAt] when the user actually views the feed
+  /// (`AppLifecycleState.resumed` in main.dart). Resetting here would zero
+  /// the badge on every feed stream emit because this method is called from
+  /// `FeedController` for the latest all-friends post regardless of author.
   Future<void> updateWidgetData({
     required String postId,
     required String imageUrl,
@@ -56,13 +62,6 @@ class WidgetDataService {
     await _setOrRemove(_WidgetKeys.authorAvatarUrl, authorAvatarUrl);
     await _setOrRemove(_WidgetKeys.caption, caption);
     await _setOrRemove(_WidgetKeys.captionType, captionType);
-
-    // Reset the last-viewed clock so the new post's badge starts at 0
-    // for the user who just posted (their own post shouldn't count).
-    await _prefs.setInt(
-      _WidgetKeys.lastViewedAt,
-      DateTime.now().millisecondsSinceEpoch,
-    );
 
     // Poke Kotlin to enqueue an immediate one-time refresh
     await _channel.invokeMethod('updateWidget');

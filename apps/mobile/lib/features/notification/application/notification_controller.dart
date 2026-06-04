@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -116,6 +117,9 @@ class NotificationController extends _$NotificationController {
     await _localNotifications.initialize(settings);
   }
 
+  @visibleForTesting
+  void handleForeground(RemoteMessage message) => _handleForeground(message);
+
   void _handleForeground(RemoteMessage message) {
     if (state.bannerSuppressed) return;
 
@@ -150,8 +154,12 @@ class NotificationController extends _$NotificationController {
 
     _bannerTimer?.cancel();
 
+    // `RemoteMessage.data` is `Map<String, dynamic>` — server may send numeric
+    // / bool values (vd `unreadCount: 3`). `Map<String, String>.from` without
+    // converting would throw `_TypeError` and kill the FCM stream listener.
+    // Match `handleOpenedApp` and stringify every value.
     final data = Map<String, String>.from(
-      message.data.map((k, v) => MapEntry(k, v)),
+      message.data.map((k, v) => MapEntry(k, v.toString())),
     );
 
     state = state.copyWith(
