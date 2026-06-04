@@ -110,6 +110,20 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
 
   bool get _isReadOnly => widget.mode == DiaryCanvasMode.read;
 
+  /// Cover URL từ Firestore (read/edit mode). Khác `widget.initialImageUrl`:
+  /// initial là hint từ caller (list screen) — `_loadedEntry` sync khi
+  /// controller fetch xong; cover URL có thể đổi sau khi user edit.
+  String? _loadedCoverUrl;
+
+  /// Mood loaded từ Firestore (read/edit mode) — khác `widget.moodTemplate`
+  /// (cũng là hint). Sau khi loadEntry xong, dùng cái này để render mood.
+  MoodTemplate? _loadedMood;
+
+  /// Guard sync — chỉ ghi đè `_captionController` + `_contentController`
+  /// 1 lần khi loadEntry hoàn thành. Tránh re-emit stream đè text user
+  /// vừa gõ trong edit mode.
+  bool _hasSyncedFromEntry = false;
+
   @override
   void initState() {
     super.initState();
@@ -123,6 +137,49 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
         TextEditingController(text: widget.initialContent ?? '');
     // Date hiển thị topbar: entryDate (read/edit) hoặc hôm nay (create).
     _displayDate = widget.entryDate ?? DateTime.now();
+    _loadedCoverUrl = widget.initialImageUrl;
+    _loadedMood = widget.moodTemplate;
+
+    // Read/edit mode + có entryId → fetch entry thật + sync state.
+    final entryId = widget.entryId;
+    if (entryId != null &&
+        entryId.isNotEmpty &&
+        widget.mode != DiaryCanvasMode.create) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(diaryControllerProvider.notifier).loadEntry(entryId);
+      });
+    }
+  }
+
+  /// Sync controllers + local state khi controller emit `currentEntry`.
+  /// Chỉ apply cho read/edit mode + match entryId hiện tại + chỉ sync 1 lần.
+  void _syncFromEntry(DiaryEntry entry) {
+    if (entry.entryId != widget.entryId) return;
+    if (_hasSyncedFromEntry) {
+      // Re-emit (vd sau updateEntryNoImage success) — chỉ sync cover URL +
+      // privacy, KHÔNG ghi đè text controllers (user có thể đang gõ tiếp).
+      setState(() {
+        _loadedCoverUrl =
+            entry.coverImageUrl.isNotEmpty ? entry.coverImageUrl : null;
+        _loadedMood = entry.moodTemplate;
+        _privacy = entry.privacy;
+      });
+      return;
+    }
+    _hasSyncedFromEntry = true;
+    final fullText = entry.content
+        .map((b) => b.maybeWhen(text: (v, _) => v, orElse: () => ''))
+        .where((s) => s.isNotEmpty)
+        .join('\n\n');
+    _captionController.text = entry.moodCaption;
+    _contentController.text = fullText;
+    setState(() {
+      _loadedCoverUrl =
+          entry.coverImageUrl.isNotEmpty ? entry.coverImageUrl : null;
+      _loadedMood = entry.moodTemplate;
+      _privacy = entry.privacy;
+    });
   }
 
   /// Format DateTime → "DD tháng MM" (tiếng Việt, không zero-pad).
@@ -154,27 +211,14 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
   ///
   /// T9b (PR4b) sẽ wire edit mode đầy đủ — hiện tại edit pop trực tiếp.
   Future<void> _handleSave() async {
-    final mood = widget.moodTemplate;
+    final mood = _loadedMood ?? widget.moodTemplate;
     if (mood == null) {
       // Defensive — create flow phải pass mood từ picker.
       unawaited(Navigator.of(context).maybePop());
       return;
     }
-    if (widget.mode == DiaryCanvasMode.edit) {
-      // TODO(D/T9b/HanDHG): edit mode wire ở PR4b — issue #272.
-      unawaited(Navigator.of(context).maybePop());
-      return;
-    }
 
-    // Validate inputs (spec §Worst path).
-    final coverBytes = _coverBytes;
     final contentText = _contentController.text.trim();
-    if (coverBytes == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn ảnh bìa')),
-      );
-      return;
-    }
     if (contentText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng nhập nội dung')),
@@ -193,26 +237,81 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
     final caption = _captionController.text.trim().isEmpty
         ? _moodLabel(mood)
         : _captionController.text.trim();
+    final coverBytes = _coverBytes;
+    final isEdit = widget.mode == DiaryCanvasMode.edit;
+    final existingEntry = ref.read(diaryControllerProvider).currentEntry;
 
-    // Build draft — entryId rỗng để repo reserve, timestamps server-side
-    // sẽ override createdAt/updatedAt (em pass placeholder để model validate).
-    final placeholderTs = DateTime.now();
-    final draft = DiaryEntry(
-      entryId: '',
-      authorUid: uid,
-      moodTemplate: mood,
-      coverImageUrl: '', // controller replace với coverUrl thật sau upload
-      moodCaption: caption,
-      content: [DiaryContentBlock.text(value: contentText)],
-      privacy: _privacy,
-      createdAt: placeholderTs,
-      updatedAt: placeholderTs,
-    );
-
-    await ref.read(diaryControllerProvider.notifier).saveEntry(
-          draft: draft,
-          coverBytes: coverBytes,
+    if (isEdit) {
+      // Edit mode — phải có entry loaded để giữ createdAt + entryId.
+      if (existingEntry == null || existingEntry.entryId != widget.entryId) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chưa tải được nhật ký, vui lòng thử lại'),
+          ),
         );
+        return;
+      }
+
+      if (coverBytes != null) {
+        // Đổi ảnh → dùng saveEntry path để upload + update Firestore với
+        // coverUrl mới (controller.state.mode = edit → repo.updateEntry).
+        final draft = existingEntry.copyWith(
+          moodCaption: caption,
+          content: [DiaryContentBlock.text(value: contentText)],
+          privacy: _privacy,
+          moodTemplate: mood,
+          updatedAt: DateTime.now(),
+        );
+        ref
+            .read(diaryControllerProvider.notifier)
+            .setMode(DiaryCanvasMode.edit);
+        await ref.read(diaryControllerProvider.notifier).saveEntry(
+              draft: draft,
+              coverBytes: coverBytes,
+            );
+      } else {
+        // Không đổi ảnh → updateEntryNoImage (qua controller, không bypass).
+        final updated = existingEntry.copyWith(
+          moodCaption: caption,
+          content: [DiaryContentBlock.text(value: contentText)],
+          privacy: _privacy,
+          updatedAt: DateTime.now(),
+        );
+        await ref
+            .read(diaryControllerProvider.notifier)
+            .updateEntryNoImage(updated);
+        // ErrorMessage handled bởi ref.listen trong build → SnackBar.
+      }
+    } else {
+      // Create mode — cần coverBytes.
+      if (coverBytes == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vui lòng chọn ảnh bìa')),
+        );
+        return;
+      }
+
+      final placeholderTs = DateTime.now();
+      final draft = DiaryEntry(
+        entryId: '',
+        authorUid: uid,
+        moodTemplate: mood,
+        coverImageUrl: '',
+        moodCaption: caption,
+        content: [DiaryContentBlock.text(value: contentText)],
+        privacy: _privacy,
+        createdAt: placeholderTs,
+        updatedAt: placeholderTs,
+      );
+
+      ref
+          .read(diaryControllerProvider.notifier)
+          .setMode(DiaryCanvasMode.create);
+      await ref.read(diaryControllerProvider.notifier).saveEntry(
+            draft: draft,
+            coverBytes: coverBytes,
+          );
+    }
 
     if (!mounted) return;
 
@@ -280,34 +379,68 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
       case DiaryMenuAction.edit:
         // Push Canvas edit mode với content hiện tại prefilled. Dùng
         // pushReplacement để back nút trở về Diary list (skip read mode).
-        await Navigator.of(context).pushReplacement(
-          MaterialPageRoute<void>(
-            builder: (_) => DiaryCanvasScreen(
-              mode: DiaryCanvasMode.edit,
-              entryId: widget.entryId,
-              moodTemplate: widget.moodTemplate,
-              initialCaption: _captionController.text,
-              initialContent: _contentController.text,
-              initialImageUrl: widget.initialImageUrl,
-              entryDate: _displayDate,
+        // entry đã loaded vào state.currentEntry — edit screen sẽ tự re-fetch
+        // qua loadEntry (initState fire).
+        unawaited(
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(
+              builder: (_) => DiaryCanvasScreen(
+                mode: DiaryCanvasMode.edit,
+                entryId: widget.entryId,
+                moodTemplate: _loadedMood ?? widget.moodTemplate,
+                initialCaption: _captionController.text,
+                initialContent: _contentController.text,
+                initialImageUrl: _loadedCoverUrl,
+                entryDate: _displayDate,
+              ),
             ),
           ),
         );
       case DiaryMenuAction.delete:
         final confirmed = await DeleteDiaryDialog.show(context);
-        if (confirmed == true && mounted) {
-          // TODO(D/T6/HanDHG): gọi DiaryController.deleteEntry(entryId).
-          // ignore: unawaited_futures
-          Navigator.of(context).maybePop();
+        if (confirmed != true || !mounted) return;
+        final entryId = widget.entryId;
+        if (entryId == null || entryId.isEmpty) {
+          unawaited(Navigator.of(context).maybePop());
+          return;
+        }
+        await ref.read(diaryControllerProvider.notifier).deleteEntry(entryId);
+        if (!mounted) return;
+        // Error handled bởi ref.listen errorMessage SnackBar.
+        // Success → pop về list (stream tự loại entry).
+        if (ref.read(diaryControllerProvider).errorMessage == null) {
+          unawaited(Navigator.of(context).maybePop());
         }
       case DiaryMenuAction.share:
-        // TODO(D/T7/HanDHG): native share sheet (share_plus với text + cover image).
+        // TODO(D/T-share/HanDHG): native share sheet (share_plus) — defer Tier 1.
         break;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Read/edit mode: listen currentEntry → sync controllers + local state
+    // khi loadEntry hoàn thành (initState fire postFrame).
+    if (widget.mode != DiaryCanvasMode.create) {
+      ref.listen<DiaryEntry?>(
+        diaryControllerProvider.select((s) => s.currentEntry),
+        (prev, next) {
+          if (next != null && next != prev) _syncFromEntry(next);
+        },
+      );
+    }
+    // ErrorMessage listener — show SnackBar khi error fire.
+    ref.listen<String?>(
+      diaryControllerProvider.select((s) => s.errorMessage),
+      (prev, next) {
+        if (next == null || next == prev) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next)),
+        );
+        ref.read(diaryControllerProvider.notifier).clearError();
+      },
+    );
+
     return Scaffold(
       backgroundColor: _canvasBg,
       body: SafeArea(
@@ -458,13 +591,26 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
 
   // ── Mood zone: cover (mood image) + caption highlight ──
   Widget _buildMoodZone() {
-    final mood = widget.moodTemplate;
+    // Priority: user-picked bytes (chưa save) > loaded URL (read/edit) >
+    // mood asset (create mode default).
+    final mood = _loadedMood ?? widget.moodTemplate;
     final coverBytes = _coverBytes;
+    final coverUrl = _loadedCoverUrl;
     final canPick = !_isReadOnly;
 
     Widget coverChild;
     if (coverBytes != null) {
       coverChild = Image.memory(coverBytes, fit: BoxFit.contain);
+    } else if (coverUrl != null && coverUrl.isNotEmpty) {
+      coverChild = Image.network(
+        coverUrl,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const Icon(
+          Icons.broken_image_outlined,
+          size: 48,
+          color: AppColors.bw500,
+        ),
+      );
     } else if (mood == null) {
       coverChild = const Icon(
         Icons.image_outlined,
