@@ -1,6 +1,5 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { initializeApp } from 'firebase-admin/app';
 import { z } from 'zod';
 
@@ -17,6 +16,7 @@ initializeApp();
 setGlobalOptions({
   region: 'asia-southeast1',
   maxInstances: 10,
+  timeoutSeconds: 60,
 });
 
 // ===== Schemas =====
@@ -75,25 +75,11 @@ export { onFriendshipDeleted } from './friend/onFriendshipDeleted.js';
 
 // onPostCreated + onPostDeleted implemented in ./feed/ — exported above
 
-// ===== Notification module stubs =====
+// ===== Notification module =====
 
-/** TODO(N/impl): send FCM to receiver + persist /notifications doc */
-export const onFriendRequestCreated = onDocumentCreated(
-  { document: 'friend_requests/{requestId}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(N/impl) */ },
-);
-
-/** TODO(N/impl): send FCM to original sender + persist /notifications doc */
-export const onFriendRequestAccepted = onDocumentCreated(
-  { document: 'friendships/{pairId}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(N/impl) */ },
-);
-
-/** TODO(N/impl): send FCM to post owner + persist /notifications doc */
-export const onReactionCreated = onDocumentCreated(
-  { document: 'posts/{postId}/reactions/{reactionId}', region: 'asia-southeast1' },
-  (_event) => { /* TODO(N/impl) */ },
-);
+export { onFriendRequestCreated } from './notification/onFriendRequestCreated.js';
+export { onFriendRequestAccepted } from './notification/onFriendRequestAccepted.js';
+export { onReactionCreated } from './notification/onReactionCreated.js';
 
 // ===== Space module =====
 
