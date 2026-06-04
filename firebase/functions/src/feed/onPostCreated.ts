@@ -39,12 +39,26 @@ export const onPostCreated = onDocumentCreated(
   { document: 'posts/{postId}', region: 'asia-southeast1' },
   async (event) => {
     const post = event.data?.data() as PostData | undefined;
-    if (!post) return;
+    if (!post) {
+      logger.warn('[POST-DEBUG] Trigger onPostCreated nổ nhưng event.data rỗng → bỏ qua');
+      return;
+    }
 
     const db = getFirestore();
     const { postId } = event.params;
     const { authorId, audienceType, audienceUids } = post;
     const spaceIds = post.spaceIds ?? [];
+
+    logger.info(
+      {
+        postId,
+        authorId,
+        audienceType,
+        audienceCount: audienceUids?.length ?? 0,
+        spaceCount: spaceIds.length,
+      },
+      '[POST-DEBUG] Trigger onPostCreated bắt đầu chạy',
+    );
 
     // 1. Always increment postCount on author (set merge — safe if field missing)
     await db.doc(`users/${authorId}`).set(
@@ -132,6 +146,29 @@ async function _sendFcmToRecipients(
   authorName: string,
   postId: string,
 ): Promise<void> {
+  logger.info(
+    { postId, authorId, recipientCount: recipientUids.length },
+    '[POST-FCM-DEBUG] Bắt đầu gửi FCM cho friends của post',
+  );
+
+  if (recipientUids.length === 0) {
+    logger.info({ postId, authorId }, '[POST-FCM-DEBUG] Không có friend nào để gửi → bỏ qua');
+    return;
+  }
+
+  // ⚠️ CẢNH BÁO: function này đọc token từ /users/{uid}/private/fcm,
+  // NHƯNG mobile (firebase_notification_repository.dart:36) save token vào
+  // /users/{uid}/fcmTokens/{tokenId}. Đây là root cause khiến post
+  // notification KHÔNG bao giờ tới friend. 2 path bất nhất.
+  // Reaction + friend_request dùng _fcm.ts:sendFcmToUser → đọc đúng path
+  // /users/{uid}/fcmTokens nên hoạt động.
+  // Fix: thay 2 dòng dưới bằng `await sendFcmToUser(db, uid, {...})` cho
+  // từng uid, hoặc đổi sang đọc collection fcmTokens.
+  logger.warn(
+    { postId, authorId },
+    '[POST-FCM-DEBUG] ⚠️ Đang đọc token từ /users/{uid}/private/fcm — path này KHÔNG khớp với chỗ mobile save (/users/{uid}/fcmTokens). Đây có thể là lý do push không tới.',
+  );
+
   // Batch load FCM tokens
   const tokenPromises = recipientUids.map((uid) =>
     db.collection(`users/${uid}/private`).doc('fcm').get(),
@@ -139,16 +176,43 @@ async function _sendFcmToRecipients(
   const tokenDocs = await Promise.all(tokenPromises);
 
   const tokens: string[] = [];
+  let missingDocCount = 0;
+  let emptyTokenCount = 0;
   for (const doc of tokenDocs) {
-    if (!doc.exists) continue;
+    if (!doc.exists) {
+      missingDocCount++;
+      continue;
+    }
     const t = doc.data()?.token as string | undefined;
-    if (t != null && t !== '') tokens.push(t);
+    if (t != null && t !== '') {
+      tokens.push(t);
+    } else {
+      emptyTokenCount++;
+    }
   }
 
-  if (tokens.length === 0) return;
+  logger.info(
+    {
+      postId,
+      authorId,
+      totalRecipients: recipientUids.length,
+      validTokenCount: tokens.length,
+      missingDocCount,
+      emptyTokenCount,
+    },
+    '[POST-FCM-DEBUG] Kết quả đọc token (missingDocCount cao = path mismatch đã nói ở trên)',
+  );
+
+  if (tokens.length === 0) {
+    logger.warn(
+      { postId, authorId },
+      '[POST-FCM-DEBUG] Không tìm được token nào hợp lệ → KHÔNG gửi FCM',
+    );
+    return;
+  }
 
   try {
-    await getMessaging().sendEachForMulticast({
+    const response = await getMessaging().sendEachForMulticast({
       tokens,
       notification: {
         title: authorName,
@@ -163,7 +227,16 @@ async function _sendFcmToRecipients(
         notification: { channelId: 'posts' },
       },
     });
+    logger.info(
+      {
+        postId,
+        authorId,
+        successCount: response.successCount,
+        failureCount: response.failureCount,
+      },
+      '[POST-FCM-DEBUG] Kết quả multicast post notification',
+    );
   } catch (e) {
-    logger.error('FCM multicast failed', e);
+    logger.error('[POST-FCM-DEBUG] FCM multicast throw exception', { postId, error: e });
   }
 }

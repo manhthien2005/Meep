@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -11,6 +12,12 @@ import 'package:meep/features/notification/data/notification_preferences.dart';
 import 'package:meep/features/notification/data/notification_repository.dart';
 
 part 'notification_controller.g.dart';
+
+/// Helper log tiếng Việt cho flow notification — dùng `developer.log` thay
+/// `print` để filter được trong DevTools / logcat theo tag `MEEP-NOTI`.
+void _notiLog(String message, {Object? error}) {
+  developer.log(message, name: 'MEEP-NOTI', error: error);
+}
 
 @Riverpod(keepAlive: true)
 NotificationRepository notificationRepository(Ref ref) =>
@@ -58,7 +65,11 @@ class NotificationController extends _$NotificationController {
   /// AsyncLoading→AsyncData) must NOT chain extra `onMessage` listeners,
   /// else `_handleForeground` fires N times per push.
   Future<void> initFcm() async {
-    if (_fcmInitialized) return;
+    _notiLog('Bắt đầu khởi tạo FCM (initFcm gọi)');
+    if (_fcmInitialized) {
+      _notiLog('FCM đã init từ trước → bỏ qua (idempotent)');
+      return;
+    }
     _fcmInitialized = true;
 
     final messaging = FirebaseMessaging.instance;
@@ -68,8 +79,14 @@ class NotificationController extends _$NotificationController {
       badge: true,
       sound: true,
     );
+    _notiLog(
+      'Permission status sau requestPermission: ${settings.authorizationStatus}',
+    );
 
     if (settings.authorizationStatus == AuthorizationStatus.denied) {
+      _notiLog(
+        '⚠️ User TỪ CHỐI quyền notification → không gửi push được cho tới khi user vào Settings cho phép lại',
+      );
       state = state.copyWith(fcmPermissionDenied: true);
       // Reset so retry after user grants in Settings re-runs the full flow.
       _fcmInitialized = false;
@@ -77,13 +94,24 @@ class NotificationController extends _$NotificationController {
     }
 
     await _initLocalNotifications();
+    _notiLog('Đã init FlutterLocalNotificationsPlugin xong');
 
     final token = await messaging.getToken();
     if (token != null) {
+      _notiLog(
+        'Đã lấy được FCM token (length=${token.length}), chuẩn bị lưu vào Firestore',
+      );
       await _saveToken(token);
+    } else {
+      _notiLog(
+        '⚠️ messaging.getToken() trả về null — device chưa có Firebase Installation? Kiểm tra google-services.json',
+      );
     }
 
-    _onTokenRefreshSub = messaging.onTokenRefresh.listen(_saveToken);
+    _onTokenRefreshSub = messaging.onTokenRefresh.listen((t) {
+      _notiLog('FCM token rotate — save lại token mới (length=${t.length})');
+      _saveToken(t);
+    });
 
     // Cold-start deep link captured BEFORE wiring the live stream — else a
     // background-arriving message during init can be handled by both
@@ -91,18 +119,36 @@ class NotificationController extends _$NotificationController {
     // causing a double navigate. Per Firebase docs.
     final initialMessage = await messaging.getInitialMessage();
     if (initialMessage != null) {
+      _notiLog(
+        'Có initial message (app mở từ trạng thái terminated qua tap noti): ${initialMessage.messageId}',
+      );
       handleOpenedApp(initialMessage);
     }
 
     _onMessageSub = FirebaseMessaging.onMessage.listen(_handleForeground);
     _onMessageOpenedAppSub =
         FirebaseMessaging.onMessageOpenedApp.listen(handleOpenedApp);
+    _notiLog(
+      '✓ FCM init xong — đã wire onMessage + onMessageOpenedApp listeners',
+    );
   }
 
   Future<void> _saveToken(String token) async {
     final uid = ref.read(currentUidProvider).valueOrNull;
-    if (uid == null) return;
-    await ref.read(notificationRepositoryProvider).saveFcmToken(uid, token);
+    if (uid == null) {
+      _notiLog(
+        '⚠️ _saveToken bị skip vì uid null — user chưa login. Token sẽ được save khi auth ready',
+      );
+      return;
+    }
+    _notiLog('Lưu token cho uid=$uid');
+    try {
+      await ref.read(notificationRepositoryProvider).saveFcmToken(uid, token);
+      _notiLog('✓ Save token thành công cho uid=$uid');
+    } catch (e, st) {
+      _notiLog('❌ Save token THẤT BẠI cho uid=$uid', error: e);
+      developer.log('stacktrace', name: 'MEEP-NOTI', stackTrace: st);
+    }
   }
 
   Future<void> _initLocalNotifications() async {
@@ -117,9 +163,25 @@ class NotificationController extends _$NotificationController {
   }
 
   void _handleForeground(RemoteMessage message) {
-    if (state.bannerSuppressed) return;
+    _notiLog(
+      'Nhận foreground message: messageId=${message.messageId}, '
+      'title=${message.notification?.title}, '
+      'body=${message.notification?.body}, '
+      'dataKeys=${message.data.keys.toList()}',
+    );
+    if (state.bannerSuppressed) {
+      _notiLog(
+        'Banner đang bị suppress (user tắt) → không hiện banner trong app, chỉ show local noti',
+      );
+      return;
+    }
 
     final notification = message.notification;
+    if (notification == null) {
+      _notiLog(
+        '⚠️ Message không có .notification (data-only message) → không show local noti, chỉ update banner state',
+      );
+    }
     if (notification != null) {
       // Unique ID per push — `notification.hashCode` collides on duplicate
       // title+body (vd 2 reactions from same friend) and silently replaces
@@ -183,6 +245,9 @@ class NotificationController extends _$NotificationController {
     final messageId = message.messageId ?? 'no-id-${message.hashCode}';
     final data = Map<String, String>.from(
       message.data.map((k, v) => MapEntry(k, v.toString())),
+    );
+    _notiLog(
+      'User tap notification → mở app: messageId=$messageId, type=${data['type']}, data=$data',
     );
     state = state.copyWith(
       lastOpenedApp: OpenedAppPayload(messageId: messageId, data: data),

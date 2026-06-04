@@ -30,23 +30,37 @@ export const onFriendRequestCreated = onDocumentCreated(
   { document: 'friend_requests/{requestId}', region: 'asia-southeast1' },
   async (event) => {
     const raw = event.data?.data();
-    if (!raw) return;
+    if (!raw) {
+      logger.warn('[FRIEND-REQ-DEBUG] Trigger nổ nhưng event.data rỗng → bỏ qua');
+      return;
+    }
+
+    const { requestId } = event.params;
+    logger.info(
+      { requestId },
+      '[FRIEND-REQ-DEBUG] Trigger onFriendRequestCreated bắt đầu chạy',
+    );
 
     const data = raw as Partial<FriendRequestData>;
     const senderId = typeof data.senderId === 'string' ? data.senderId : '';
     const receiverId = typeof data.receiverId === 'string' ? data.receiverId : '';
     if (!senderId || !receiverId) {
-      logger.warn('onFriendRequestCreated: missing sender/receiver', {
-        requestId: event.params.requestId,
+      logger.warn('[FRIEND-REQ-DEBUG] Thiếu senderId hoặc receiverId → bỏ qua', {
+        requestId,
+        hasSender: !!senderId,
+        hasReceiver: !!receiverId,
       });
       return;
     }
 
-    const { requestId } = event.params;
     const db = getFirestore();
 
     const senderSnap = await db.doc(`users/${senderId}`).get();
     const senderName = readDisplayName(senderSnap.data());
+    logger.info(
+      { requestId, senderId, receiverId, senderName },
+      '[FRIEND-REQ-DEBUG] Đọc xong sender, chuẩn bị build payload',
+    );
 
     const payload = buildFriendRequestPayload(senderName, requestId, senderId);
 
@@ -62,14 +76,19 @@ export const onFriendRequestCreated = onDocumentCreated(
         read: false,
         createdAt: FieldValue.serverTimestamp(),
       });
+      logger.info(
+        { receiverId, requestId },
+        '[FRIEND-REQ-DEBUG] Đã tạo notification doc, chuẩn bị gửi FCM',
+      );
     } catch (e) {
       if (isAlreadyExists(e)) {
-        logger.info('onFriendRequestCreated: notification already exists, skip', {
+        logger.info('[FRIEND-REQ-DEBUG] Notification đã tồn tại (trigger fire 2 lần) → bỏ qua', {
           requestId,
           receiverId,
         });
         return;
       }
+      logger.error('[FRIEND-REQ-DEBUG] Lỗi khi tạo notification doc', { requestId, error: e });
       throw e;
     }
 
@@ -79,6 +98,10 @@ export const onFriendRequestCreated = onDocumentCreated(
       data: payload.data,
       channelId: 'friend',
     });
+    logger.info(
+      { receiverId, requestId },
+      '[FRIEND-REQ-DEBUG] Đã gọi xong sendFcmToUser',
+    );
   },
 );
 

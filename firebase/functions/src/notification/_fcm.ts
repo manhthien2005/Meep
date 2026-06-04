@@ -33,8 +33,24 @@ export async function sendFcmToUser(
   uid: string,
   payload: FcmPayload,
 ): Promise<void> {
+  logger.info(
+    { uid, title: payload.title, channelId: payload.channelId },
+    '[FCM-DEBUG] Bắt đầu gửi notification cho user',
+  );
+
   const tokenSnap = await db.collection(`users/${uid}/fcmTokens`).get();
-  if (tokenSnap.empty) return;
+  logger.info(
+    { uid, totalDocs: tokenSnap.size, path: `users/${uid}/fcmTokens` },
+    '[FCM-DEBUG] Đã đọc token snapshot từ Firestore',
+  );
+
+  if (tokenSnap.empty) {
+    logger.warn(
+      { uid },
+      '[FCM-DEBUG] User không có token nào trong fcmTokens → bỏ qua gửi push (user chưa login hoặc chưa save token)',
+    );
+    return;
+  }
 
   const tokens: string[] = [];
   const tokenRefs: FirebaseFirestore.DocumentReference[] = [];
@@ -45,7 +61,18 @@ export async function sendFcmToUser(
       tokenRefs.push(doc.ref);
     }
   }
-  if (tokens.length === 0) return;
+  if (tokens.length === 0) {
+    logger.warn(
+      { uid, totalDocs: tokenSnap.size },
+      '[FCM-DEBUG] Có doc nhưng không có token hợp lệ (field token rỗng hoặc sai type) → bỏ qua',
+    );
+    return;
+  }
+
+  logger.info(
+    { uid, validTokenCount: tokens.length },
+    '[FCM-DEBUG] Đã lọc xong token hợp lệ, chuẩn bị gọi sendEachForMulticast',
+  );
 
   // Lazy-import to keep cold-start light (firebase/functions/CLAUDE.md).
   const { getMessaging } = await import('firebase-admin/messaging');
@@ -58,9 +85,29 @@ export async function sendFcmToUser(
       android: { notification: { channelId: payload.channelId } },
     });
 
+    logger.info(
+      {
+        uid,
+        successCount: response.successCount,
+        failureCount: response.failureCount,
+        totalTokens: tokens.length,
+      },
+      '[FCM-DEBUG] Kết quả multicast từ FCM',
+    );
+
     const invalidRefs: FirebaseFirestore.DocumentReference[] = [];
     response.responses.forEach((r, i) => {
       if (r.success) return;
+      logger.warn(
+        {
+          uid,
+          tokenIndex: i,
+          errorCode: r.error?.code,
+          errorMessage: r.error?.message,
+          isPermanent: isPermanentTokenError(r.error?.code),
+        },
+        '[FCM-DEBUG] Một token gửi fail',
+      );
       if (isPermanentTokenError(r.error?.code)) {
         const ref = tokenRefs[i];
         if (ref) invalidRefs.push(ref);
@@ -71,9 +118,16 @@ export async function sendFcmToUser(
       const batch = db.batch();
       invalidRefs.forEach((ref) => batch.delete(ref));
       await batch.commit();
+      logger.info(
+        { uid, prunedCount: invalidRefs.length },
+        '[FCM-DEBUG] Đã xóa token không còn hợp lệ khỏi Firestore',
+      );
     }
   } catch (e) {
-    logger.error('FCM multicast failed', { uid, error: e });
+    logger.error('[FCM-DEBUG] FCM multicast throw exception (network/quota?)', {
+      uid,
+      error: e,
+    });
   }
 }
 

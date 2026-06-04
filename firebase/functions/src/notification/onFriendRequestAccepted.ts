@@ -28,24 +28,44 @@ export const onFriendRequestAccepted = onDocumentUpdated(
   async (event) => {
     const before = event.data?.before.data() as FriendRequestSnapshot | undefined;
     const after = event.data?.after.data() as FriendRequestSnapshot | undefined;
-    if (!before || !after) return;
-
-    if (!isAcceptedTransition(before.status, after.status)) return;
-
-    const senderId = typeof after.senderId === 'string' ? after.senderId : '';
-    const receiverId = typeof after.receiverId === 'string' ? after.receiverId : '';
-    if (!senderId || !receiverId) {
-      logger.warn('onFriendRequestAccepted: missing sender/receiver', {
-        requestId: event.params.requestId,
-      });
+    if (!before || !after) {
+      logger.warn('[FRIEND-ACCEPT-DEBUG] Trigger nổ nhưng before/after rỗng → bỏ qua');
       return;
     }
 
     const { requestId } = event.params;
+    logger.info(
+      { requestId, beforeStatus: before.status, afterStatus: after.status },
+      '[FRIEND-ACCEPT-DEBUG] Trigger onFriendRequestAccepted bắt đầu, kiểm tra transition',
+    );
+
+    if (!isAcceptedTransition(before.status, after.status)) {
+      logger.info(
+        { requestId, beforeStatus: before.status, afterStatus: after.status },
+        '[FRIEND-ACCEPT-DEBUG] Không phải transition pending→accepted → bỏ qua',
+      );
+      return;
+    }
+
+    const senderId = typeof after.senderId === 'string' ? after.senderId : '';
+    const receiverId = typeof after.receiverId === 'string' ? after.receiverId : '';
+    if (!senderId || !receiverId) {
+      logger.warn('[FRIEND-ACCEPT-DEBUG] Thiếu senderId hoặc receiverId → bỏ qua', {
+        requestId,
+        hasSender: !!senderId,
+        hasReceiver: !!receiverId,
+      });
+      return;
+    }
+
     const db = getFirestore();
 
     const receiverSnap = await db.doc(`users/${receiverId}`).get();
     const receiverName = readDisplayName(receiverSnap.data());
+    logger.info(
+      { requestId, senderId, receiverId, receiverName },
+      '[FRIEND-ACCEPT-DEBUG] Đọc xong receiver, chuẩn bị notify sender',
+    );
 
     const title = `${receiverName} đã chấp nhận lời mời kết bạn`;
     const body = 'Các bạn giờ là bạn bè trên Meep!';
@@ -66,14 +86,19 @@ export const onFriendRequestAccepted = onDocumentUpdated(
         read: false,
         createdAt: FieldValue.serverTimestamp(),
       });
+      logger.info(
+        { senderId, requestId },
+        '[FRIEND-ACCEPT-DEBUG] Đã tạo notification doc, chuẩn bị gửi FCM cho sender',
+      );
     } catch (e) {
       if (isAlreadyExists(e)) {
-        logger.info('onFriendRequestAccepted: notification already exists, skip', {
+        logger.info('[FRIEND-ACCEPT-DEBUG] Notification đã tồn tại (trigger fire 2 lần) → bỏ qua', {
           requestId,
           senderId,
         });
         return;
       }
+      logger.error('[FRIEND-ACCEPT-DEBUG] Lỗi khi tạo notification doc', { requestId, error: e });
       throw e;
     }
 
@@ -83,6 +108,10 @@ export const onFriendRequestAccepted = onDocumentUpdated(
       data,
       channelId: 'friend',
     });
+    logger.info(
+      { senderId, requestId },
+      '[FRIEND-ACCEPT-DEBUG] Đã gọi xong sendFcmToUser',
+    );
   },
 );
 

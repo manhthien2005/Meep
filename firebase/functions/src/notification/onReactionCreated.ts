@@ -38,30 +38,46 @@ export const onReactionCreated = onDocumentCreated(
   },
   async (event) => {
     const raw = event.data?.data() as ReactionData | undefined;
-    if (!raw) return;
+    if (!raw) {
+      logger.warn('[REACTION-DEBUG] Trigger nổ nhưng event.data rỗng → bỏ qua');
+      return;
+    }
 
     const { postId, reactorUid: reactorId } = event.params;
+    logger.info(
+      { postId, reactorId },
+      '[REACTION-DEBUG] Trigger onReactionCreated bắt đầu chạy',
+    );
+
     const emoji = typeof raw.emoji === 'string' ? raw.emoji : '';
     if (!emoji) {
-      logger.warn('onReactionCreated: missing emoji', { postId, reactorId });
+      logger.warn('[REACTION-DEBUG] Reaction thiếu emoji → bỏ qua', { postId, reactorId });
       return;
     }
 
     const db = getFirestore();
     const postSnap = await db.doc(`posts/${postId}`).get();
     if (!postSnap.exists) {
-      // Post was deleted between reaction write and trigger fire — onPostDeleted
-      // will sweep the reactions subcollection. Nothing to notify.
+      logger.warn(
+        { postId, reactorId },
+        '[REACTION-DEBUG] Post không tồn tại (có thể đã xóa) → bỏ qua notification',
+      );
       return;
     }
     const post = postSnap.data() as PostData | undefined;
     const authorId = typeof post?.authorId === 'string' ? post.authorId : '';
     if (!authorId) {
-      logger.warn('onReactionCreated: post has no authorId', { postId });
+      logger.warn('[REACTION-DEBUG] Post không có authorId → bỏ qua', { postId });
       return;
     }
 
-    if (isSelfReaction(reactorId, authorId)) return;
+    if (isSelfReaction(reactorId, authorId)) {
+      logger.info(
+        { postId, reactorId },
+        '[REACTION-DEBUG] User react vào post của chính mình → không gửi thông báo',
+      );
+      return;
+    }
 
     // Denormalized name preferred; fall back to a fresh /users read.
     let reactorName =
@@ -93,14 +109,19 @@ export const onReactionCreated = onDocumentCreated(
         read: false,
         createdAt: FieldValue.serverTimestamp(),
       });
+      logger.info(
+        { authorId, postId, reactorId },
+        '[REACTION-DEBUG] Đã tạo notification doc trong Firestore, chuẩn bị gửi FCM',
+      );
     } catch (e) {
       if (isAlreadyExists(e)) {
-        logger.info('onReactionCreated: notification already exists, skip', {
+        logger.info('[REACTION-DEBUG] Notification đã tồn tại (trigger fire 2 lần) → bỏ qua', {
           postId,
           reactorId,
         });
         return;
       }
+      logger.error('[REACTION-DEBUG] Lỗi khi tạo notification doc', { postId, reactorId, error: e });
       throw e;
     }
 
@@ -110,6 +131,10 @@ export const onReactionCreated = onDocumentCreated(
       data,
       channelId: 'reaction',
     });
+    logger.info(
+      { authorId, postId, reactorId },
+      '[REACTION-DEBUG] Đã gọi xong sendFcmToUser',
+    );
   },
 );
 
