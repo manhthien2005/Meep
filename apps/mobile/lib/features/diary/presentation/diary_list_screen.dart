@@ -60,12 +60,22 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     // Riverpod pattern chuẩn: ref.listenManual fire ngay với current value +
     // mọi emit sau. Trigger loadEntries 1 lần / uid; sign out → sign in lại
     // với uid khác sẽ tự re-trigger.
+    //
+    // Controller keepAlive=true → state persist qua navigation. Skip reload
+    // nếu controller đã có entries (avoid re-fetch khi quay về list từ canvas).
     ref.listenManual<AsyncValue<String?>>(
       currentUidProvider,
       (_, next) {
         final uid = next.valueOrNull;
         if (uid == null || _loadedForUid == uid) return;
         _loadedForUid = uid;
+
+        final state = ref.read(diaryControllerProvider);
+        if (state.entries.isNotEmpty) {
+          // Controller keepAlive đã có data — skip reload, render ngay.
+          return;
+        }
+
         _loadingStartAt = DateTime.now();
         ref.read(diaryControllerProvider.notifier).loadEntries(uid);
       },
@@ -249,7 +259,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             ),
           ),
 
-          // Avatar — load từ profile, tap → SettingsSheet
+          // Avatar — match chat module pattern: imageUrl + fallback initials.
+          // Tap → SettingsSheet.
           Semantics(
             button: true,
             label: 'Cài đặt',
@@ -266,6 +277,12 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                     .valueOrNull
                     ?.avatarUrl,
                 size: 40,
+                fallbackText: avatarFallbackFromName(
+                  ref
+                      .watch(currentUserProfileProvider)
+                      .valueOrNull
+                      ?.displayName,
+                ),
               ),
             ),
           ),
@@ -406,7 +423,9 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
         crossAxisCount: 2,
         mainAxisSpacing: 32,
         crossAxisSpacing: 32,
-        childAspectRatio: 150.5 / 182,
+        // Buffer 4px height: tránh overflow 1-2px do font/scale rounding
+        // (text line-height float làm DiaryMoodCard cao hơn 182 logical px).
+        childAspectRatio: 150.5 / 186,
       ),
       itemCount: entries.length,
       itemBuilder: (context, index) {

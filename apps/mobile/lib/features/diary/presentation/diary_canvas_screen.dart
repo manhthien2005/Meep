@@ -763,27 +763,46 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
   }
 
   /// Preview ảnh inline đã pick (create/edit, trước save).
+  /// Layout match `PolaroidImageBlock` — ảnh nằm trong "Picture Window"
+  /// region (5.69% left, 4.53% top, 88.6% width, 73% height) của frame.
   List<Widget> _buildPickedInlinePreviews() {
-    return _inlineImageBytes.asMap().entries.map((e) {
+    // Tỉ lệ Picture Window trong frame Polaroid (Figma 769:5116).
+    const picLeft = 15.79 / 277.63;
+    const picTop = 15.36 / 339;
+    const picWidth = 246.02 / 277.63;
+    const picHeight = 247.4 / 339;
+    const aspect = 277.63 / 339;
+
+    return _inlineImageBytes.map((bytes) {
       return Column(
         children: [
           const SizedBox(height: 24),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(5.33),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Image.memory(
-                  e.value,
-                  fit: BoxFit.contain,
-                  width: double.infinity,
-                ),
-                // Polaroid frame overlay
-                Image.asset(
-                  'assets/frames/frame_polaroid.png',
-                  fit: BoxFit.contain,
-                ),
-              ],
+          AspectRatio(
+            aspectRatio: aspect,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final w = constraints.maxWidth;
+                final h = constraints.maxHeight;
+                return Stack(
+                  children: [
+                    // 1. Frame asset background (white border + textured lattice).
+                    Positioned.fill(
+                      child: Image.asset(
+                        'assets/frames/frame_polaroid.png',
+                        fit: BoxFit.fill,
+                      ),
+                    ),
+                    // 2. User image positioned vào Picture Window region.
+                    Positioned(
+                      left: w * picLeft,
+                      top: h * picTop,
+                      width: w * picWidth,
+                      height: h * picHeight,
+                      child: Image.memory(bytes, fit: BoxFit.cover),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
