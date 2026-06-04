@@ -1,26 +1,54 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:gal/gal.dart';
+import 'package:http/http.dart' as http;
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/feed/application/post_controller.dart';
+import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
+import 'package:share_plus/share_plus.dart';
 
 const _cSheetBg = Color(0xFF252627);
 const _cButtonFill = Color(0xFF394041);
 
-class SharePhotoSheet extends StatelessWidget {
-  const SharePhotoSheet({super.key});
+/// Bottom sheet "Chia sẻ đến..." cho ảnh post.
+///
+/// Figma: Profile `573:3648` / Streak `633:3546` — cùng layout.
+/// Reused bởi Profile module + Streak module.
+///
+/// Logic:
+/// - **Chia sẻ** → `Share.shareUri(post.coverImageUrl)` native
+/// - **Messenger / Instagram** → TODO post-MVP (cần add `url_launcher` package — leader-gated)
+/// - **Tin nhắn** → disabled M3 (Chat module Tier 1 sau)
+/// - **Lưu** → `http.get(coverImageUrl)` + `Gal.putImageBytes`
+/// - **Xoá** → chỉ hiện khi `isAuthor` → `postController.deletePost`
+class SharePhotoSheet extends ConsumerWidget {
+  const SharePhotoSheet({
+    super.key,
+    required this.post,
+    required this.isAuthor,
+  });
 
-  static Future<void> show(BuildContext context) {
+  final Post post;
+  final bool isAuthor;
+
+  static Future<void> show(
+    BuildContext context, {
+    required Post post,
+    required bool isAuthor,
+  }) {
     return showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => const SharePhotoSheet(),
+      builder: (_) => SharePhotoSheet(post: post, isAuthor: isAuthor),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return SizedBox(
       height: 265,
       child: AppBottomSheet(
@@ -40,38 +68,43 @@ class SharePhotoSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 26),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 26),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _ShareTarget(
                     iconAsset: 'assets/icons/ic_share_outline.svg',
-                    outerColor: Color(0xFF656c6d),
-                    innerColor: Color(0xFF656c6d),
+                    outerColor: const Color(0xFF656c6d),
+                    innerColor: const Color(0xFF656c6d),
                     label: 'Chia sẻ',
                     isIcon: true,
+                    onTap: () => _onNativeShare(context),
                   ),
                   _ShareTarget(
                     logoAsset: 'assets/icons/ic_logo_messenger.svg',
-                    outerColor: Color(0xFFDEE5E6),
+                    outerColor: const Color(0xFFDEE5E6),
                     innerColor: Colors.transparent,
                     label: 'Messenger',
                     isIcon: false,
+                    onTap: () => _onMessengerShare(context),
                   ),
                   _ShareTarget(
                     logoAsset: 'assets/icons/ic_logo_instagram.svg',
-                    outerColor: Color(0xFFDEE5E6),
+                    outerColor: const Color(0xFFDEE5E6),
                     innerColor: Colors.transparent,
                     label: 'Instagram',
                     isIcon: false,
+                    onTap: () => _onInstagramShare(context),
                   ),
-                  _ShareTarget(
+                  const _ShareTarget(
                     logoAsset: 'assets/icons/ic_logo_sms.svg',
                     outerColor: Color(0xFFDEE5E6),
                     innerColor: Colors.transparent,
                     label: 'Tin nhắn',
                     isIcon: false,
+                    enabled: false, // M3: Chat module disabled
+                    onTap: null,
                   ),
                 ],
               ),
@@ -85,17 +118,19 @@ class SharePhotoSheet extends StatelessWidget {
                     child: _ActionButton(
                       iconAsset: 'assets/icons/ic_download.svg',
                       label: 'Lưu',
-                      onTap: () => Navigator.of(context).pop(),
+                      onTap: () => _onSave(context),
                     ),
                   ),
-                  const SizedBox(width: 19),
-                  Expanded(
-                    child: _ActionButton(
-                      iconAsset: 'assets/icons/ic_trash.svg',
-                      label: 'Xoá',
-                      onTap: () => Navigator.of(context).pop(),
+                  if (isAuthor) ...[
+                    const SizedBox(width: 19),
+                    Expanded(
+                      child: _ActionButton(
+                        iconAsset: 'assets/icons/ic_trash.svg',
+                        label: 'Xoá',
+                        onTap: () => _onDelete(context, ref),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -104,6 +139,54 @@ class SharePhotoSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _onNativeShare(BuildContext context) async {
+    final url = post.coverImageUrl;
+    Navigator.of(context).pop();
+    if (url.isEmpty) return;
+    await Share.shareUri(Uri.parse(url));
+  }
+
+  // TODO(ST3+/post-MVP): Messenger/Instagram deeplink cần `url_launcher` package
+  // — leader-gated dependency add. Hiện tại chỉ pop sheet (placeholder match
+  // behavior của ShareModal trong Feed module).
+  void _onMessengerShare(BuildContext context) {
+    Navigator.of(context).pop();
+  }
+
+  void _onInstagramShare(BuildContext context) {
+    Navigator.of(context).pop();
+  }
+
+  Future<void> _onSave(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final url = post.coverImageUrl;
+    Navigator.of(context).pop();
+    if (url.isEmpty) return;
+    try {
+      final response = await http.get(Uri.parse(url));
+      await Gal.putImageBytes(response.bodyBytes);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Đã lưu ảnh')),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Không thể lưu ảnh, thử lại')),
+      );
+    }
+  }
+
+  Future<void> _onDelete(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    Navigator.of(context).pop();
+    try {
+      await ref.read(postControllerProvider.notifier).deletePost(post.postId);
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Không thể xoá, thử lại')),
+      );
+    }
   }
 }
 
@@ -117,6 +200,8 @@ class _ShareTarget extends StatelessWidget {
     required this.isIcon,
     this.iconAsset,
     this.logoAsset,
+    this.onTap,
+    this.enabled = true,
   });
 
   final String label;
@@ -125,13 +210,14 @@ class _ShareTarget extends StatelessWidget {
   final bool isIcon;
   final String? iconAsset;
   final String? logoAsset;
+  final VoidCallback? onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Outer ring (50px) visible as border + inner content (42px)
         Container(
           width: 50,
           height: 50,
@@ -175,6 +261,19 @@ class _ShareTarget extends StatelessWidget {
           style: AppTextStyles.smSemiBold.copyWith(color: AppColors.bw100),
         ),
       ],
+    );
+
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.5,
+      child: Semantics(
+        button: enabled,
+        label: label,
+        child: GestureDetector(
+          onTap: enabled ? onTap : null,
+          behavior: HitTestBehavior.opaque,
+          child: content,
+        ),
+      ),
     );
   }
 }
