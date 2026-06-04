@@ -7,13 +7,14 @@ import 'package:meep/features/notification/application/notification_state.dart';
 
 /// Figma component `Noti` — overlay notification banner.
 ///
-/// Collapsed (h=65, `765:4981`): logo + senderName + timestamp + chevron-down
-/// + message preview.
-/// Expanded (h=112, `765:4766`): same top row + [Trả lời] + [Tắt thông báo].
+/// UX: single-tap = open the screen the notification points at (giống
+/// Android tray, Locket, Snapchat); long-press = "Tắt thông báo" (suppress
+/// banners cho session, vẫn nhận push tray). Auto-dismiss sau 4s do timer
+/// trong [NotificationController]. Expand/collapse + 2 actions trong Figma
+/// đã được lược bỏ vì conflict với tap-to-open — quan trọng hơn.
 
 const _bannerWidth = 364.0;
-const _collapsedHeight = 65.0;
-const _expandedHeight = 112.0;
+const _bannerHeight = 65.0;
 const _logoSize = 40.0;
 
 const _senderNameStyle = TextStyle(
@@ -37,21 +38,22 @@ const _previewStyle = TextStyle(
   height: 18 / 13,
 );
 
-const _actionStyle = TextStyle(
-  fontFamily: 'Nunito',
-  fontSize: 12,
-  fontWeight: FontWeight.w400,
-  height: 16 / 12,
-);
-
 class NotificationBanner extends StatefulWidget {
   const NotificationBanner({
     super.key,
     required this.payload,
+    required this.onTap,
     required this.onSuppress,
   });
 
   final BannerPayload payload;
+
+  /// Tap → consume payload + route. Caller (main.dart) gọi
+  /// `notificationController.openBannerAsTap()` để emit `OpenedAppPayload`
+  /// cho router consume.
+  final VoidCallback onTap;
+
+  /// Long-press → suppress banner cho phiên hiện tại (push tray vẫn nhận).
   final VoidCallback onSuppress;
 
   @override
@@ -60,7 +62,6 @@ class NotificationBanner extends StatefulWidget {
 
 class _NotificationBannerState extends State<NotificationBanner>
     with SingleTickerProviderStateMixin {
-  bool _expanded = false;
   late final AnimationController _slideController;
   late final Animation<Offset> _slideAnim;
 
@@ -102,11 +103,9 @@ class _NotificationBannerState extends State<NotificationBanner>
   Widget build(BuildContext context) {
     return SlideTransition(
       position: _slideAnim,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
+      child: Container(
         width: _bannerWidth,
-        height: _expanded ? _expandedHeight : _collapsedHeight,
+        height: _bannerHeight,
         decoration: BoxDecoration(
           color: const Color(0xE02D2D2F),
           borderRadius: BorderRadius.circular(20),
@@ -115,108 +114,51 @@ class _NotificationBannerState extends State<NotificationBanner>
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
-            onTap: () => setState(() => _expanded = !_expanded),
+            onTap: widget.onTap,
+            onLongPress: widget.onSuppress,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Top row ──────────────────────────────────────────
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SvgPicture.asset(
-                        'assets/icons/ic_logo_sheet.svg',
-                        width: _logoSize,
-                        height: _logoSize,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  SvgPicture.asset(
+                    'assets/icons/ic_logo_sheet.svg',
+                    width: _logoSize,
+                    height: _logoSize,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    widget.payload.title,
-                                    style: _senderNameStyle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _formatTime(widget.payload.timestamp),
-                                  style: _timestampStyle,
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(
-                                  _expanded
-                                      ? Icons.keyboard_arrow_up
-                                      : Icons.keyboard_arrow_down,
-                                  color: AppColors.bw500,
-                                  size: 18,
-                                ),
-                              ],
+                            Expanded(
+                              child: Text(
+                                widget.payload.title,
+                                style: _senderNameStyle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(width: 8),
                             Text(
-                              widget.payload.body,
-                              style: _previewStyle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              _formatTime(widget.payload.timestamp),
+                              style: _timestampStyle.copyWith(
+                                color: AppColors.bw500,
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                  // ── Expanded actions ─────────────────────────────────
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeInOut,
-                    alignment: Alignment.topCenter,
-                    child: _expanded
-                        ? Padding(
-                            padding: const EdgeInsets.only(top: 10),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      // TODO(N/T4/KhoaLND): wire to Chat 1-1 module
-                                    },
-                                    child: Text(
-                                      'Trả lời',
-                                      textAlign: TextAlign.center,
-                                      style: _actionStyle.copyWith(
-                                        color: AppColors.bw500,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Container(
-                                  width: 1,
-                                  height: 14,
-                                  color: AppColors.bw500.withValues(alpha: 0.3),
-                                ),
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: widget.onSuppress,
-                                    child: Text(
-                                      'Tắt thông báo',
-                                      textAlign: TextAlign.center,
-                                      style: _actionStyle.copyWith(
-                                        color: AppColors.bw500,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : const SizedBox.shrink(),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.payload.body,
+                          style: _previewStyle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

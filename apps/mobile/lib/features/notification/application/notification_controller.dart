@@ -168,6 +168,29 @@ class NotificationController extends _$NotificationController {
     });
   }
 
+  /// User tap vào banner foreground → biến `currentBanner.data` thành
+  /// [OpenedAppPayload] để router (`appRouter` ref.listen) tự route +
+  /// consume. Banner bị clear ngay để tránh hiển thị trùng với screen
+  /// đích vừa mở.
+  ///
+  /// Synthetic `messageId` — banner foreground không có FCM `messageId`
+  /// (đây là delivery `onMessage` chứ không phải `onMessageOpenedApp`).
+  /// Dùng microsecond stamp của `BannerPayload.timestamp` đảm bảo 2 banner
+  /// liên tiếp tap không bị freezed `==` dedupe về cùng một payload.
+  void openBannerAsTap() {
+    final banner = state.currentBanner;
+    if (banner == null) return;
+    final messageId = 'banner-${banner.timestamp.microsecondsSinceEpoch}';
+    _bannerTimer?.cancel();
+    state = state.copyWith(
+      currentBanner: null,
+      lastOpenedApp: OpenedAppPayload(
+        messageId: messageId,
+        data: banner.data,
+      ),
+    );
+  }
+
   /// Wraps a tapped `RemoteMessage` into [OpenedAppPayload] and writes it
   /// to state — the router's `ref.listen` consumes it and routes once.
   ///
