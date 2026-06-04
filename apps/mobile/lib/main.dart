@@ -24,6 +24,7 @@ import 'package:meep/features/reaction/data/firebase_reaction_repository.dart';
 import 'package:meep/features/chat/data/firebase_conversation_repository.dart';
 import 'package:meep/features/diary/application/diary_controller.dart';
 import 'package:meep/features/diary/data/firebase_diary_repository.dart';
+import 'package:meep/features/diary/data/image_picker_service.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/data/firebase_friend_repository.dart';
 import 'package:meep/features/friend/data/firebase_friend_request_repository.dart';
@@ -129,6 +130,9 @@ void main() async {
         ),
         diaryStorageClientProvider.overrideWithValue(
           FirebaseDiaryStorageClient(FirebaseStorage.instance),
+        ),
+        imagePickerServiceProvider.overrideWithValue(
+          const FlutterImagePickerService(),
         ),
         streakRepositoryProvider.overrideWithValue(
           FirebaseStreakRepository(FirebaseFirestore.instance),

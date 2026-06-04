@@ -3,10 +3,15 @@ part of 'diary_canvas_screen.dart';
 /// Content toolbar — 4 SVG icons: image, type, align, smile.
 /// Figma `658:6070` (Frame 1570, Turquoise/200 bg + Turquoise/500 border).
 class _ContentToolbar extends StatelessWidget {
-  const _ContentToolbar({required this.onType, required this.onAlign});
+  const _ContentToolbar({
+    required this.onType,
+    required this.onAlign,
+    required this.onImage,
+  });
 
   final VoidCallback onType;
   final VoidCallback onAlign;
+  final VoidCallback onImage;
 
   @override
   Widget build(BuildContext context) {
@@ -22,10 +27,8 @@ class _ContentToolbar extends StatelessWidget {
         children: [
           _SvgIconBtn(
             asset: 'assets/icons/ic_diary_image.svg',
-            semanticLabel: 'Chèn ảnh',
-            onTap: () {
-              // TODO(D/T8/HanDHG): chèn ảnh inline (Polaroid frame)
-            },
+            semanticLabel: 'Chọn ảnh bìa',
+            onTap: onImage,
           ),
           const SizedBox(width: 22),
           _SvgIconBtn(

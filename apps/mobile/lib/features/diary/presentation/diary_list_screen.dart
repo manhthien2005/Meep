@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/diary/application/diary_controller.dart';
+import 'package:meep/features/diary/data/diary_content_block.dart';
 import 'package:meep/features/diary/data/diary_entry.dart';
 import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
 import 'package:meep/features/diary/presentation/diary_search_screen.dart';
@@ -20,113 +24,79 @@ part 'diary_list_screen_mood_picker.dart';
 /// Mood picker là overlay inline: tap FAB [+] → FAB xoay thành [x] + nền
 /// đổi xám, scrim mờ + 5 mood arc bao quanh nửa trên FAB. Tap [x] hoặc
 /// scrim → đóng.
-class DiaryListScreen extends StatefulWidget {
+class DiaryListScreen extends ConsumerStatefulWidget {
   const DiaryListScreen({super.key});
 
   @override
-  State<DiaryListScreen> createState() => _DiaryListScreenState();
-}
-
-// DEV mock data — chỉ dùng cho TextButton mở Canvas read demo. Xoá khi
-// wire DiaryRepository thật.
-const _devMockContent =
-    'Hôm nay là một ngày thật tuyệt vời. Mình đã đi dạo bên bờ biển '
-    'cùng các bạn thân, mặt trời lặn nhuộm cả bầu trời thành màu cam '
-    'rực rỡ. Mình ngồi đó nghe sóng vỗ, ngắm những con thuyền nhỏ '
-    'lướt trên mặt nước. Có những khoảnh khắc bình yên đến lạ thường, '
-    'khi mọi lo toan tan biến và mình chỉ còn cảm nhận được hơi thở '
-    'của biển cả.';
-const _devMockImageUrl = 'https://picsum.photos/seed/diary/600/600';
-
-// DEV mock entries cho Grid/List view — xoá khi wire DiaryRepository.
-class _MockEntry {
-  const _MockEntry({
-    required this.title,
-    required this.date,
-    required this.mood,
-    this.content = '',
-  });
-
-  final String title;
-  final DateTime date;
-  final MoodTemplate mood;
-
-  /// Body text — non-empty cho seed entries để Canvas read mode demo có
-  /// nội dung. Empty cho entry mới tạo từ Canvas (chưa nhập gì).
-  final String content;
+  ConsumerState<DiaryListScreen> createState() => _DiaryListScreenState();
 }
 
 /// Format ngắn cho card display: "DD th MM".
 String _formatShortDate(DateTime d) => '${d.day} th ${d.month}';
 
-/// Seed mock entries — khi mở app lần đầu. State sau đó mutable trong
-/// `_DiaryListScreenState._entries` để insert entry mới khi save Canvas.
-final List<_MockEntry> _seedMockEntries = [
-  _MockEntry(
-    title: 'Happy!',
-    date: DateTime(2026, 5, 22),
-    mood: MoodTemplate.happy,
-  ),
-  _MockEntry(
-    title: 'Tired',
-    date: DateTime(2026, 5, 20),
-    mood: MoodTemplate.tired,
-  ),
-  _MockEntry(
-    title: 'Title nhật ký',
-    date: DateTime(2026, 5, 19),
-    mood: MoodTemplate.bored,
-  ),
-  _MockEntry(
-    title: 'Đà lạt',
-    date: DateTime(2026, 5, 18),
-    mood: MoodTemplate.happy,
-  ),
-];
-
 /// View mode cho danh sách nhật ký — Grid 2-col vs List dọc.
 enum _ViewMode { grid, list }
 
-class _DiaryListScreenState extends State<DiaryListScreen> {
+class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   bool _pickerOpen = false;
   _ViewMode _viewMode = _ViewMode.grid;
 
-  /// Mutable copy của seed mock — entry mới insert lên đầu khi user save
-  /// Canvas (FE mock). Khi wire DiaryRepository: bỏ list này, đổi sang
-  /// `StreamProvider` watch `/diary_entries` của user.
-  late final List<_MockEntry> _entries = [..._seedMockEntries];
+  /// Track uid đã trigger loadEntries để không gọi lại khi cùng uid emit
+  /// nhiều lần (vd auth state stream replay).
+  String? _loadedForUid;
+
+  @override
+  void initState() {
+    super.initState();
+    // Riverpod pattern chuẩn: ref.listenManual fire ngay với current value +
+    // mọi emit sau. Trigger loadEntries 1 lần / uid; sign out → sign in lại
+    // với uid khác sẽ tự re-trigger.
+    ref.listenManual<AsyncValue<String?>>(
+      currentUidProvider,
+      (_, next) {
+        final uid = next.valueOrNull;
+        if (uid == null || _loadedForUid == uid) return;
+        _loadedForUid = uid;
+        ref.read(diaryControllerProvider.notifier).loadEntries(uid);
+      },
+      fireImmediately: true,
+    );
+  }
 
   void _togglePicker() => setState(() => _pickerOpen = !_pickerOpen);
   void _closePicker() => setState(() => _pickerOpen = false);
 
-  /// Tap 1 mood trong picker — close picker, push Canvas create, đợi user
-  /// save → insert entry mới lên đầu list.
+  /// Tap 1 mood trong picker — close picker, push Canvas create.
+  /// Sau save: stream `watchEntries` tự đẩy entry mới về `state.entries` —
+  /// KHÔNG cần manual insert như mock cũ.
   Future<void> _onMoodSelected(MoodTemplate mood) async {
     _closePicker();
-    final result = await Navigator.of(context).push<DiaryDraftResult>(
-      MaterialPageRoute<DiaryDraftResult>(
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
         builder: (_) => DiaryCanvasScreen(
           mode: DiaryCanvasMode.create,
           moodTemplate: mood,
         ),
       ),
     );
-    if (result == null || !mounted) return;
-    setState(() {
-      _entries.insert(
-        0,
-        _MockEntry(
-          title: result.caption,
-          date: result.createdAt,
-          mood: result.mood,
-          content: result.content,
-        ),
-      );
-    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Listen errorMessage qua provider.select để show SnackBar khi error
+    // mới fire (kể cả khi đã có entries cũ — branch error trong _buildBody
+    // chỉ render khi empty).
+    ref.listen<String?>(
+      diaryControllerProvider.select((s) => s.errorMessage),
+      (prev, next) {
+        if (next == null || next == prev) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next)),
+        );
+        ref.read(diaryControllerProvider.notifier).clearError();
+      },
+    );
+
     return Scaffold(
       backgroundColor: AppColors.bw900, // #050F10
       body: Stack(
@@ -137,7 +107,7 @@ class _DiaryListScreenState extends State<DiaryListScreen> {
               children: [
                 _buildTopbar(),
                 _buildFilterRow(),
-                // Body co giãn: Grid / List / Empty
+                // Body co giãn: Grid / List / Empty / Loading / Error
                 Expanded(child: _buildBody()),
                 // Padding dưới chừa chỗ cho FAB + taskbar
                 const SizedBox(height: 160),
@@ -327,13 +297,41 @@ class _DiaryListScreenState extends State<DiaryListScreen> {
     );
   }
 
-  // ── Body: render theo view mode hoặc empty state ──
+  // ── Body: render theo controller state ──
   Widget _buildBody() {
-    if (_entries.isEmpty) return _buildEmptyState();
-    return _viewMode == _ViewMode.grid ? _buildGrid() : _buildList();
+    final state = ref.watch(diaryControllerProvider);
+
+    if (state.isLoading && state.entries.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.turquoise500),
+      );
+    }
+
+    if (state.errorMessage != null && state.entries.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            state.errorMessage ?? 'Không tải được nhật ký',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontFamily: 'Nunito',
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.bw500,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (state.entries.isEmpty) return _buildEmptyState();
+    return _viewMode == _ViewMode.grid
+        ? _buildGrid(state.entries)
+        : _buildList(state.entries);
   }
 
-  Widget _buildGrid() {
+  Widget _buildGrid(List<DiaryEntry> entries) {
     return GridView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 39),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -342,49 +340,61 @@ class _DiaryListScreenState extends State<DiaryListScreen> {
         crossAxisSpacing: 32,
         childAspectRatio: 150.5 / 182,
       ),
-      itemCount: _entries.length,
+      itemCount: entries.length,
       itemBuilder: (context, index) {
-        final e = _entries[index];
+        final e = entries[index];
         return DiaryMoodCard(
-          title: e.title,
-          date: _formatShortDate(e.date),
-          mood: e.mood,
+          title: e.moodCaption,
+          date: _formatShortDate(e.createdAt),
+          mood: e.moodTemplate,
           onTap: () => _openCanvasRead(e),
         );
       },
     );
   }
 
-  Widget _buildList() {
+  Widget _buildList(List<DiaryEntry> entries) {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 17),
-      itemCount: _entries.length,
+      itemCount: entries.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        final e = _entries[index];
+        final e = entries[index];
         return DiaryListCard(
-          title: e.title,
-          date: _formatShortDate(e.date),
-          mood: e.mood,
+          title: e.moodCaption,
+          date: _formatShortDate(e.createdAt),
+          mood: e.moodTemplate,
           onTap: () => _openCanvasRead(e),
         );
       },
     );
   }
 
-  void _openCanvasRead(_MockEntry e) {
-    // Entry mới chưa có content → dùng text user vừa nhập (có thể rỗng).
-    // Entry seed (content rỗng) → demo bằng mock content + image.
-    final isSeed = e.content.isEmpty;
+  /// Read mode — T9b sẽ wire đầy đủ (fetch entry + render content blocks).
+  /// PR4a tạm push canvas với fields hiện có; render text content + ảnh
+  /// inline sẽ bổ sung ở T9b.
+  void _openCanvasRead(DiaryEntry e) {
+    // Lấy text content từ block đầu tiên dạng text (nếu có) — placeholder
+    // tới khi T9b render đầy đủ block list.
+    final firstText = e.content.firstWhere(
+      (b) => b.maybeWhen(text: (_, __) => true, orElse: () => false),
+      orElse: () => const DiaryContentBlock.text(value: ''),
+    );
+    final textValue = firstText.maybeWhen(
+      text: (value, _) => value,
+      orElse: () => '',
+    );
+
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => DiaryCanvasScreen(
           mode: DiaryCanvasMode.read,
-          moodTemplate: e.mood,
-          initialCaption: e.title,
-          initialContent: isSeed ? _devMockContent : e.content,
-          initialImageUrl: isSeed ? _devMockImageUrl : null,
-          entryDate: e.date,
+          entryId: e.entryId,
+          moodTemplate: e.moodTemplate,
+          initialCaption: e.moodCaption,
+          initialContent: textValue,
+          initialImageUrl: e.coverImageUrl.isNotEmpty ? e.coverImageUrl : null,
+          entryDate: e.createdAt,
         ),
       ),
     );

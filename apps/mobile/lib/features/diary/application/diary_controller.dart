@@ -9,6 +9,7 @@ import 'package:meep/features/diary/data/diary_content_block.dart';
 import 'package:meep/features/diary/data/diary_entry.dart';
 import 'package:meep/features/diary/data/diary_repository.dart';
 import 'package:meep/features/diary/data/firebase_diary_repository.dart';
+import 'package:meep/features/diary/data/image_picker_service.dart';
 
 part 'diary_controller.freezed.dart';
 part 'diary_controller.g.dart';
@@ -43,6 +44,13 @@ DiaryStorageClient diaryStorageClient(DiaryStorageClientRef ref) =>
     throw UnimplementedError(
       'diaryStorageClientProvider must be overridden — '
       'wire FirebaseDiaryStorageClient in main.dart',
+    );
+
+@Riverpod(keepAlive: true)
+ImagePickerService imagePickerService(ImagePickerServiceRef ref) =>
+    throw UnimplementedError(
+      'imagePickerServiceProvider must be overridden — '
+      'wire FlutterImagePickerService in main.dart',
     );
 
 @riverpod
