@@ -103,10 +103,9 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
   bool _underline = false;
   bool _strikethrough = false;
 
-  /// Cover image bytes — user pick từ gallery qua `ImagePickerService`.
-  /// Null trước khi pick; sau khi pick lưu để gửi vào `controller.saveEntry`.
-  /// Read mode KHÔNG dùng (cover render từ `widget.initialImageUrl`).
-  Uint8List? _coverBytes;
+  /// Inline image bytes — user pick từ gallery qua `ImagePickerService`.
+  /// Mỗi entry = 1 ảnh inline trong content. Max 5 entries.
+  final List<Uint8List> _inlineImageBytes = [];
 
   bool get _isReadOnly => widget.mode == DiaryCanvasMode.read;
 
@@ -203,17 +202,13 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
         MoodTemplate.sad => 'Buồn bã',
       };
 
-  /// Save handler — tap check ở topbar (create mode only ở PR4a).
+  /// Save handler — tap check ở topbar.
   ///
-  /// Validate: phải có mood + cover bytes + content text non-empty.
-  /// Build `DiaryEntry` draft → `controller.saveEntry(draft, coverBytes)`.
-  /// Stream `watchEntries` sẽ tự đẩy entry mới về list khi pop về.
-  ///
-  /// T9b (PR4b) sẽ wire edit mode đầy đủ — hiện tại edit pop trực tiếp.
+  /// Create mode: cover = '' (mood asset là visual, không upload).
+  /// Inline images — upload tuần tự nếu user đã pick.
   Future<void> _handleSave() async {
     final mood = _loadedMood ?? widget.moodTemplate;
     if (mood == null) {
-      // Defensive — create flow phải pass mood từ picker.
       unawaited(Navigator.of(context).maybePop());
       return;
     }
@@ -237,12 +232,10 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
     final caption = _captionController.text.trim().isEmpty
         ? _moodLabel(mood)
         : _captionController.text.trim();
-    final coverBytes = _coverBytes;
     final isEdit = widget.mode == DiaryCanvasMode.edit;
     final existingEntry = ref.read(diaryControllerProvider).currentEntry;
 
     if (isEdit) {
-      // Edit mode — phải có entry loaded để giữ createdAt + entryId.
       if (existingEntry == null || existingEntry.entryId != widget.entryId) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -252,14 +245,16 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
         return;
       }
 
-      if (coverBytes != null) {
-        // Đổi ảnh → dùng saveEntry path để upload + update Firestore với
-        // coverUrl mới (controller.state.mode = edit → repo.updateEntry).
+      final hasNewImages = _inlineImageBytes.isNotEmpty;
+
+      if (hasNewImages) {
         final draft = existingEntry.copyWith(
           moodCaption: caption,
-          content: [DiaryContentBlock.text(value: contentText)],
+          content: _buildContentBlocks(
+            contentText,
+            existingEntry: existingEntry,
+          ),
           privacy: _privacy,
-          moodTemplate: mood,
           updatedAt: DateTime.now(),
         );
         ref
@@ -267,30 +262,25 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
             .setMode(DiaryCanvasMode.edit);
         await ref.read(diaryControllerProvider.notifier).saveEntry(
               draft: draft,
-              coverBytes: coverBytes,
+              coverBytes: null,
+              inlineImageBytes: _inlineImageBytes,
             );
       } else {
-        // Không đổi ảnh → updateEntryNoImage (qua controller, không bypass).
         final updated = existingEntry.copyWith(
           moodCaption: caption,
-          content: [DiaryContentBlock.text(value: contentText)],
+          content: _buildContentBlocks(
+            contentText,
+            existingEntry: existingEntry,
+          ),
           privacy: _privacy,
           updatedAt: DateTime.now(),
         );
         await ref
             .read(diaryControllerProvider.notifier)
             .updateEntryNoImage(updated);
-        // ErrorMessage handled bởi ref.listen trong build → SnackBar.
       }
     } else {
-      // Create mode — cần coverBytes.
-      if (coverBytes == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Vui lòng chọn ảnh bìa')),
-        );
-        return;
-      }
-
+      // Create mode — cover = '' (no upload), inline images from picker.
       final placeholderTs = DateTime.now();
       final draft = DiaryEntry(
         entryId: '',
@@ -298,7 +288,7 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
         moodTemplate: mood,
         coverImageUrl: '',
         moodCaption: caption,
-        content: [DiaryContentBlock.text(value: contentText)],
+        content: _buildContentBlocks(contentText),
         privacy: _privacy,
         createdAt: placeholderTs,
         updatedAt: placeholderTs,
@@ -309,7 +299,8 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
           .setMode(DiaryCanvasMode.create);
       await ref.read(diaryControllerProvider.notifier).saveEntry(
             draft: draft,
-            coverBytes: coverBytes,
+            coverBytes: null,
+            inlineImageBytes: _inlineImageBytes,
           );
     }
 
@@ -324,16 +315,66 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
       return;
     }
 
-    // Success — pop về list. Stream tự đẩy entry mới vào state.entries.
+    // Clear inline bytes sau success — tránh re-upload nếu user back gesture
+    // cancel pop rồi tap check lại (duplicate upload + content blocks).
+    _inlineImageBytes.clear();
     unawaited(Navigator.of(context).maybePop());
   }
 
-  /// Open gallery → pick + compress → lưu bytes vào `_coverBytes`.
-  Future<void> _pickCoverImage() async {
+  /// Build content blocks: text block + ImageBlock cho mỗi inline ảnh.
+  ///
+  /// Edit mode: preserve existing ImageBlocks từ `existingEntry.content`
+  /// (URL đã có trên Firestore), append placeholder cho ảnh mới pick.
+  /// Create mode: chỉ text + placeholder ảnh mới.
+  ///
+  /// Lý do tách: `_syncFromEntry` chỉ load text + caption, image blocks
+  /// không đẩy vào controllers — nếu rebuild blocks chỉ từ text, image
+  /// cũ sẽ bị mất khi save edit.
+  List<DiaryContentBlock> _buildContentBlocks(
+    String text, {
+    DiaryEntry? existingEntry,
+  }) {
+    final blocks = <DiaryContentBlock>[
+      DiaryContentBlock.text(value: text),
+    ];
+    // Preserve existing image blocks (edit mode).
+    if (existingEntry != null) {
+      for (final b in existingEntry.content) {
+        b.maybeWhen(
+          image: (url) => blocks.add(DiaryContentBlock.image(imageUrl: url)),
+          orElse: () {},
+        );
+      }
+    }
+    // Append placeholder cho ảnh mới pick.
+    for (var i = 0; i < _inlineImageBytes.length; i++) {
+      blocks.add(DiaryContentBlock.image(imageUrl: 'placeholder:$i'));
+    }
+    return blocks;
+  }
+
+  /// Open gallery → pick + compress → lưu bytes vào `_inlineImageBytes`.
+  /// Max 5 ảnh tổng (existing entry image blocks + new picks) — tránh vượt
+  /// Firestore rule cap (content.size() ≤ 20 mixed blocks, 5 images per spec).
+  Future<void> _pickInlineImage() async {
+    final existing = ref
+            .read(diaryControllerProvider)
+            .currentEntry
+            ?.content
+            .where((b) => b.maybeWhen(image: (_) => true, orElse: () => false))
+            .length ??
+        0;
+    final total = existing + _inlineImageBytes.length;
+    if (total >= 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tối đa 5 ảnh inline')),
+      );
+      return;
+    }
     try {
       final bytes = await ref.read(imagePickerServiceProvider).pickImage();
       if (bytes == null || !mounted) return;
-      setState(() => _coverBytes = bytes);
+      setState(() => _inlineImageBytes.add(bytes));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -488,7 +529,7 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
       _ToolMode.content => _ContentToolbar(
           onType: () => setState(() => _toolMode = _ToolMode.style),
           onAlign: () => setState(() => _toolMode = _ToolMode.align),
-          onImage: () => unawaited(_pickCoverImage()),
+          onImage: () => unawaited(_pickInlineImage()),
         ),
     };
   }
@@ -589,19 +630,14 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
     );
   }
 
-  // ── Mood zone: cover (mood image) + caption highlight ──
+  // ── Mood zone: mood asset (luôn cố định) + caption highlight ──
   Widget _buildMoodZone() {
-    // Priority: user-picked bytes (chưa save) > loaded URL (read/edit) >
-    // mood asset (create mode default).
     final mood = _loadedMood ?? widget.moodTemplate;
-    final coverBytes = _coverBytes;
     final coverUrl = _loadedCoverUrl;
-    final canPick = !_isReadOnly;
 
     Widget coverChild;
-    if (coverBytes != null) {
-      coverChild = Image.memory(coverBytes, fit: BoxFit.contain);
-    } else if (coverUrl != null && coverUrl.isNotEmpty) {
+    if (coverUrl != null && coverUrl.isNotEmpty) {
+      // Read mode: cover URL từ Firestore (nếu có).
       coverChild = Image.network(
         coverUrl,
         fit: BoxFit.contain,
@@ -623,19 +659,8 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
 
     return Column(
       children: [
-        // Cover — tap để chọn ảnh trong create/edit mode.
-        SizedBox(
-          height: 102,
-          child: Semantics(
-            label: canPick ? 'Chọn ảnh bìa' : 'Ảnh bìa',
-            button: canPick,
-            child: GestureDetector(
-              onTap: canPick ? () => unawaited(_pickCoverImage()) : null,
-              behavior: HitTestBehavior.opaque,
-              child: coverChild,
-            ),
-          ),
-        ),
+        // Cover — mood asset, không tương tác.
+        SizedBox(height: 102, child: coverChild),
         const SizedBox(height: 16),
 
         // Mood caption — highlight nền turquoise (thay line xanh), editable
@@ -686,17 +711,19 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_isReadOnly)
+        if (_isReadOnly) ...[
           Text(
             _contentController.text,
             textAlign: _contentAlign,
             style: _contentStyle,
-          )
-        else
+          ),
+          // Read mode: render ImageBlock từ entry.content.
+          ..._buildReadInlineImages(),
+        ] else ...[
           TextField(
             controller: _contentController,
             focusNode: _contentFocus,
-            autofocus: true, // bật keyboard ngay khi vào canvas
+            autofocus: true,
             maxLines: null,
             textAlign: _contentAlign,
             style: _contentStyle,
@@ -706,12 +733,62 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
               hintStyle: TextStyle(color: AppColors.bw500),
             ),
           ),
-        if (widget.initialImageUrl != null) ...[
-          const SizedBox(height: 24),
-          PolaroidImageBlock(imageUrl: widget.initialImageUrl!),
+          // Edit/Create: hiển thị inline ảnh đã pick (chưa save).
+          ..._buildPickedInlinePreviews(),
         ],
       ],
     );
+  }
+
+  /// Render ImageBlock items từ entry đã load (read mode).
+  List<Widget> _buildReadInlineImages() {
+    final entry = ref.watch(
+      diaryControllerProvider.select((s) => s.currentEntry),
+    );
+    if (entry == null) return const [];
+    return entry.content
+        .where((b) => b.maybeWhen(image: (_) => true, orElse: () => false))
+        .map(
+          (b) => b.maybeWhen(
+            image: (url) => Column(
+              children: [
+                const SizedBox(height: 24),
+                PolaroidImageBlock(imageUrl: url),
+              ],
+            ),
+            orElse: () => const SizedBox.shrink(),
+          ),
+        )
+        .toList();
+  }
+
+  /// Preview ảnh inline đã pick (create/edit, trước save).
+  List<Widget> _buildPickedInlinePreviews() {
+    return _inlineImageBytes.asMap().entries.map((e) {
+      return Column(
+        children: [
+          const SizedBox(height: 24),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(5.33),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Image.memory(
+                  e.value,
+                  fit: BoxFit.contain,
+                  width: double.infinity,
+                ),
+                // Polaroid frame overlay
+                Image.asset(
+                  'assets/frames/frame_polaroid.png',
+                  fit: BoxFit.contain,
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }).toList();
   }
 
   static const _contentStyle = TextStyle(

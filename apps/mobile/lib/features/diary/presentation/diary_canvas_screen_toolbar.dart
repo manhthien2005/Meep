@@ -27,7 +27,7 @@ class _ContentToolbar extends StatelessWidget {
         children: [
           _SvgIconBtn(
             asset: 'assets/icons/ic_diary_image.svg',
-            semanticLabel: 'Chọn ảnh bìa',
+            semanticLabel: 'Chèn ảnh',
             onTap: onImage,
           ),
           const SizedBox(width: 22),

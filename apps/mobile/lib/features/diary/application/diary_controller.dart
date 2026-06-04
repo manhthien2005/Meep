@@ -94,7 +94,7 @@ class DiaryController extends _$DiaryController {
   /// Upload fail bất kỳ bước → KHÔNG tạo/update Firestore doc.
   Future<void> saveEntry({
     required DiaryEntry draft,
-    required Uint8List coverBytes,
+    Uint8List? coverBytes,
     List<Uint8List> inlineImageBytes = const [],
   }) async {
     state = state.copyWith(isSaving: true, errorMessage: null);
@@ -111,19 +111,21 @@ class DiaryController extends _$DiaryController {
           ? repo.reserveEntryId()
           : draft.entryId;
 
-      // Bước 1 — upload cover
-      String coverUrl;
-      try {
-        coverUrl = await storage.upload(
-          uid: uid,
-          entryId: entryId,
-          fileName: 'cover.jpg',
-          bytes: coverBytes,
-          contentType: 'image/jpeg',
-        );
-      } catch (e) {
-        state = _afterFailure(e, fallback: 'Tải ảnh bìa thất bại');
-        return;
+      // Bước 1 — upload cover (skip nếu không đổi ảnh cover)
+      String coverUrl = draft.coverImageUrl;
+      if (coverBytes != null) {
+        try {
+          coverUrl = await storage.upload(
+            uid: uid,
+            entryId: entryId,
+            fileName: 'cover.jpg',
+            bytes: coverBytes,
+            contentType: 'image/jpeg',
+          );
+        } catch (e) {
+          state = _afterFailure(e, fallback: 'Tải ảnh bìa thất bại');
+          return;
+        }
       }
 
       // Bước 2 — upload inline images tuần tự
@@ -146,9 +148,9 @@ class DiaryController extends _$DiaryController {
 
       // Bước 3 — build entry với URLs thật + Firestore write.
       //
-      // Inline image URL mapping: controller replace ImageBlock placeholder
-      // theo thứ tự — block ảnh thứ N nhận `inlineUrls[N-1]`. PR4 wire UI
-      // sẽ define convention rõ ràng cho UI gọi.
+      // Inline image URL mapping: chỉ replace ImageBlock có sentinel
+      // `placeholder:` (UI mới pick). ImageBlock với URL Firestore cũ giữ
+      // nguyên — tránh edit mode ghi đè URL hợp lệ bằng URL mới (mất ảnh).
       var inlineIdx = 0;
       final contentBlocks = draft.content.map((b) {
         return b.when(
@@ -156,10 +158,14 @@ class DiaryController extends _$DiaryController {
             value: value,
             style: style,
           ),
-          image: (_) {
-            final url =
-                inlineIdx < inlineUrls.length ? inlineUrls[inlineIdx++] : '';
-            return DiaryContentBlock.image(imageUrl: url);
+          image: (existingUrl) {
+            if (existingUrl.startsWith('placeholder:')) {
+              final url =
+                  inlineIdx < inlineUrls.length ? inlineUrls[inlineIdx++] : '';
+              return DiaryContentBlock.image(imageUrl: url);
+            }
+            // URL Firestore cũ — giữ nguyên.
+            return DiaryContentBlock.image(imageUrl: existingUrl);
           },
         );
       }).toList();
