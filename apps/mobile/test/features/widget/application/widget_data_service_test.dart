@@ -174,5 +174,56 @@ void main() {
       final result = await service.requestPinAppWidget();
       expect(result, isFalse);
     });
+
+    test('returns false when native throws PlatformException — W2', () async {
+      // Older Android / custom ROMs can throw if widget pin isn't supported.
+      // Caller's UI flow uses the bool to decide whether to show manual
+      // instructions, so a thrown exception must NOT bubble.
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('meep/widget'),
+        (call) async => throw PlatformException(code: 'UNSUPPORTED'),
+      );
+      final result = await service.requestPinAppWidget();
+      expect(result, isFalse);
+    });
+  });
+
+  group('channel error handling — W2 regression', () {
+    // FeedController + main.dart lifecycle hook gọi update / record /
+    // clear không có try/catch của riêng. Service phải swallow native
+    // errors để feed stream / lifecycle callback không crash.
+
+    setUp(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('meep/widget'),
+        (call) async => throw PlatformException(code: 'NATIVE_FAIL'),
+      );
+    });
+
+    test('updateWidgetData completes when native throws', () async {
+      await expectLater(
+        service.updateWidgetData(
+          postId: 'p1',
+          imageUrl: 'https://cdn/x.jpg',
+        ),
+        completes,
+      );
+      // Prefs still written even when the poke failed.
+      expect(prefs.getString(_kPostId), 'p1');
+    });
+
+    test('recordLastViewedAt completes when native throws', () async {
+      await expectLater(service.recordLastViewedAt(), completes);
+      expect(prefs.getInt(_kLastViewedAt), isNotNull);
+    });
+
+    test('clearData completes when native throws', () async {
+      await prefs.setString(_kPostId, 'p1');
+      await expectLater(service.clearData(), completes);
+      // Prefs still cleared even when the poke failed.
+      expect(prefs.getString(_kPostId), isNull);
+    });
   });
 }

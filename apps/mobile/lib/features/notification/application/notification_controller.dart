@@ -242,4 +242,31 @@ class NotificationController extends _$NotificationController {
   Future<void> markAsRead(String notifId) async {
     await ref.read(notificationRepositoryProvider).markAsRead(notifId);
   }
+
+  /// Logout cleanup — cancel every FCM subscription, drop the local banner
+  /// state, and reset `_fcmInitialized` so the next `initFcm()` call (after
+  /// a different user signs in) re-runs the full permission/token/listener
+  /// wiring.
+  ///
+  /// Without this, user A logout → user B login on the same device runs
+  /// `initFcm()` which early-returns at L62 (`_fcmInitialized = true`),
+  /// leaving user B's token unsaved + the existing listeners still bound
+  /// to user A's `_saveToken` closure. user B then receives NO push until
+  /// cold restart. Settings logout flow calls this before `auth.signOut()`.
+  Future<void> resetForLogout() async {
+    await _onMessageSub?.cancel();
+    _onMessageSub = null;
+    await _onMessageOpenedAppSub?.cancel();
+    _onMessageOpenedAppSub = null;
+    await _onTokenRefreshSub?.cancel();
+    _onTokenRefreshSub = null;
+    _bannerTimer?.cancel();
+    _bannerTimer = null;
+    _fcmInitialized = false;
+    state = state.copyWith(
+      currentBanner: null,
+      lastOpenedApp: null,
+      fcmPermissionDenied: false,
+    );
+  }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -64,7 +65,7 @@ class WidgetDataService {
     await _setOrRemove(_WidgetKeys.captionType, captionType);
 
     // Poke Kotlin to enqueue an immediate one-time refresh
-    await _channel.invokeMethod('updateWidget');
+    await _safePoke('updateWidget');
   }
 
   /// Record the moment the user opened the app (resumed).
@@ -78,7 +79,7 @@ class WidgetDataService {
       DateTime.now().millisecondsSinceEpoch,
     );
     // Poke Kotlin to recalculate badge count
-    await _channel.invokeMethod('updateWidget');
+    await _safePoke('updateWidget');
   }
 
   /// Open Android launcher's native widget picker.
@@ -87,9 +88,21 @@ class WidgetDataService {
   /// `true` when the intent was fired. Returns `false` when the launcher
   /// doesn't support automatic pinning (Android < 8.0, some custom ROMs) —
   /// caller should show manual instructions.
+  ///
+  /// Native errors are swallowed (returns false) — caller's UI flow uses
+  /// the boolean to decide whether to show manual instructions, and a
+  /// MissingPluginException on iOS shouldn't crash the settings screen.
   Future<bool> requestPinAppWidget() async {
-    final result = await _channel.invokeMethod<bool>('requestPinAppWidget');
-    return result ?? false;
+    try {
+      final result = await _channel.invokeMethod<bool>('requestPinAppWidget');
+      return result ?? false;
+    } on PlatformException catch (e, st) {
+      debugPrint('[WidgetDataService] requestPinAppWidget failed: $e\n$st');
+      return false;
+    } on MissingPluginException catch (e, st) {
+      debugPrint('[WidgetDataService] requestPinAppWidget missing: $e\n$st');
+      return false;
+    }
   }
 
   /// Wipe all widget cached data from SharedPreferences.
@@ -100,7 +113,7 @@ class WidgetDataService {
     for (final key in _WidgetKeys.all) {
       await _prefs.remove(key);
     }
-    await _channel.invokeMethod('updateWidget');
+    await _safePoke('updateWidget');
   }
 
   Future<void> _setOrRemove(String key, String? value) async {
@@ -108,6 +121,20 @@ class WidgetDataService {
       await _prefs.setString(key, value);
     } else {
       await _prefs.remove(key);
+    }
+  }
+
+  /// Fire-and-forget MethodChannel ping — Kotlin side just enqueues a
+  /// background refresh. Failure modes (`PlatformException` from a Kotlin
+  /// crash, `MissingPluginException` on iOS / unit tests) are swallowed
+  /// so widget syncing never blocks the feed stream / lifecycle callback.
+  Future<void> _safePoke(String method) async {
+    try {
+      await _channel.invokeMethod(method);
+    } on PlatformException catch (e, st) {
+      debugPrint('[WidgetDataService] $method failed: $e\n$st');
+    } on MissingPluginException catch (e, st) {
+      debugPrint('[WidgetDataService] $method missing: $e\n$st');
     }
   }
 }

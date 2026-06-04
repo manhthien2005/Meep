@@ -333,4 +333,58 @@ void main() {
       expect(banner.body, 'Ảnh của bạn');
     });
   });
+
+  group('resetForLogout', () {
+    // N2 regression — `_fcmInitialized` must drop to false so a subsequent
+    // user-B login on the same device re-runs the full initFcm() path
+    // (permission, token save, listener wiring). Without this, the early
+    // return at `if (_fcmInitialized) return;` skips token save for user B
+    // and they get no push until cold restart.
+
+    test('clears currentBanner + lastOpenedApp + fcmPermissionDenied',
+        () async {
+      final controller =
+          container.read(notificationControllerProvider.notifier);
+
+      // Seed state with a banner + opened-app + denied flag.
+      controller.handleForeground(
+        const RemoteMessage(
+          messageId: 'fg-1',
+          notification: RemoteNotification(title: 't', body: 'b'),
+          data: {'type': 'new_post'},
+        ),
+      );
+      controller.handleOpenedApp(
+        const RemoteMessage(messageId: 'open-1', data: {'type': 'reaction'}),
+      );
+      expect(
+        container.read(notificationControllerProvider).currentBanner,
+        isNotNull,
+      );
+      expect(
+        container.read(notificationControllerProvider).lastOpenedApp,
+        isNotNull,
+      );
+
+      await controller.resetForLogout();
+
+      final state = container.read(notificationControllerProvider);
+      expect(state.currentBanner, isNull);
+      expect(state.lastOpenedApp, isNull);
+      expect(state.fcmPermissionDenied, isFalse);
+    });
+
+    test('is idempotent — calling twice is safe', () async {
+      final controller =
+          container.read(notificationControllerProvider.notifier);
+
+      await controller.resetForLogout();
+      await controller.resetForLogout();
+
+      // No exception thrown, state remains clean.
+      final state = container.read(notificationControllerProvider);
+      expect(state.currentBanner, isNull);
+      expect(state.lastOpenedApp, isNull);
+    });
+  });
 }

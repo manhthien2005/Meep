@@ -79,8 +79,22 @@ class FirebaseNotificationRepository implements NotificationRepository {
   /// Single-field update keeps the Firestore rule
   /// `affectedKeys().hasOnly(['read'])` satisfied — owner can mark read,
   /// can't tamper with title/body/type.
+  ///
+  /// Defensive — rejects short ids early instead of letting `_firestore.doc()`
+  /// throw a generic "Invalid document path" deep inside the SDK. Mismatch
+  /// usually means a caller forgot to round-trip through [getNotifications]
+  /// (vd dùng `doc.id` thẳng từ a query snapshot).
   @override
   Future<void> markAsRead(String notifId) async {
+    if (!notifId.contains('/')) {
+      throw ArgumentError.value(
+        notifId,
+        'notifId',
+        'markAsRead expects a full Firestore path '
+            '(users/{uid}/notifications/{id}) — got a short id. Caller must '
+            'use AppNotification.notifId from getNotifications().',
+      );
+    }
     await _firestore.doc(notifId).update({'read': true});
   }
 }
