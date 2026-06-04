@@ -394,6 +394,40 @@ void main() {
       );
     });
 
+    test('chat_message with conversationId → /chat/<conversationId>', () {
+      expect(
+        routeForNotification(const {
+          'type': 'chat_message',
+          'conversationId': 'conv-abc',
+          'senderId': 'uid-sender',
+          'messageId': 'msg-1',
+        }),
+        '/chat/conv-abc',
+      );
+    });
+
+    test('chat_message with missing conversationId → /home', () {
+      // Defensive — payload từ onMessageCreated luôn set conversationId; rỗng
+      // hoặc thiếu nghĩa là malformed, đừng đẩy user vào chat screen lỗi.
+      expect(routeForNotification(const {'type': 'chat_message'}), '/home');
+      expect(
+        routeForNotification(
+          const {'type': 'chat_message', 'conversationId': ''},
+        ),
+        '/home',
+      );
+    });
+
+    test('chat_message percent-encodes conversationId', () {
+      expect(
+        routeForNotification(const {
+          'type': 'chat_message',
+          'conversationId': 'a/b c',
+        }),
+        '/chat/a%2Fb%20c',
+      );
+    });
+
     test('unknown type → /home (fallback, no crash)', () {
       expect(
         routeForNotification(const {'type': 'made_up_type'}),
