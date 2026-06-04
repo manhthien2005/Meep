@@ -18,8 +18,6 @@ import 'package:meep/shared/widgets/share_profile_sheet.dart';
 // #363636 → actionButtonFill
 // #DDDDDD → actionButtonText
 // #D9D9D9 → avatarRingIdle
-// AppTextStyles.lgSemiBold  — 20px w600 h:28/20  (username)
-// AppTextStyles.baseSemiBold — 18px w600 h:24/18 (stats number)
 const _cBg = Color(0xFF050F10); // Black & White/900
 const _cButtonFill = Color(0xFF363636);
 const _cButtonText = Color(0xFFDDDDDD);
@@ -93,25 +91,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             avatarUrl: profile.avatarUrl,
                           ),
                           const SizedBox(width: 25),
-                          _StatsRow(
-                            postCount: profile.postCount,
-                            friendCount: profile.friendCount,
-                            spaceCount: profile.spaceCount,
-                            onFriendTap: () {
-                              // TODO(P/T3/HanDHG): open FriendSheet
-                            },
+                          Expanded(
+                            child: _StatsRow(
+                              postCount: profile.postCount,
+                              friendCount: profile.friendCount,
+                              spaceCount: profile.spaceCount,
+                              onFriendTap: () {
+                                // TODO(P/T3/HanDHG): open FriendSheet
+                              },
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 10),
                       Text(
                         profile.username,
-                        style: const TextStyle(
-                          fontFamily: 'Nunito',
-                          fontSize: 20,
-                          // TODO: AppTextStyles.lgSemiBold
-                          fontWeight: FontWeight.w600,
-                          height: 28 / 20,
+                        style: AppTextStyles.lgSemiBold.copyWith(
                           color: AppColors.bw100,
                         ),
                       ),
@@ -321,16 +316,16 @@ class _StatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _StatItem(count: postCount, label: 'Khoảnh khắc'),
-        const SizedBox(width: 30),
-        GestureDetector(
-          onTap: onFriendTap,
-          child: _StatItem(count: friendCount, label: 'Bạn bè'),
+        Flexible(child: _StatItem(count: postCount, label: 'Khoảnh khắc')),
+        Flexible(
+          child: GestureDetector(
+            onTap: onFriendTap,
+            child: _StatItem(count: friendCount, label: 'Bạn bè'),
+          ),
         ),
-        const SizedBox(width: 30),
-        _StatItem(count: spaceCount, label: 'Space'),
+        Flexible(child: _StatItem(count: spaceCount, label: 'Space')),
       ],
     );
   }
@@ -342,27 +337,27 @@ class _StatItem extends StatelessWidget {
   final int count;
   final String label;
 
+  // Counter trên Firestore có thể drift âm do CF race / miss (Task 4 — Path C
+  // fix root cause ở PR riêng). Clamp tại display layer để user không thấy
+  // "-1 Khoảnh khắc". Khi BE fix xong + backfill, clamp này thành no-op.
+  int get _safeCount => count < 0 ? 0 : count;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          '$count',
-          style: const TextStyle(
-            fontFamily: 'Nunito',
-            fontSize: 18,
-            // TODO: AppTextStyles.baseSemiBold
-            fontWeight: FontWeight.w600,
-            height: 24 / 18,
-            color: AppColors.bw100,
-          ),
+          '$_safeCount',
+          style: AppTextStyles.baseSemiBold.copyWith(color: AppColors.bw100),
           textAlign: TextAlign.center,
         ),
         Text(
           label,
           style: AppTextStyles.smMedium.copyWith(color: AppColors.bw100),
           textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
