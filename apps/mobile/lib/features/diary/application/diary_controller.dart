@@ -53,7 +53,7 @@ ImagePickerService imagePickerService(ImagePickerServiceRef ref) =>
       'wire FlutterImagePickerService in main.dart',
     );
 
-@riverpod
+@Riverpod(keepAlive: true)
 class DiaryController extends _$DiaryController {
   StreamSubscription<List<DiaryEntry>>? _entriesSub;
 
