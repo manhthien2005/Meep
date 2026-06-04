@@ -57,7 +57,9 @@ class _StreakScreenState extends ConsumerState<StreakScreen> {
         unreadCounts.values.fold<int>(0, (sum, val) => sum + val);
 
     final hasNoPosts = state.allPostDates.isEmpty;
-    final viewingMonth = state.viewingMonth ?? _startOfThisMonth();
+    final nowLocal = ref.watch(nowProvider)();
+    final viewingMonth =
+        state.viewingMonth ?? DateTime(nowLocal.year, nowLocal.month);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0804),
@@ -86,7 +88,7 @@ class _StreakScreenState extends ConsumerState<StreakScreen> {
                       child: StreakCalendar(
                         viewingMonth: viewingMonth,
                         monthPosts: state.monthPosts,
-                        today: DateTime.now(),
+                        today: nowLocal,
                         onTapDay: (index) => _openPhotoDetail(context, index),
                         onSwipePrev: () => ref
                             .read(streakControllerProvider.notifier)
@@ -153,12 +155,15 @@ class _StreakScreenState extends ConsumerState<StreakScreen> {
   void _openPhotoDetail(BuildContext context, int initialIndex) {
     final state = ref.read(streakControllerProvider);
     if (state.monthPosts.isEmpty) return;
+    // Clamp index: monthPosts có thể đã thay đổi giữa lúc render cell và lúc
+    // tap (stream emit lại, hoặc delete xảy ra song song). Tránh OOB crash.
+    final safeIndex = initialIndex.clamp(0, state.monthPosts.length - 1);
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => PhotoDetailScreen(
-          postId: state.monthPosts[initialIndex].postId,
-          initialIndex: initialIndex,
+          postId: state.monthPosts[safeIndex].postId,
+          initialIndex: safeIndex,
           posts: state.monthPosts,
           captionPillColor: const Color(0x66394041),
           timeColor: AppColors.bw600,
@@ -170,11 +175,6 @@ class _StreakScreenState extends ConsumerState<StreakScreen> {
         ),
       ),
     );
-  }
-
-  static DateTime _startOfThisMonth() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month);
   }
 }
 
