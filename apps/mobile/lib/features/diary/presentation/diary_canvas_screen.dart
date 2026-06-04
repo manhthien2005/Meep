@@ -1,7 +1,13 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:meep/core/theme/app_colors.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/diary/application/diary_controller.dart';
+import 'package:meep/features/diary/data/diary_content_block.dart';
 import 'package:meep/features/diary/data/diary_entry.dart';
 import 'package:meep/features/diary/presentation/discard_changes_dialog.dart';
 import 'package:meep/features/diary/presentation/privacy_sheet.dart';
@@ -20,26 +26,6 @@ export 'package:meep/features/diary/application/diary_controller.dart'
 part 'diary_canvas_screen_toolbar.dart';
 part 'diary_canvas_screen_dot_grid.dart';
 
-/// Payload pop về khi user tap check ở Canvas (create mode).
-///
-/// FE-mock only — sau khi wire DiaryRepository, replace bằng `DiaryEntry`
-/// (data layer) hoặc gọi controller.saveDraft trực tiếp trong Canvas.
-class DiaryDraftResult {
-  const DiaryDraftResult({
-    required this.caption,
-    required this.content,
-    required this.mood,
-    required this.createdAt,
-    required this.privacy,
-  });
-
-  final String caption;
-  final String content;
-  final MoodTemplate mood;
-  final DateTime createdAt;
-  final DiaryPrivacy privacy;
-}
-
 /// Mode của toolbar dưới Canvas (edit/create only).
 ///
 /// - `content`: toolbar chính 4 icon (image / type / align / smile).
@@ -55,7 +41,7 @@ enum _ToolMode { content, style, align }
 /// Light theme intentionally — hardcode `#F9FCFC` (KHÔNG dùng Theme.of).
 /// Layout: topbar (ngoài box) → box border đen + dots bg (mood zone +
 /// content) → content toolbar (ngoài box).
-class DiaryCanvasScreen extends StatefulWidget {
+class DiaryCanvasScreen extends ConsumerStatefulWidget {
   const DiaryCanvasScreen({
     super.key,
     required this.mode,
@@ -86,10 +72,10 @@ class DiaryCanvasScreen extends StatefulWidget {
   final DateTime? entryDate;
 
   @override
-  State<DiaryCanvasScreen> createState() => _DiaryCanvasScreenState();
+  ConsumerState<DiaryCanvasScreen> createState() => _DiaryCanvasScreenState();
 }
 
-class _DiaryCanvasScreenState extends State<DiaryCanvasScreen> {
+class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
   /// Canvas light theme — alias để giữ semantic rõ ràng trong code.
   /// `bw100` (#F9FCFC) = nền canvas sáng theo spec §Technical approach.
   static const _canvasBg = AppColors.bw100;
@@ -116,6 +102,11 @@ class _DiaryCanvasScreenState extends State<DiaryCanvasScreen> {
   bool _italic = false;
   bool _underline = false;
   bool _strikethrough = false;
+
+  /// Cover image bytes — user pick từ gallery qua `ImagePickerService`.
+  /// Null trước khi pick; sau khi pick lưu để gửi vào `controller.saveEntry`.
+  /// Read mode KHÔNG dùng (cover render từ `widget.initialImageUrl`).
+  Uint8List? _coverBytes;
 
   bool get _isReadOnly => widget.mode == DiaryCanvasMode.read;
 
@@ -155,35 +146,101 @@ class _DiaryCanvasScreenState extends State<DiaryCanvasScreen> {
         MoodTemplate.sad => 'Buồn bã',
       };
 
-  /// Save handler — tap check ở topbar.
+  /// Save handler — tap check ở topbar (create mode only ở PR4a).
   ///
-  /// Create mode (FE mock): pop về list với `DiaryDraftResult` để list
-  /// insert entry mới lên đầu. Edit mode: chỉ pop (chưa wire update mock).
-  /// Sau khi wire DiaryRepository: gọi controller.save() rồi pop.
-  void _handleSave() {
+  /// Validate: phải có mood + cover bytes + content text non-empty.
+  /// Build `DiaryEntry` draft → `controller.saveEntry(draft, coverBytes)`.
+  /// Stream `watchEntries` sẽ tự đẩy entry mới về list khi pop về.
+  ///
+  /// T9b (PR4b) sẽ wire edit mode đầy đủ — hiện tại edit pop trực tiếp.
+  Future<void> _handleSave() async {
     final mood = widget.moodTemplate;
     if (mood == null) {
       // Defensive — create flow phải pass mood từ picker.
-      Navigator.of(context).maybePop();
+      unawaited(Navigator.of(context).maybePop());
       return;
     }
     if (widget.mode == DiaryCanvasMode.edit) {
-      // TODO(D/T3/HanDHG): edit mode wire khi có DiaryRepository.
-      Navigator.of(context).maybePop();
+      // TODO(D/T9b/HanDHG): edit mode wire ở PR4b — issue #272.
+      unawaited(Navigator.of(context).maybePop());
       return;
     }
+
+    // Validate inputs (spec §Worst path).
+    final coverBytes = _coverBytes;
+    final contentText = _contentController.text.trim();
+    if (coverBytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng chọn ảnh bìa')),
+      );
+      return;
+    }
+    if (contentText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng nhập nội dung')),
+      );
+      return;
+    }
+
+    final uid = ref.read(currentUidProvider).valueOrNull;
+    if (uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bạn cần đăng nhập để lưu nhật ký')),
+      );
+      return;
+    }
+
     final caption = _captionController.text.trim().isEmpty
         ? _moodLabel(mood)
         : _captionController.text.trim();
-    Navigator.of(context).pop(
-      DiaryDraftResult(
-        caption: caption,
-        content: _contentController.text,
-        mood: mood,
-        createdAt: _displayDate,
-        privacy: _privacy,
-      ),
+
+    // Build draft — entryId rỗng để repo reserve, timestamps server-side
+    // sẽ override createdAt/updatedAt (em pass placeholder để model validate).
+    final placeholderTs = DateTime.now();
+    final draft = DiaryEntry(
+      entryId: '',
+      authorUid: uid,
+      moodTemplate: mood,
+      coverImageUrl: '', // controller replace với coverUrl thật sau upload
+      moodCaption: caption,
+      content: [DiaryContentBlock.text(value: contentText)],
+      privacy: _privacy,
+      createdAt: placeholderTs,
+      updatedAt: placeholderTs,
     );
+
+    await ref.read(diaryControllerProvider.notifier).saveEntry(
+          draft: draft,
+          coverBytes: coverBytes,
+        );
+
+    if (!mounted) return;
+
+    final errorMessage = ref.read(diaryControllerProvider).errorMessage;
+    if (errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
+      ref.read(diaryControllerProvider.notifier).clearError();
+      return;
+    }
+
+    // Success — pop về list. Stream tự đẩy entry mới vào state.entries.
+    unawaited(Navigator.of(context).maybePop());
+  }
+
+  /// Open gallery → pick + compress → lưu bytes vào `_coverBytes`.
+  Future<void> _pickCoverImage() async {
+    try {
+      final bytes = await ref.read(imagePickerServiceProvider).pickImage();
+      if (bytes == null || !mounted) return;
+      setState(() => _coverBytes = bytes);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể chọn ảnh, vui lòng thử lại')),
+      );
+    }
   }
 
   /// Mood background asset (hiển thị trong cover circle).
@@ -298,6 +355,7 @@ class _DiaryCanvasScreenState extends State<DiaryCanvasScreen> {
       _ToolMode.content => _ContentToolbar(
           onType: () => setState(() => _toolMode = _ToolMode.style),
           onAlign: () => setState(() => _toolMode = _ToolMode.align),
+          onImage: () => unawaited(_pickCoverImage()),
         ),
     };
   }
@@ -401,18 +459,36 @@ class _DiaryCanvasScreenState extends State<DiaryCanvasScreen> {
   // ── Mood zone: cover (mood image) + caption highlight ──
   Widget _buildMoodZone() {
     final mood = widget.moodTemplate;
+    final coverBytes = _coverBytes;
+    final canPick = !_isReadOnly;
+
+    Widget coverChild;
+    if (coverBytes != null) {
+      coverChild = Image.memory(coverBytes, fit: BoxFit.contain);
+    } else if (mood == null) {
+      coverChild = const Icon(
+        Icons.image_outlined,
+        size: 48,
+        color: AppColors.bw500,
+      );
+    } else {
+      coverChild = Image.asset(_moodAsset(mood), fit: BoxFit.contain);
+    }
+
     return Column(
       children: [
-        // Cover — mood image thuần (không khung tròn để giữ shape gốc)
+        // Cover — tap để chọn ảnh trong create/edit mode.
         SizedBox(
           height: 102,
-          child: mood == null
-              ? const Icon(
-                  Icons.image_outlined,
-                  size: 48,
-                  color: AppColors.bw500,
-                )
-              : Image.asset(_moodAsset(mood), fit: BoxFit.contain),
+          child: Semantics(
+            label: canPick ? 'Chọn ảnh bìa' : 'Ảnh bìa',
+            button: canPick,
+            child: GestureDetector(
+              onTap: canPick ? () => unawaited(_pickCoverImage()) : null,
+              behavior: HitTestBehavior.opaque,
+              child: coverChild,
+            ),
+          ),
         ),
         const SizedBox(height: 16),
 
