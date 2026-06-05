@@ -299,5 +299,24 @@ void main() {
       final snap = await notificationsRef(uid).doc('rt').get();
       expect(snap.data()!['read'], isTrue);
     });
+
+    test(
+      'throws ArgumentError when caller passes a short id instead of a path '
+      '— regression N5',
+      () async {
+        // Defensive guard: short id like `n1` would hit `_firestore.doc(n1)`
+        // and trigger "Invalid document path" from deep inside the SDK. Reject
+        // explicitly so callers get a clear error message pointing at the
+        // contract (must use AppNotification.notifId from getNotifications).
+        await expectLater(
+          repo.markAsRead('n1'),
+          throwsA(isA<ArgumentError>()),
+        );
+        await expectLater(
+          repo.markAsRead(''),
+          throwsA(isA<ArgumentError>()),
+        );
+      },
+    );
   });
 }

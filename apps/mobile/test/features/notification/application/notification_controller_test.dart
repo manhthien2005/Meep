@@ -255,4 +255,136 @@ void main() {
       );
     });
   });
+
+  group('handleForeground', () {
+    // `handleForeground` is exposed via `@visibleForTesting` so the regression
+    // for the dynamic→String coercion can be pinned here. In production the
+    // method is fed by `FirebaseMessaging.onMessage.listen` inside `initFcm`.
+
+    test(
+        'coerces non-string data values to strings — '
+        'regression N1 (was: TypeError crashed FCM stream)', () {
+      // Wire-level FCM data is `Map<String, dynamic>`. Server occasionally
+      // sends ints/bools (vd `unreadCount: 3`). Before the fix this threw
+      // `_TypeError` inside `Map<String, String>.from` and killed the
+      // listener — every subsequent push was dropped silently until the next
+      // cold start.
+      final controller =
+          container.read(notificationControllerProvider.notifier);
+
+      controller.handleForeground(
+        const RemoteMessage(
+          messageId: 'fcm-fg-1',
+          notification: RemoteNotification(title: 'A', body: 'B'),
+          data: {'type': 'reaction', 'postId': 12345, 'unread': true},
+        ),
+      );
+
+      final state = container.read(notificationControllerProvider);
+      expect(state.currentBanner, isNotNull);
+      expect(state.currentBanner!.data, {
+        'type': 'reaction',
+        'postId': '12345',
+        'unread': 'true',
+      });
+    });
+
+    test('drops the banner when bannerSuppressed = true', () async {
+      await notifPrefs.setBannerSuppressed(true);
+      final container2 = makeContainer();
+      addTearDown(container2.dispose);
+
+      final controller =
+          container2.read(notificationControllerProvider.notifier);
+      controller.handleForeground(
+        const RemoteMessage(
+          messageId: 'm',
+          notification: RemoteNotification(title: 't', body: 'b'),
+          data: {'type': 'new_post'},
+        ),
+      );
+
+      expect(
+        container2.read(notificationControllerProvider).currentBanner,
+        isNull,
+      );
+    });
+
+    test('populates currentBanner with title + body from RemoteNotification',
+        () {
+      final controller =
+          container.read(notificationControllerProvider.notifier);
+
+      controller.handleForeground(
+        const RemoteMessage(
+          messageId: 'm1',
+          notification: RemoteNotification(
+            title: 'Lan đã thả tim',
+            body: 'Ảnh của bạn',
+          ),
+          data: {'type': 'reaction', 'postId': 'p9'},
+        ),
+      );
+
+      final banner =
+          container.read(notificationControllerProvider).currentBanner;
+      expect(banner, isNotNull);
+      expect(banner!.title, 'Lan đã thả tim');
+      expect(banner.body, 'Ảnh của bạn');
+    });
+  });
+
+  group('resetForLogout', () {
+    // N2 regression — `_fcmInitialized` must drop to false so a subsequent
+    // user-B login on the same device re-runs the full initFcm() path
+    // (permission, token save, listener wiring). Without this, the early
+    // return at `if (_fcmInitialized) return;` skips token save for user B
+    // and they get no push until cold restart.
+
+    test('clears currentBanner + lastOpenedApp + fcmPermissionDenied',
+        () async {
+      final controller =
+          container.read(notificationControllerProvider.notifier);
+
+      // Seed state with a banner + opened-app + denied flag.
+      controller.handleForeground(
+        const RemoteMessage(
+          messageId: 'fg-1',
+          notification: RemoteNotification(title: 't', body: 'b'),
+          data: {'type': 'new_post'},
+        ),
+      );
+      controller.handleOpenedApp(
+        const RemoteMessage(messageId: 'open-1', data: {'type': 'reaction'}),
+      );
+      expect(
+        container.read(notificationControllerProvider).currentBanner,
+        isNotNull,
+      );
+      expect(
+        container.read(notificationControllerProvider).lastOpenedApp,
+        isNotNull,
+      );
+
+      await controller.resetForLogout();
+
+      final state = container.read(notificationControllerProvider);
+      expect(state.currentBanner, isNull);
+      expect(state.lastOpenedApp, isNull);
+      expect(state.fcmPermissionDenied, isFalse);
+    });
+
+    test('is idempotent — calling twice is safe', () async {
+      final controller =
+          container.read(notificationControllerProvider.notifier);
+
+      await controller.resetForLogout();
+      await controller.resetForLogout();
+
+      // No exception thrown, state remains clean.
+      final state = container.read(notificationControllerProvider);
+      expect(state.currentBanner, isNull);
+      expect(state.lastOpenedApp, isNull);
+    });
+  });
 }

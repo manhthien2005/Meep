@@ -98,6 +98,14 @@ class SettingsController extends _$SettingsController {
         // Swallow: widget cleanup is best-effort.
       }
     }
+    // Reset FCM listeners + `_fcmInitialized` cờ BEFORE signOut. Nếu user B
+    // login lại trên cùng device sau đó, initFcm() sẽ chạy lại từ đầu thay
+    // vì early-return → token user B mới được lưu, listener mới được wire.
+    try {
+      await ref.read(notificationControllerProvider.notifier).resetForLogout();
+    } catch (_) {
+      // Swallow: notification cleanup is best-effort.
+    }
     try {
       await auth.signOut();
       state = state.copyWith(isLoading: false);
@@ -134,6 +142,12 @@ class SettingsController extends _$SettingsController {
       await ref.read(notificationRepositoryProvider).deleteFcmToken(uid);
     } catch (_) {
       // Swallow: FCM cleanup là best-effort, không block delete.
+    }
+    // Reset FCM listeners + flag — match logout flow (N2).
+    try {
+      await ref.read(notificationControllerProvider.notifier).resetForLogout();
+    } catch (_) {
+      // Swallow: notification cleanup is best-effort.
     }
     try {
       await auth.deleteAccountCascade();
