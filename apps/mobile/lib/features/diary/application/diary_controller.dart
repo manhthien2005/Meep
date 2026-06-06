@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:meep/core/error/app_error.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/diary/data/diary_content_block.dart';
 import 'package:meep/features/diary/data/diary_entry.dart';
 import 'package:meep/features/diary/data/diary_repository.dart';
@@ -13,6 +15,21 @@ import 'package:meep/features/diary/data/image_picker_service.dart';
 
 part 'diary_controller.freezed.dart';
 part 'diary_controller.g.dart';
+
+/// Live stream của diary entries cho current user — mirror pattern của
+/// `conversationsProvider` (chat module). Fire ngay khi widget watch,
+/// Riverpod cache stream nên navigation back/forth instant.
+///
+/// Lý do tách khỏi DiaryController: pattern `initState + listenManual +
+/// loadEntries()` chậm vì nhiều bước async tuần tự (chờ uid → call load →
+/// stream subscribe → state update → rebuild). StreamProvider rút ngắn xuống
+/// 1 bước: watch → subscribe ngay → rebuild.
+@riverpod
+Stream<List<DiaryEntry>> diaryEntries(Ref ref) {
+  final uid = ref.watch(currentUidProvider).valueOrNull;
+  if (uid == null || uid.isEmpty) return Stream.value(const []);
+  return ref.watch(diaryRepositoryProvider).watchEntries(uid);
+}
 
 /// Mode of the diary canvas — mirrors presentation-layer enum cùng tên.
 /// Định nghĩa ở application layer để [DiaryState] dùng trực tiếp,

@@ -207,7 +207,8 @@ class PostController extends _$PostController {
         postId: postId,
         authorId: uid,
         authorName: authorName,
-        authorAvatarUrl: user.photoURL,
+        authorAvatarUrl: user.photoURL ??
+            ref.read(currentUserProfileProvider).valueOrNull?.avatarUrl,
         imageUrl: imageUrl,
         backImageUrl: backImageUrl,
         frontImageUrl: frontImageUrl,

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -13,7 +11,6 @@ import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
 import 'package:meep/features/diary/presentation/diary_search_screen.dart';
 import 'package:meep/features/diary/presentation/widgets/diary_list_card.dart';
 import 'package:meep/features/diary/presentation/widgets/diary_mood_card.dart';
-import 'package:meep/features/settings/presentation/settings_sheet.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 
@@ -44,52 +41,6 @@ enum _ViewMode { grid, list }
 class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   bool _pickerOpen = false;
   _ViewMode _viewMode = _ViewMode.grid;
-
-  /// Track uid đã trigger loadEntries để không gọi lại khi cùng uid emit
-  /// nhiều lần (vd auth state stream replay).
-  String? _loadedForUid;
-
-  /// Track thời điểm `loadEntries` được gọi — nếu loading kéo dài > 5s
-  /// (vd indexes chưa deploy → Firestore reject silent), hiển thị retry
-  /// button thay vì spinner vĩnh cửu.
-  DateTime? _loadingStartAt;
-
-  @override
-  void initState() {
-    super.initState();
-    // Riverpod pattern chuẩn: ref.listenManual fire ngay với current value +
-    // mọi emit sau. Trigger loadEntries 1 lần / uid; sign out → sign in lại
-    // với uid khác sẽ tự re-trigger.
-    //
-    // Controller keepAlive=true → state persist qua navigation. Skip reload
-    // nếu controller đã có entries (avoid re-fetch khi quay về list từ canvas).
-    ref.listenManual<AsyncValue<String?>>(
-      currentUidProvider,
-      (_, next) {
-        final uid = next.valueOrNull;
-        if (uid == null || _loadedForUid == uid) return;
-        _loadedForUid = uid;
-
-        final state = ref.read(diaryControllerProvider);
-        if (state.entries.isNotEmpty) {
-          // Controller keepAlive đã có data — skip reload, render ngay.
-          return;
-        }
-
-        _loadingStartAt = DateTime.now();
-        ref.read(diaryControllerProvider.notifier).loadEntries(uid);
-      },
-      fireImmediately: true,
-    );
-  }
-
-  void _retryLoad() {
-    final uid = ref.read(currentUidProvider).valueOrNull;
-    if (uid == null) return;
-    setState(() {}); // force rebuild, reset timeout visual
-    _loadingStartAt = DateTime.now();
-    ref.read(diaryControllerProvider.notifier).loadEntries(uid);
-  }
 
   void _togglePicker() => setState(() => _pickerOpen = !_pickerOpen);
   void _closePicker() => setState(() => _pickerOpen = false);
@@ -162,7 +113,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                       case TaskbarTab.chat:
                         context.go('/inbox');
                       case TaskbarTab.profile:
-                        context.go('/profile');
+                        final uid = ref.read(currentUidProvider).valueOrNull;
+                        context.go('/profile', extra: uid);
                     }
                   },
                 ),
@@ -259,33 +211,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             ),
           ),
 
-          // Avatar — match chat module pattern: imageUrl + fallback initials.
-          // Tap → SettingsSheet.
-          Semantics(
-            button: true,
-            label: 'Cài đặt',
-            child: GestureDetector(
-              onTap: () => showModalBottomSheet<void>(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (_) => const SettingsSheet(),
-              ),
-              child: AppAvatar(
-                imageUrl: ref
-                    .watch(currentUserProfileProvider)
-                    .valueOrNull
-                    ?.avatarUrl,
-                size: 40,
-                fallbackText: avatarFallbackFromName(
-                  ref
-                      .watch(currentUserProfileProvider)
-                      .valueOrNull
-                      ?.displayName,
-                ),
-              ),
-            ),
-          ),
+          const AppTopAvatar(),
         ],
       ),
     );
@@ -344,33 +270,19 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
 
   // ── Body: render theo controller state ──
   Widget _buildBody() {
-    // Auth init đang chạy — uid chưa ready. Show loading thay vì blank.
-    // Lần đầu cold start FirebaseAuth revalidateSession có thể mất 2-8s
-    // trên mobile network. Nếu không show spinner → user thấy màn trống.
-    //
-    // ⚠️ KHÔNG để ngoài _buildBody: ref.watch trong ConsumerState build()
-    // vẫn OK (Riverpod best practice là gọi watch trong build method).
-    final uid = ref.watch(currentUidProvider).valueOrNull;
-    if (uid == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.turquoise500),
-      );
-    }
-
-    final state = ref.watch(diaryControllerProvider);
-
-    if (state.isLoading && state.entries.isEmpty) {
-      // Sau 5s loading không response → timeout (vd indexes chưa deploy).
-      final elapsed = _loadingStartAt != null
-          ? DateTime.now().difference(_loadingStartAt!).inSeconds
-          : 0;
-      if (elapsed >= 5) {
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Không thể tải nhật ký',
+    // Mirror chat module: watch StreamProvider, render qua .when(). Stream
+    // fire ngay với first snapshot (data hoặc []); Riverpod cache nên
+    // navigation back/forth instant. Không cần initState/listenManual.
+    return ref.watch(diaryEntriesProvider).when(
+          loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.turquoise500),
+          ),
+          error: (e, _) => const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                'Không tải được nhật ký. Thử lại sau.',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontFamily: 'Nunito',
                   fontSize: 16,
@@ -378,55 +290,15 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                   color: AppColors.bw500,
                 ),
               ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: _retryLoad,
-                child: const Text(
-                  'Thử lại',
-                  style: TextStyle(
-                    fontFamily: 'Nunito',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.turquoise500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.turquoise500),
-      );
-    }
-
-    // Reset timeout khi load done.
-    if (_loadingStartAt != null && !state.isLoading) {
-      _loadingStartAt = null;
-    }
-
-    if (state.errorMessage != null && state.entries.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Text(
-            state.errorMessage ?? 'Không tải được nhật ký',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: 'Nunito',
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.bw500,
             ),
           ),
-        ),
-      );
-    }
-
-    if (state.entries.isEmpty) return _buildEmptyState();
-    return _viewMode == _ViewMode.grid
-        ? _buildGrid(state.entries)
-        : _buildList(state.entries);
+          data: (entries) {
+            if (entries.isEmpty) return _buildEmptyState();
+            return _viewMode == _ViewMode.grid
+                ? _buildGrid(entries)
+                : _buildList(entries);
+          },
+        );
   }
 
   Widget _buildGrid(List<DiaryEntry> entries) {

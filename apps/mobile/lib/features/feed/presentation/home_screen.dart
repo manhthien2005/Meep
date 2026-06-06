@@ -17,7 +17,6 @@ import 'package:meep/features/feed/presentation/feed_filter_dropdown.dart';
 import 'package:meep/features/feed/presentation/feed_section.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/presentation/friend_sheet.dart';
-import 'package:meep/features/settings/presentation/settings_sheet.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/space.dart';
 import 'package:meep/features/space/presentation/space_management_sheet.dart';
@@ -464,8 +463,6 @@ class _HomeTopBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUid = ref.watch(currentUidProvider).valueOrNull;
-    final avatarUrl =
-        ref.watch(currentUserProfileProvider).valueOrNull?.avatarUrl;
     final friendCount = currentUid == null
         ? 0
         : ref.watch(friendControllerProvider(currentUid)).friends.length;
@@ -504,22 +501,7 @@ class _HomeTopBar extends ConsumerWidget {
               ),
             )
           else
-            Semantics(
-              button: true,
-              label: 'Cài đặt',
-              child: GestureDetector(
-                onTap: () => showModalBottomSheet<void>(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (_) => const SettingsSheet(),
-                ),
-                child: AppAvatar(
-                  imageUrl: avatarUrl,
-                  size: 40,
-                ),
-              ),
-            ),
+            const AppTopAvatar(),
         ],
       ),
     );

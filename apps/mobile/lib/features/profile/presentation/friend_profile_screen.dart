@@ -143,7 +143,28 @@ class _FriendProfileBody extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 30, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Semantics(
+                button: true,
+                label: 'Quay lại',
+                child: GestureDetector(
+                  onTap: () => context.pop(),
+                  child: const SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Center(
+                      child: Icon(
+                        Icons.arrow_back_ios_new,
+                        color: AppColors.bw100,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

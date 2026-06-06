@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,10 +7,10 @@ import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/streak/application/streak_controller.dart';
-import 'package:meep/features/settings/presentation/settings_sheet.dart';
 import 'package:meep/features/streak/presentation/widgets/empty_state_overlay.dart';
 import 'package:meep/features/streak/presentation/widgets/streak_calendar.dart';
 import 'package:meep/features/streak/presentation/widgets/streak_stats_pill.dart';
+import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 import 'package:meep/shared/widgets/photo_detail_screen.dart';
 import 'package:meep/shared/widgets/share_photo_sheet.dart';
@@ -31,18 +30,12 @@ class StreakScreen extends ConsumerStatefulWidget {
 }
 
 class _StreakScreenState extends ConsumerState<StreakScreen> {
-  bool _initStarted = false;
-
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureInit());
-  }
-
-  void _ensureInit() {
-    if (_initStarted) return;
-    _initStarted = true;
-    ref.read(streakControllerProvider.notifier).init();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => ref.read(streakControllerProvider.notifier).init(),
+    );
   }
 
   @override
@@ -51,8 +44,6 @@ class _StreakScreenState extends ConsumerState<StreakScreen> {
     final profileAsync = ref.watch(currentUserProfileProvider);
     final totalMoments =
         profileAsync.valueOrNull?.postCount ?? state.allPostDates.length;
-    final displayName = profileAsync.valueOrNull?.displayName ?? '';
-    final avatarUrl = profileAsync.valueOrNull?.avatarUrl;
     final unreadCounts = ref.watch(unreadCountsProvider);
     final totalUnread =
         unreadCounts.values.fold<int>(0, (sum, val) => sum + val);
@@ -76,7 +67,7 @@ class _StreakScreenState extends ConsumerState<StreakScreen> {
                 ),
                 child: Column(
                   children: [
-                    _Topbar(displayName: displayName, avatarUrl: avatarUrl),
+                    const _Topbar(),
                     if (state.errorMessage != null)
                       _ErrorBanner(message: state.errorMessage!),
                     if (hasNoPosts) ...[
@@ -183,10 +174,7 @@ class _StreakScreenState extends ConsumerState<StreakScreen> {
 // ─── Topbar ───────────────────────────────────────────────────────────────────
 
 class _Topbar extends StatelessWidget {
-  const _Topbar({required this.displayName, this.avatarUrl});
-
-  final String displayName;
-  final String? avatarUrl;
+  const _Topbar();
 
   @override
   Widget build(BuildContext context) {
@@ -205,70 +193,9 @@ class _Topbar extends StatelessWidget {
                     .copyWith(color: const Color(0xFFFFFFFF)),
               ),
             ),
-            _TopAvatar(displayName: displayName, avatarUrl: avatarUrl),
+            const AppTopAvatar(),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _TopAvatar extends StatelessWidget {
-  const _TopAvatar({required this.displayName, this.avatarUrl});
-
-  final String displayName;
-  final String? avatarUrl;
-
-  static const _bgColor = Color(0xFF73716F);
-
-  String get _initials {
-    final parts = displayName.trim().split(' ');
-    if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
-    return displayName.isNotEmpty ? displayName[0].toUpperCase() : '';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final url = avatarUrl;
-    final avatar = Container(
-      width: 40,
-      height: 40,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: _bgColor,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: url != null && url.isNotEmpty
-          ? CachedNetworkImage(
-              imageUrl: url,
-              fit: BoxFit.cover,
-              errorWidget: (_, __, ___) => _initialsFallback(),
-              placeholder: (_, __) => Container(color: _bgColor),
-            )
-          : _initialsFallback(),
-    );
-    return Semantics(
-      button: true,
-      label: 'Cài đặt',
-      child: GestureDetector(
-        onTap: () => showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (_) => const SettingsSheet(),
-        ),
-        child: avatar,
-      ),
-    );
-  }
-
-  Widget _initialsFallback() {
-    return Center(
-      child: Text(
-        _initials,
-        style: AppTextStyles.smSemiBold.copyWith(color: AppColors.bw100),
       ),
     );
   }

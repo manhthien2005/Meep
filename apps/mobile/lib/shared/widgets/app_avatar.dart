@@ -1,9 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/core/theme/hex_color.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/settings/presentation/settings_sheet.dart';
 
 /// Ring thickness around avatars.
 const double _kRingWidth = 2;
@@ -152,6 +155,36 @@ class AppSpaceAvatar extends StatelessWidget {
         ),
         padding: const EdgeInsets.all(_kRingGap),
         child: disc,
+      ),
+    );
+  }
+}
+
+/// Shared top-bar avatar dùng chung cho HomeFeed, Chat (Inbox), Diary, Streak.
+/// Tự watch [currentUserProfileProvider] để lấy avatar + displayName, hiển thị
+/// [AppAvatar] size 40, tap mở [SettingsSheet]. Đảm bảo đồng bộ avatar giữa
+/// các trang và cùng route đến Settings.
+class AppTopAvatar extends ConsumerWidget {
+  const AppTopAvatar({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(currentUserProfileProvider).valueOrNull;
+    return Semantics(
+      button: true,
+      label: 'Cài đặt',
+      child: GestureDetector(
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => const SettingsSheet(),
+        ),
+        child: AppAvatar(
+          imageUrl: profile?.avatarUrl,
+          size: 40,
+          fallbackText: avatarFallbackFromName(profile?.displayName),
+        ),
       ),
     );
   }

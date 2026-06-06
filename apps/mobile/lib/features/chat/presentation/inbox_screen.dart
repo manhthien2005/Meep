@@ -8,7 +8,6 @@ import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/chat/data/conversation.dart';
 import 'package:meep/features/chat/presentation/widgets/conversation_tile.dart';
-import 'package:meep/features/settings/presentation/settings_sheet.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 
@@ -92,50 +91,25 @@ class InboxScreen extends ConsumerWidget {
   }
 }
 
-/// Topbar: centered title + trailing avatar (tap → SettingsSheet). Match
-/// home topbar pattern (`home_screen.dart`) — `AppAvatar` shared widget,
-/// no ring decoration, real user avatar từ `currentUserProfileProvider`.
-class _InboxTopbar extends ConsumerWidget {
+/// Topbar: centered title + trailing [AppTopAvatar].
+class _InboxTopbar extends StatelessWidget {
   const _InboxTopbar();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final avatarUrl =
-        ref.watch(currentUserProfileProvider).valueOrNull?.avatarUrl;
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.only(top: 8),
       child: Row(
         children: [
-          const SizedBox(width: 40),
-          const Expanded(
+          SizedBox(width: 40),
+          Expanded(
             child: Text(
               'Tin nhắn',
               textAlign: TextAlign.center,
               style: AppTextStyles.baseBold,
             ),
           ),
-          Semantics(
-            button: true,
-            label: 'Cài đặt',
-            child: GestureDetector(
-              onTap: () => showModalBottomSheet<void>(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (_) => const SettingsSheet(),
-              ),
-              child: AppAvatar(
-                imageUrl: avatarUrl,
-                size: 40,
-                fallbackText: avatarFallbackFromName(
-                  ref
-                      .watch(currentUserProfileProvider)
-                      .valueOrNull
-                      ?.displayName,
-                ),
-              ),
-            ),
-          ),
+          AppTopAvatar(),
         ],
       ),
     );

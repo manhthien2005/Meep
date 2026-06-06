@@ -75,7 +75,9 @@ class FirebaseDiaryRepository implements DiaryRepository {
         .where('authorUid', isEqualTo: authorUid)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map(_parseEntry).toList());
+        .map(
+          (snap) => snap.docs.map(_parseEntry).whereType<DiaryEntry>().toList(),
+        );
   }
 
   @override
@@ -103,7 +105,7 @@ class FirebaseDiaryRepository implements DiaryRepository {
           .where('privacy', isEqualTo: 'public')
           .orderBy('createdAt', descending: true)
           .get();
-      return snap.docs.map(_parseEntry).toList();
+      return snap.docs.map(_parseEntry).whereType<DiaryEntry>().toList();
     } on FirebaseException catch (e) {
       throw _mapFirestoreError(e);
     }
@@ -122,7 +124,7 @@ class FirebaseDiaryRepository implements DiaryRepository {
           .where('authorUid', isEqualTo: authorUid)
           .orderBy('createdAt', descending: true)
           .get();
-      return snap.docs.map(_parseEntry).where((entry) {
+      return snap.docs.map(_parseEntry).whereType<DiaryEntry>().where((entry) {
         if (entry.moodCaption.toLowerCase().contains(normalized)) return true;
         return entry.content.any(
           (block) => block.maybeWhen(
@@ -271,8 +273,10 @@ class FirebaseDiaryRepository implements DiaryRepository {
     }
   }
 
-  DiaryEntry _parseEntry(DocumentSnapshot<Map<String, dynamic>> snap) {
-    final data = Map<String, dynamic>.from(snap.data()!);
+  DiaryEntry? _parseEntry(DocumentSnapshot<Map<String, dynamic>> snap) {
+    final raw = snap.data();
+    if (raw == null) return null;
+    final data = Map<String, dynamic>.from(raw);
     data['entryId'] = snap.id;
     return DiaryEntry.fromJson(data);
   }

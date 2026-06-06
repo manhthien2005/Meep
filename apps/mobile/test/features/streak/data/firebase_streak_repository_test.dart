@@ -18,7 +18,7 @@ void main() {
     required String postId,
     required String authorId,
     required DateTime createdAt,
-    String? spaceId,
+    List<String> spaceIds = const [],
   }) {
     return db.collection('posts').doc(postId).set({
       'postId': postId,
@@ -27,7 +27,7 @@ void main() {
       'imageUrl': 'https://example.com/$postId.jpg',
       'audienceType': 'all',
       'audienceUids': <String>[],
-      'spaceId': spaceId,
+      'spaceIds': spaceIds,
       'createdAt': Timestamp.fromDate(createdAt),
     });
   }
@@ -49,12 +49,12 @@ void main() {
         createdAt: DateTime(2026, 5, 20, 14),
       );
 
-      // 1 in-month nhưng spaceId != null → loại
+      // 1 in-month nhưng spaceIds non-empty (Space post) → loại
       await seedPost(
         postId: 'p3',
         authorId: uid,
         createdAt: DateTime(2026, 5, 10),
-        spaceId: 'space-x',
+        spaceIds: ['space-x'],
       );
 
       // 1 in-month nhưng author khác → loại
@@ -76,8 +76,8 @@ void main() {
 
       expect(posts.length, 2);
       expect(posts.map((p) => p.postId).toSet(), {'p1', 'p2'});
-      // ORDER BY createdAt ASC
-      expect(posts.first.postId, 'p1');
+      // ORDER BY createdAt DESC — dùng index hiện có; thumbnail = post mới nhất/ngày
+      expect(posts.first.postId, 'p2');
     });
 
     test('tháng không có post → empty list', () async {
@@ -118,7 +118,9 @@ void main() {
       expect(dates[1], DateTime(2026, 5, 22));
     });
 
-    test('filter spaceId == null', () async {
+    test(
+        'filter All-friends posts only (loại Space posts qua spaceIds non-empty)',
+        () async {
       await seedPost(
         postId: 'p1',
         authorId: uid,
@@ -128,7 +130,7 @@ void main() {
         postId: 'p2',
         authorId: uid,
         createdAt: DateTime(2026, 5, 23),
-        spaceId: 'space-x',
+        spaceIds: ['space-x'],
       );
 
       final dates = await repo.getUserAllDates(uid);
