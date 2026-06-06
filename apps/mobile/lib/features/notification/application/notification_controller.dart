@@ -101,7 +101,14 @@ class NotificationController extends _$NotificationController {
   }
 
   Future<void> _saveToken(String token) async {
-    final uid = ref.read(currentUidProvider).valueOrNull;
+    // `valueOrNull` alone silently drops the token when the uid stream
+    // hasn't settled yet — happens during `initFcm()` if `getToken()`
+    // resolves before the auth stream emits, or when `onTokenRefresh`
+    // fires immediately after a fresh install. Await the next emission
+    // (resolves to the current value if already cached) so we save under
+    // the real uid. Stream emits null while signed-out → still drop.
+    var uid = ref.read(currentUidProvider).valueOrNull;
+    uid ??= await ref.read(currentUidProvider.future);
     if (uid == null) return;
     await ref.read(notificationRepositoryProvider).saveFcmToken(uid, token);
   }
