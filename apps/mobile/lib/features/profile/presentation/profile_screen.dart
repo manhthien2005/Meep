@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/profile/application/profile_controller.dart';
 import 'package:meep/features/profile/application/profile_posts_provider.dart';
@@ -37,7 +38,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(profileControllerProvider(widget.uid));
+    final effectiveUid = widget.uid.isEmpty
+        ? ref.watch(currentUidProvider).valueOrNull ?? ''
+        : widget.uid;
+    final state = ref.watch(profileControllerProvider(effectiveUid));
     final unreadCounts = ref.watch(unreadCountsProvider);
     final totalUnread =
         unreadCounts.values.fold<int>(0, (sum, val) => sum + val);
@@ -177,7 +181,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       case TaskbarTab.chat:
                         context.go('/inbox');
                       case TaskbarTab.profile:
-                        context.go('/profile', extra: widget.uid);
+                        context.go('/profile', extra: effectiveUid);
                     }
                   },
                 ),

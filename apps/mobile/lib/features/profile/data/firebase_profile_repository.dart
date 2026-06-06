@@ -70,7 +70,7 @@ class FirebaseProfileRepository implements ProfileRepository {
     try {
       final snap = await _firestore.doc('users/$uid').get();
       if (!snap.exists) return null;
-      return UserProfile.fromJson(snap.data()!);
+      return UserProfile.fromJson(_withTimestampFallback(snap.data()!));
     } on FirebaseException catch (e) {
       throw _mapFirestoreError(e);
     }
@@ -80,8 +80,21 @@ class FirebaseProfileRepository implements ProfileRepository {
   Stream<UserProfile?> watchUserProfile(String uid) {
     return _firestore.doc('users/$uid').snapshots().map((snap) {
       if (!snap.exists) return null;
-      return UserProfile.fromJson(snap.data()!);
+      return UserProfile.fromJson(_withTimestampFallback(snap.data()!));
     });
+  }
+
+  /// Firestore `update({...: serverTimestamp()})` apply optimistic local
+  /// trước khi server xác nhận — pending snapshot trả `null` cho field
+  /// serverTimestamp. UserProfile.fromJson decode `required DateTime` từ null
+  /// → throws → stream onError. Fallback `Timestamp.now()` giúp decode pending
+  /// snapshot OK; server confirm sau đó emit lại với real timestamp (no-op
+  /// visually).
+  Map<String, dynamic> _withTimestampFallback(Map<String, dynamic> data) {
+    final patched = Map<String, dynamic>.from(data);
+    patched['updatedAt'] ??= Timestamp.now();
+    patched['createdAt'] ??= Timestamp.now();
+    return patched;
   }
 
   @override

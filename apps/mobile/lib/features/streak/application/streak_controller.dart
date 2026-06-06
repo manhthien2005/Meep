@@ -128,12 +128,47 @@ class StreakController extends _$StreakController {
     final repo = ref.read(streakRepositoryProvider);
     _monthSub = repo.watchUserMonth(uid, month).listen(
       (posts) {
-        state = state.copyWith(monthPosts: posts, isLoading: false);
+        final nowLocal = ref.read(nowProvider)();
+        final newDates = _extractDates(posts);
+        final merged = _mergeDates(state.allPostDates, newDates);
+        final streak = calculateStreak(merged, nowLocal);
+        state = state.copyWith(
+          monthPosts: posts,
+          allPostDates: merged,
+          currentStreak: streak,
+          isLoading: false,
+        );
       },
       onError: (Object e) {
         state = _afterFailure(e);
       },
     );
+  }
+
+  /// Extract unique days (local timezone) from a list of posts.
+  List<DateTime> _extractDates(List<Post> posts) {
+    final days = <DateTime>{};
+    for (final p in posts) {
+      final local = p.createdAt.toLocal();
+      days.add(DateTime(local.year, local.month, local.day));
+    }
+    return days.toList();
+  }
+
+  /// Merge two date lists, deduplicate, sort DESC.
+  List<DateTime> _mergeDates(
+    List<DateTime> existing,
+    List<DateTime> incoming,
+  ) {
+    final set = <DateTime>{};
+    for (final d in existing) {
+      set.add(DateTime(d.year, d.month, d.day));
+    }
+    for (final d in incoming) {
+      set.add(DateTime(d.year, d.month, d.day));
+    }
+    final sorted = set.toList()..sort((a, b) => b.compareTo(a));
+    return sorted;
   }
 
   /// Reset isLoading + map error to message (pattern AUTH #4).

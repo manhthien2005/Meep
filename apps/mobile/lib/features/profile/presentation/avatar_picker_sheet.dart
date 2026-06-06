@@ -14,12 +14,24 @@ const _cSheetBg = Color(0xFF2B2B2B);
 const _cRemove = Color(0xFFE43700); // AppColors.error800
 
 class AvatarPickerSheet extends StatelessWidget {
-  const AvatarPickerSheet({super.key});
+  const AvatarPickerSheet({
+    super.key,
+    required this.onPickGallery,
+    required this.onPickCamera,
+    required this.onRemove,
+    this.canRemove = true,
+  });
+
+  final VoidCallback onPickGallery;
+  final VoidCallback onPickCamera;
+  final VoidCallback onRemove;
+  // Hide "Gỡ ảnh hiện tại" khi user chưa set avatar.
+  final bool canRemove;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 265,
+      height: canRemove ? 265 : 217,
       child: AppBottomSheet(
         backgroundColor: _cSheetBg,
         child: SafeArea(
@@ -50,10 +62,7 @@ class AvatarPickerSheet extends StatelessWidget {
                       ),
                       label: 'Chọn từ thư viện',
                       labelColor: AppColors.bw100,
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        // TODO(T6): image_picker.pickImage(source: gallery) → compress → updateAvatar()
-                      },
+                      onTap: onPickGallery,
                     ),
                     _SheetOption(
                       icon: SvgPicture.asset(
@@ -67,28 +76,23 @@ class AvatarPickerSheet extends StatelessWidget {
                       ),
                       label: 'Chụp ảnh',
                       labelColor: AppColors.bw100,
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        // TODO(T6): image_picker.pickImage(source: camera) → compress → updateAvatar()
-                      },
+                      onTap: onPickCamera,
                     ),
-                    _SheetOption(
-                      icon: SvgPicture.asset(
-                        _iTrash,
-                        width: 20,
-                        height: 20,
-                        colorFilter: const ColorFilter.mode(
-                          _cRemove,
-                          BlendMode.srcIn,
+                    if (canRemove)
+                      _SheetOption(
+                        icon: SvgPicture.asset(
+                          _iTrash,
+                          width: 20,
+                          height: 20,
+                          colorFilter: const ColorFilter.mode(
+                            _cRemove,
+                            BlendMode.srcIn,
+                          ),
                         ),
+                        label: 'Gỡ ảnh hiện tại',
+                        labelColor: _cRemove,
+                        onTap: onRemove,
                       ),
-                      label: 'Gỡ ảnh hiện tại',
-                      labelColor: _cRemove,
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        // TODO(T6): removeAvatar() → avatarUrl = null → hiện initials
-                      },
-                    ),
                     const SizedBox(height: 8),
                     Text(
                       'Ảnh hồ sơ của bạn sẽ được hiển thị cho tất cả bạn bè của bạn.',

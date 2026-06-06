@@ -120,7 +120,8 @@ void main() {
 
       final state = container.read(streakControllerProvider);
       expect(state.viewingMonth, DateTime(2026, 5));
-      expect(state.allPostDates.length, 3);
+      // allPostDates được merge từ stream → 3 (init) + 1 (May 10 từ monthPosts) = 4
+      expect(state.allPostDates.length, 4);
       expect(state.currentStreak, 3);
       expect(state.monthPosts.length, 2);
       expect(state.isLoading, false);
@@ -185,7 +186,8 @@ void main() {
       final state = container.read(streakControllerProvider);
       expect(state.viewingMonth, DateTime(2026, 4));
       expect(state.currentStreak, 1, reason: 'global, không đổi khi swipe');
-      expect(state.allPostDates.length, 1);
+      // allPostDates được merge từ stream: May 22 (init) + May 10 (stream May) + Apr 15 (stream April) = 3
+      expect(state.allPostDates.length, 3);
       expect(state.monthPosts.length, 1);
       expect(state.monthPosts.first.postId, 'p-apr');
       expect(repo.watchedMonths, [DateTime(2026, 5), DateTime(2026, 4)]);

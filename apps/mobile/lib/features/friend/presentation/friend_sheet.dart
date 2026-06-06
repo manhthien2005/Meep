@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
@@ -587,25 +588,34 @@ class _FriendSheetState extends ConsumerState<FriendSheet> {
       height: 50,
       child: Row(
         children: [
-          // Avatar với ring turquoise
-          AppAvatar(
-            imageUrl: friend.avatarUrl,
-            size: 50,
-            ringColor: AppColors.turquoise500,
-            fallbackText: friend.displayName.isNotEmpty
-                ? friend.displayName[0].toUpperCase()
-                : null,
-          ),
-          const SizedBox(width: 16),
-          // Name
-          Expanded(
-            child: Text(
-              friend.displayName,
-              style: AppTextStyles.mdBold.copyWith(
-                color: AppColors.bw100,
-              ),
+          GestureDetector(
+            onTap: () {
+              final router = GoRouter.of(context);
+              Navigator.of(context).pop();
+              router.push('/friend-profile/${friend.uid}');
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppAvatar(
+                  imageUrl: friend.avatarUrl,
+                  size: 50,
+                  ringColor: AppColors.turquoise500,
+                  fallbackText: friend.displayName.isNotEmpty
+                      ? friend.displayName[0].toUpperCase()
+                      : null,
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  friend.displayName,
+                  style: AppTextStyles.mdBold.copyWith(
+                    color: AppColors.bw100,
+                  ),
+                ),
+              ],
             ),
           ),
+          const Spacer(),
           // Remove button (X icon)
           SizedBox(
             width: 20,
