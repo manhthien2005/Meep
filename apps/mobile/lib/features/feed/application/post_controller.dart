@@ -196,19 +196,23 @@ class PostController extends _$PostController {
         }
       }
 
-      // authorName: chữ đầu tiên trong displayName, tối đa 6 ký tự.
-      // Dài hơn → cắt còn 6 + "...".
-      final rawName = user.displayName?.trim() ?? '';
-      final firstName = rawName.split(' ').first;
-      final authorName =
-          firstName.length <= 6 ? firstName : '${firstName.substring(0, 6)}...';
+      // authorName: lưu full displayName. UI tự handle ellipsis (xem
+      // `feed_section.dart` _AuthorLabel: maxLines 1 + ellipsis + Flexible).
+      // Ưu tiên Firestore profile (source of truth, luôn sync với
+      // /users/{uid}.displayName) — FirebaseAuth currentUser.displayName có
+      // thể null/empty với user đăng ký bằng email/phone trước khi sync về
+      // Auth.
+      final profile = ref.read(currentUserProfileProvider).valueOrNull;
+      final profileName = profile?.displayName.trim() ?? '';
+      final authorName = profileName.isNotEmpty
+          ? profileName
+          : (user.displayName?.trim() ?? '');
 
       final post = Post(
         postId: postId,
         authorId: uid,
         authorName: authorName,
-        authorAvatarUrl: user.photoURL ??
-            ref.read(currentUserProfileProvider).valueOrNull?.avatarUrl,
+        authorAvatarUrl: user.photoURL ?? profile?.avatarUrl,
         imageUrl: imageUrl,
         backImageUrl: backImageUrl,
         frontImageUrl: frontImageUrl,

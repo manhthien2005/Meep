@@ -137,16 +137,30 @@ class FeedController extends _$FeedController {
   }
 
   void _updateWidget(Ref ref, Post post) {
+    // Fire-and-forget. Sync `try` ngoài chỉ catch lỗi đồng bộ của
+    // `ref.read` (vd provider scope sai) — async error trong Future của
+    // `updateWidgetData` cần `.catchError`, nếu không sẽ trở thành
+    // unhandled async exception. `_safePoke` bên trong đã nuốt
+    // PlatformException/MissingPluginException, nên `.catchError` chỉ là
+    // safety net cho future-proof.
     try {
-      ref.read(widgetDataServiceProvider).updateWidgetData(
-            postId: post.postId,
-            imageUrl: post.coverImageUrl,
-            authorAvatarUrl: post.authorAvatarUrl,
-            caption: post.caption,
-            captionType: post.captionType?.name,
-          );
-    } catch (_) {
+      unawaited(
+        ref
+            .read(widgetDataServiceProvider)
+            .updateWidgetData(
+              postId: post.postId,
+              imageUrl: post.coverImageUrl,
+              authorAvatarUrl: post.authorAvatarUrl,
+              caption: post.caption,
+              captionType: post.captionType?.name,
+            )
+            .catchError((Object e, StackTrace st) {
+          debugPrint('[FeedController] widget update failed: $e\n$st');
+        }),
+      );
+    } catch (e, st) {
       // Best-effort — widget update must not crash the feed stream.
+      debugPrint('[FeedController] widget update sync error: $e\n$st');
     }
   }
 }
