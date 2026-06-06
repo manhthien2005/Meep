@@ -338,13 +338,16 @@ class WidgetSyncWorkerTest {
     private fun givenGlideBitmap() {
         val bitmap = mockk<Bitmap>(relaxed = true)
         val futureTarget = mockk<FutureTarget<Bitmap>>(relaxed = true)
-        every { futureTarget.get() } returns bitmap
+        // Loader now caps target size via submit(w, h) and adds a timeout to
+        // get(timeout, unit) — mock the args-bearing overloads so the new
+        // signature in WidgetSyncWorker.loadBitmap resolves.
+        every { futureTarget.get(any(), any()) } returns bitmap
 
         @Suppress("UNCHECKED_CAST")
         val requestBuilder = mockk<RequestBuilder<Bitmap>>(relaxed = true)
         every { requestBuilder.load(any<String>()) } returns requestBuilder
         every { requestBuilder.apply(any()) } returns requestBuilder
-        every { requestBuilder.submit() } returns futureTarget
+        every { requestBuilder.submit(any(), any()) } returns futureTarget
 
         val requestManager = mockk<RequestManager>(relaxed = true)
         every { requestManager.asBitmap() } returns requestBuilder
