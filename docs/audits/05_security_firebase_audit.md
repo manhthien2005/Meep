@@ -181,6 +181,29 @@
 - test: `firestore.rules.test.ts describe('/conversations — stranger create denied')` — Alice + Bob KHÔNG friendship, Alice try create `/conversations/{aliceUid}_{bobUid}` → assertFails
 - deps: none
 
+### ISSUE CHAT-SEC-002
+
+- sev: P2
+- blocker: no
+- area: rules
+- files:
+  - `firebase/firestore.rules`
+- loc: 294-302 (/conversations update block)
+- symbols:
+  - `match /conversations/{conversationId}` → `allow update`
+- evidence: `affectedKeys().hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'lastReadAt'])` (firestore.rules:296-302) — field whitelist nhưng KHÔNG có value validation cho từng field: `lastMessage` không có type+size check, `lastSenderId` không enforce `== request.auth.uid`, `lastMessageAt` không type-check timestamp, `lastReadAt` không shape-check (map<uid, timestamp>).
+- access_path: participant A (legitimate friend) gọi `conversations.doc(pairId).update({lastMessage: '<1MB string hoặc fake content>', lastSenderId: B.uid, lastMessageAt: <arbitrary timestamp>})` — rule pass vì A trong participantIds + affectedKeys hợp lệ. Inbox preview của B sẽ render "B đã gửi: <content A đặt>" (impersonation in inbox UI). Hoặc A set `lastReadAt[B] = future timestamp` → B's unread badge bị "đè" về 0 cho đến khi có message thực sự mới hơn timestamp giả đó. Bloat doc qua 1MB lastMessage cũng possible nhưng impact thấp vì doc rebuild.
+- risk: defense-in-depth — UI integrity (inbox preview hiển thị sai sender) + minor doc bloat. Không leak data nhưng vi phạm invariant "lastMessage source = sender của message gần nhất". CHAT module dùng denormalized fields này cho inbox list render trực tiếp không lookup messages.
+- fix: thêm value validation trong allow update block, mirror /posts pattern:
+  - `(!affectedKeys().hasAny(['lastMessage']) || (request.resource.data.lastMessage is string && request.resource.data.lastMessage.size() <= 500))`
+  - `(!affectedKeys().hasAny(['lastSenderId']) || request.resource.data.lastSenderId == request.auth.uid)`
+  - `(!affectedKeys().hasAny(['lastMessageAt']) || request.resource.data.lastMessageAt is timestamp)`
+  - `(!affectedKeys().hasAny(['lastReadAt']) || request.resource.data.lastReadAt is map)`
+  - `lastReadAt` keyed by uid — nếu enforce shape thì cần check key set là subset participantIds; rule expression hỗ trợ được qua `keys()` API.
+- authority: firestore.rules:316-318 đã model pattern type+size check cho `senderDisplayName` trong /messages create — mirror sang /conversations update; tmp prompt §Field validation "Server-set fields protected ... client KHÔNG ghi được từ phía client" (sender field thuộc nhóm này về spirit)
+- test: `firestore.rules.test.ts describe('/conversations update — tamper guards')` — 4 assertion: participant A update lastSenderId=B.uid → assertFails (post-fix); A update lastMessage với 1000 chars → assertFails; A update lastMessageAt=string → assertFails; A update lastMessage hợp lệ → assertSucceeds
+- deps: pair với CHAT-SEC-001 (cùng module /conversations); test add vào cùng describe block đề xuất TESTING-SEC-001
+
 ### ISSUE AUTH-SEC-001
 
 - sev: P1
@@ -415,6 +438,7 @@
 ### batch_3_p2
 - USERNAME-SEC-001 — Move username lookup vào CF (depends USER-SEC-001)
 - REACTION-SEC-001 — Type+size guard trên /reactions update
+- CHAT-SEC-002 — Value validation trên /conversations update (lastMessage size, lastSenderId == auth.uid, lastReadAt shape) — added pass-3
 - USER-SEC-002 — Length cap displayName trong /users update
 - DIARY-SEC-001 — Privacy enum + type guard trên /diary update
 - TESTING-SEC-001 — Coverage gap fix cuối cùng (cover toàn bộ collection rule mới fix)
@@ -437,6 +461,7 @@
 - `AUTH-SEC-001`: vitest `deleteAccount.test.ts` mock authData with stale `auth_time` → throws `failed-precondition`
 - `USERNAME-SEC-001`: vitest `checkUsernameAvailable.test.ts` verify response only `{available: bool}`; rules test unauth read /usernames → assertFails post-fix
 - `REACTION-SEC-001`: rules test reactor update reactorName with 1000 chars → assertFails
+- `CHAT-SEC-002`: rules test participant A update `lastSenderId: B.uid` → assertFails post-fix; A update `lastMessage` với 1000 chars → assertFails; A update hợp lệ (lastMessage ≤ 500 chars, lastSenderId == A.uid) → assertSucceeds
 - `WIDGET-SEC-001`: widget test `settings_controller_test.dart` mock WidgetDataService; verify `clearData()` invoked trong deleteAccount path trước `auth.deleteAccountCascade()` (logout path đã có test sẵn — chỉ cần mirror)
 - `USER-SEC-002`: rules test owner update displayName 1000 chars → assertFails
 - `TESTING-SEC-001`: thêm describe blocks; verify CI `pr-check.yml firestore-rules` job pass
@@ -555,8 +580,22 @@
 
 - pass_1_checklist: N=88 items, M=17 issues, K=88 no_issue_notes mappings (each checklist item mapped to ≥1 issue or note via cross-reference; 6 additional gap items added — imageUrl regex, CAMERA, READ_MEDIA_IMAGES, branch protection, callable unauth test, trigger invalid-input test), gap=0
 - pass_2_schema: total=17, missing_field_fixed=0 (every issue has sev/blocker/area/files/loc/symbols/evidence/access_path/risk/fix/authority/test/deps), severity_demoted=1 in pass-2 reverify (WIDGET-SEC-001 P2→P3: pass-1 claim "logout missing clearData" SAI — verified `settings_controller.dart:94-99` đã có `clearData()` trong try/catch; chỉ deleteAccount path line 127-158 còn miss → scope hẹp lại, server cascade làm cache stale → URL invalid trong window ~15min nên impact thấp). Pre-pass-2 demotions (in original draft): RULES-004 streaks → no_issue (verified `firebase_streak_repository.dart:8` "không có collection riêng"); RULES-008 diary privacy update P1→P2 (read rule fail-safe denies invalid privacy). evidence_failed_grep=0 — pass-2 re-grep all 17 evidence quotes against source files; 3 line drifts corrected in-place: STORAGE-002 storage.rules:31→30, FUNC-SEC-002 onSpaceMemberAdded.ts:14-19→12-17, WIDGET-SEC-001 settings_controller.dart loc range. Reframed offensive phrasing in 6 issues (APPCHECK-001, USER-SEC-001, STORAGE-001, CHAT-SEC-001, AUTH-SEC-001, USERNAME-SEC-001, REACTION-SEC-001) to defensive language without changing technical content.
-- pass_3_dedupe: before=17, after=17, consolidations=0 (STORAGE-001 vs STORAGE-002 share root cause "Storage read auth-only doesn't mirror Firestore friend boundary" but distinct files+symbols /posts vs /diary — kept separate per "no duplicate cùng file+symbol+root_cause" criterion. USER-SEC-001 vs USERNAME-SEC-001 share story "user enumeration" but distinct rule blocks + fix paths — kept separate with USERNAME-SEC-001.deps linking)
+- pass_3_dedupe: before=17, after=18 sau pass-3 (added CHAT-SEC-002 P2 from gap scan — /conversations update value-validation gap discovered when re-reading rules cross-reference REACTION-SEC-001 pattern). Consolidations=0 (STORAGE-001 vs STORAGE-002 share root cause "Storage read auth-only doesn't mirror Firestore friend boundary" but distinct files+symbols /posts vs /diary — kept separate per "no duplicate cùng file+symbol+root_cause" criterion. USER-SEC-001 vs USERNAME-SEC-001 share story "user enumeration" but distinct rule blocks + fix paths — kept separate with USERNAME-SEC-001.deps linking. CHAT-SEC-001 vs CHAT-SEC-002: distinct rule blocks — create vs update; CHAT-SEC-002.deps reference cùng test plan TESTING-SEC-001)
 - pass_4_coverage: checked=11, partial=1 (client Firebase usage boundary — sampled feed/notification/chat/widget/settings/auth, not every feature module), blocked=0, total=12, verdict=full (every "checked" area backed by grep evidence + file read in commands table)
+
+pass_3_reverify_notes (gap scan + new issue):
+- NEW ISSUE 1 (CHAT-SEC-002 P2): /conversations update rule line 294-302 có field whitelist nhưng KHÔNG có value validation. Participant có thể tamper `lastSenderId` thành uid khác (impersonation inbox preview), `lastMessage` không cap size, `lastReadAt` không shape-check. Defense-in-depth gap. Discovered khi re-read firestore.rules:294-302 đối chiếu với /reactions update pattern (REACTION-SEC-001) — cùng class lỗi (whitelist OK, value-validation missing). Mirror fix style.
+- GAP SCAN coverage: re-read 6 CF files (updateSpace, kickMember, transferOwnership, onMessageCreated, onReactionCreated, onFriendRequestCreated, onFriendshipDeleted, _fcm.ts) — không tìm thêm gap nào. Cụ thể:
+  - updateSpace.ts: schema refine reject empty patch + creator-only check + deletedAt guard — OK
+  - kickMember.ts: creator + non-self + member-check guard — OK
+  - transferOwnership.ts: creator + non-self + newCreator-is-member guard — OK
+  - onMessageCreated.ts: senderId narrow, participant fan-out idempotent qua notif doc create — OK
+  - onFriendshipDeleted.ts: 1 `console.warn` (line 25) vi phạm Functions CLAUDE.md "Don't console.log in production" — code quality concern không phải security, defer.
+  - createSpace.ts: server verify friendship trước khi tạo Space — defense in depth tốt, không gap.
+  - _fcm.ts: logs uid + error (uid OK per "Log IDs only"), token prune permanent error — OK.
+- INDEX REVIEW: `firestore.indexes.json` 10 composite indexes — không có index lộ field PII không cần thiết. authorUid+privacy+createdAt cho diary OK (privacy không phải PII). conversations participantIds+lastMessageAt cần cho inbox query.
+- IMAGEURL REGEX gap (đã note pass-1 §no_issue_notes "Field validation — additional"): client luôn upload qua Storage SDK trả URL `firebasestorage.googleapis.com` nên không phải attack vector hiện tại; rule không enforce domain match — defense-in-depth gap nhỏ, vẫn note-only, không escalate.
+- MESSAGE createdAt validation gap: `/conversations/{id}/messages` create rule (line 308-322) không check `createdAt is timestamp` — client có thể set arbitrary timestamp gây sai thứ tự render. Impact thấp (sender đã được pin == auth.uid). Note-only, không escalate sang issue mới.
 
 pass_2_reverify_notes (post-commit follow-up after user request):
 - FACT FIX 1 (WIDGET-SEC-001 demote P2→P3 + evidence rewrite): pass-1 claimed `settings_controller.dart:89-110 logout … KHÔNG gọi widget clearData`. Re-read confirms `settings_controller.dart:94-99` đã có `try { await ref.read(widgetDataServiceProvider).clearData(); } catch (_) {}` trong logout path. Real gap thu hẹp về `deleteAccount` path line 127-158 (missing clearData). Demoted P2→P3, fix instruction đổi sang deleteAccount path, test plan đổi sang mirror deleteAccount test case.
@@ -574,3 +613,5 @@ verdict: not_ready
 **Recommended path:** Fix batch_1_p0 + batch_2_p1 (7 issues) trong 1 sprint (3-5 ngày dev), re-audit, then ship M3.
 
 Final distribution after pass-2 reverify: **P0=2, P1=5, P2=5, P3=5 — total 17 issues** (WIDGET-SEC-001 demoted P2→P3 sau khi verify logout path đã clear cache; chỉ deleteAccount path còn missing — impact thấp vì server cascade làm URL invalid trong 15min).
+
+Final distribution after pass-3 reverify: **P0=2, P1=5, P2=6, P3=5 — total 18 issues** (CHAT-SEC-002 P2 added: /conversations update rule cho phép tamper lastSenderId/lastMessage/lastReadAt mà không value-validate; defense-in-depth gap discovered khi cross-reference với REACTION-SEC-001 pattern).
