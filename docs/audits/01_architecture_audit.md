@@ -259,25 +259,43 @@ Only P0/P1.
 
 - sev: P1
 - blocker: no
-- area: Layering — widget file size beyond split threshold
-- files:
-  - `apps/mobile/lib/features/feed/presentation/feed_section.dart` (1031 lines)
-  - `apps/mobile/lib/features/feed/presentation/capture_preview_screen.dart` (771 lines)
-  - `apps/mobile/lib/features/feed/presentation/home_screen.dart` (630 lines)
+- area: Layering — widget/controller files exceed CLAUDE.md split threshold (17 files)
+- files (over 300 lines, sorted by size):
+  - `apps/mobile/lib/features/feed/presentation/feed_section.dart` (1031)
+  - `apps/mobile/lib/features/friend/presentation/friend_sheet.dart` (941)
+  - `apps/mobile/lib/features/diary/presentation/diary_canvas_screen.dart` (820)
+  - `apps/mobile/lib/features/feed/presentation/capture_preview_screen.dart` (771)
+  - `apps/mobile/lib/features/profile/presentation/edit_profile_screen.dart` (683)
+  - `apps/mobile/lib/features/feed/presentation/home_screen.dart` (630)
+  - `apps/mobile/lib/features/feed/presentation/camera_section.dart` (595)
+  - `apps/mobile/lib/shared/widgets/photo_detail_screen.dart` (569)
+  - `apps/mobile/lib/features/profile/presentation/friend_profile_screen.dart` (550)
+  - `apps/mobile/lib/core/router/app_router.dart` (546)
+  - `apps/mobile/lib/features/space/presentation/space_edit_sheet.dart` (453)
+  - `apps/mobile/lib/features/diary/presentation/diary_list_screen.dart` (421)
+  - `apps/mobile/lib/features/profile/presentation/profile_screen.dart` (406)
+  - `apps/mobile/lib/features/auth/data/firebase_auth_repository.dart` (399)
+  - `apps/mobile/lib/dev/widget_catalog_page.dart` (386)
+  - `apps/mobile/lib/features/friend/application/friend_controller.dart` (381)
+  - `apps/mobile/lib/features/diary/data/firebase_diary_repository.dart` (367)
+  - `apps/mobile/lib/features/space/application/space_controller.dart` (350)
+  - `apps/mobile/lib/features/diary/presentation/diary_search_screen.dart` (345)
+  - `apps/mobile/lib/features/diary/application/diary_controller.dart` (344)
 - loc: file-level
-- symbols:
-  - `FeedSection` + multiple private widgets (`_PostCard`, `_PostHeader`, `_FeedFooter`, `_EmptyState`, ...)
-  - `CapturePreviewScreen` + sibling widgets
-  - `HomeScreen` + private widgets (`_PostPage`, `_EmptyFeedPage`, ...)
-- evidence: `wc -l` numbers above; `apps/mobile/CLAUDE.md §Widget split thresholds` table — `class > 300 lines → split by SRP`; `Widget body > 150 lines → split into sub-widgets`
-- risk: Files grow ~3-7× the documented split threshold. Maintenance burden: any feed bug fix forces reading 1000+ lines. Code review (`/review`) tail-window misses changes deep in file. Onboarding cost spikes — new dev cannot trace shadow state (`_pendingHighlightPostId`, `_pendingOpenFriendSheet`, `_currentPage`, `_posts`, `_ringColor`) across one giant `_HomeScreenState`. Conflict surface enlarges on parallel feature PRs.
-- fix: Extract per CLAUDE.md table:
-  - `feed_section.dart`: split into `feed_section.dart` (just the `FeedSection` widget + `.when` shell), `widgets/own_post_card.dart`, `widgets/friend_post_card.dart`, `widgets/feed_reaction_bar.dart`, `widgets/feed_share_handlers.dart`. Aim ≤ 300 lines each.
-  - `capture_preview_screen.dart`: extract caption picker, audience row, send button into `widgets/`.
-  - `home_screen.dart`: extract `_PostPage`, `_EmptyFeedPage`, `_filterModeFor`, `_ringColor` derivation, taskbar dispatch into separate files; move `_RouterNotifier`-style logic out of widget state.
+- symbols: each file holds 1 top-level page/controller + numerous private widgets/helpers
+- evidence: `find apps/mobile/lib -name "*.dart" ! -name "*.g.dart" ! -name "*.freezed.dart" -exec wc -l {} \; | sort -rn | head -20` produces the list above; `apps/mobile/CLAUDE.md §Widget split thresholds` table requires `Class > 300 lines → split by SRP`; `Widget body > 150 lines → split into sub-widgets`; `CLAUDE.md §File organization` says "Files ≤ 300 lines. Split if larger."
+- risk: 20 files exceed the 300-line ceiling — 7 files are above 500. Maintenance burden: any feed/friend/diary bug fix forces reading 600-1000+ lines. Code review (`/review`) tail-window misses changes deep in file. Onboarding cost spikes — new dev cannot trace shadow state (`_pendingHighlightPostId`, `_pendingOpenFriendSheet`, `_currentPage`, `_posts`, `_ringColor`) across one giant `_HomeScreenState`. Conflict surface enlarges on parallel feature PRs. Spreads across 6 modules + core/router + shared/widgets + dev/ — not a single-module smell. Note: `app_router.dart` (546 lines) is `core/` — the only `core/` violation; rest are feature presentations.
+- fix: Prioritize the 7 worst offenders (>500 lines) for batch_2:
+  - `feed_section.dart`, `home_screen.dart`, `capture_preview_screen.dart`, `camera_section.dart`: per earlier guidance — extract `widgets/own_post_card.dart`, `friend_post_card.dart`, etc.
+  - `friend_sheet.dart`: split into `friend_search_section.dart`, `friend_list_section.dart`, `pending_requests_section.dart`, `invite_link_section.dart`.
+  - `diary_canvas_screen.dart`: extract toolbar (already separate `_toolbar.dart` exists), dot grid, content blocks per `auth.md` Pattern #1.
+  - `edit_profile_screen.dart`: extract form sections (display name + username + avatar) into widgets.
+  - `photo_detail_screen.dart`: extract PhotoCarousel + ReactionRow + ShareSheet.
+  - `app_router.dart`: extract route builders into `core/router/routes/{auth_routes,feed_routes,profile_routes,...}` modules; keep `app_router.dart` as just the GoRouter wiring.
+  - Remaining 10 files (300-450 lines): track but defer to batch_3 polish unless the file is bug-prone.
 - authority: `apps/mobile/CLAUDE.md §Widget split thresholds` + `CLAUDE.md §File organization` ("Files ≤ 300 lines. Split if larger.")
-- test: After split, `flutter test test/features/feed/` must stay green; add widget tests for any newly extracted reusable widget under `test/features/feed/presentation/widgets/`.
-- deps: LAYER-001 (touches same files; sequence: fix LAYER-001 first since both edits hit the same call sites)
+- test: After each split, `flutter test test/features/<module>/` must stay green; add widget tests for newly extracted reusable widgets under `test/features/<module>/presentation/widgets/`.
+- deps: LAYER-001 (feed presentation files overlap; fix LAYER-001 first because the split happens in the same files)
 
 ### ISSUE STATE-ARCH-001
 
@@ -499,6 +517,29 @@ Only P0/P1.
 - test: Manual: tap `https://meep.app/invite/test-uid` from device's Gmail → app opens at `/invite/test-uid`. Unit: `test/core/config/app_config_test.dart` asserts `inviteLinkPrefix.startsWith('https://')`. Widget: `friend_sheet_test.dart` asserts copied clipboard text matches `AppConfig.inviteLinkPrefix`.
 - deps: HOME-ARCH-001 (both touch `/invite/:uid` target — fix HOME-ARCH-001 first)
 
+### ISSUE ARCH-004
+
+- sev: P3
+- blocker: no
+- area: Docs/ADR drift — reference architecture vs repo gitignore policy
+- files:
+  - `.gitignore` (root)
+  - `.claude/reference-architectures/auth.md`
+- loc:
+  - root `.gitignore` contains `**/*.g.dart` + `**/*.freezed.dart`
+  - `auth.md` Pattern #1 says `<model>.freezed.dart  # generated, commit cùng` and `<model>.g.dart  # generated, commit cùng`
+- symbols:
+  - generated file policy
+- evidence:
+  - `find apps/mobile/lib -name "*.g.dart" -o -name "*.freezed.dart"` returns ZERO matches in working tree
+  - `grep -E "\.g\.dart|\.freezed\.dart" .gitignore` (root) returns `**/*.g.dart` + `**/*.freezed.dart`
+  - `auth.md` Pattern #1 lines explicitly say "commit cùng" for generated files
+- risk: New module owner reading `auth.md` and committing `*.g.dart` to their feature branch will hit `.gitignore` silently — their files won't be tracked. Conversely, anyone trusting auth.md may think CI doesn't need `build_runner` step (it does, since gen files aren't in repo). Onboarding-cost smell, not a runtime bug. Convention "gitignore gen files + CI build_runner" is the standard Flutter approach — auth.md should describe THAT convention.
+- fix: Update `auth.md` Pattern #1 to read `<model>.freezed.dart  # generated, gitignored — run dart run build_runner build` and `<model>.g.dart  # generated, gitignored — same`. OR (if leader wants to commit gen files): remove the entries from root `.gitignore` and run `dart run build_runner build` then commit. Pick ONE, document in ADR.
+- authority: root `.gitignore` (current state) vs `auth.md` Pattern #1 (documented intent)
+- test: After fix, `auth.md` Pattern #1 description matches `.gitignore` state. No code change.
+- deps: none
+
 ### ISSUE DEV-001
 
 - sev: P3
@@ -556,6 +597,7 @@ Only P0/P1.
 17. **PUBSPEC-001** — remove `sign_in_with_apple` dep.
 18. **DEV-001** — gate `/dev/widgets` route behind `kDebugMode`.
 19. **ARCH-003** — leader decision: scaffold or descope RollCall.
+20. **ARCH-004** — sync `auth.md` Pattern #1 gen-file commit policy with repo `.gitignore` (either update doc OR remove gitignore entries).
 
 ## test_plan_after_fix
 
@@ -577,6 +619,7 @@ Only P0/P1.
 - `ROUTER-001`: `flutter test test/core/router/app_router_test.dart` — unauthenticated `/inbox` redirects to `/intro`.
 - `PUBSPEC-001`: `flutter pub get && flutter analyze --no-pub` clean; `flutter test` passes.
 - `ARCH-003`: `flutter analyze --no-pub` clean after scaffold; `flutter test` passes (no behavior added).
+- `ARCH-004`: `diff <(grep -E 'commit cùng|gitignored' .claude/reference-architectures/auth.md) <(grep -E '\.g\.dart|\.freezed\.dart' .gitignore)` shows aligned wording (docs-only fix, no flutter command).
 
 ## no_issue_notes
 
@@ -593,6 +636,11 @@ Compact notes for important areas checked with no issue found.
 - `shared/widgets/` has 22 files all real-name shared components (`AppAvatar`, `AppPhotoFrame`, `AppPrimaryButton`, ...). Spot-check shows no false reuse beyond `post_card.dart` coupling captured in SHARED-001.
 - `core/utils/pair_id.dart` matches `CLAUDE.md §Identifiers pairIdOf`. Single source of truth.
 - Riverpod `keepAlive: true` usage (22 occurrences) appropriately scoped to repositories + cross-route controllers — no default-everywhere smell.
+- File naming: `find apps/mobile/lib -name "*.dart" ! -name "*.g.dart" ! -name "*.freezed.dart" | grep -E '[A-Z]'` returns 0 hits — all snake_case per `CLAUDE.md §Naming`. ✓
+- Global singletons / service locators: `grep -rn "getIt\|GetIt"` returns 0 hits. `static final` usages are all `RegExp` constants (`auth_validators.dart:5,8`) or `chat_seed_data.dart` test seed fixtures — no DI-bypass smell. ✓
+- Async state ownership (Pattern checklist): 24 `StreamSubscription | .listen(` sites in features/; spot-checked notification (line 49-54), friend (57-66), space, streak, profile, diary, feed (125), reaction (51) — each subscription paired with `ref.onDispose` cancel. ✓
+- Tier 2 scope note (out of architecture scope, flagged for 02_code_quality): `GroupChatScreen` + `/group-chat/:conversationId` route + `chat/data/conversation.dart spaceId` field + CF `space/spacePostFanOut` are shipped — `CLAUDE.md §Tier 2` lists `group chat in Space` as "Won't have". This is a scope drift in code review territory, not architectural per se; surfaced here for cross-audit awareness.
+- Firebase singleton audit scope confirmation: `grep -rn "FirebaseFirestore.instance\|FirebaseAuth.instance.currentUser"` outside `main.dart` + `firebase_*_repository.dart` returns ONLY the 5 sites flagged under LAYER-001 + LAYER-002. No other module leaks Firebase singletons.
 
 ## postcheck
 
@@ -612,7 +660,11 @@ Rationale: 2× P0 (Firebase leaks in feed widget + controller layer) block the l
 
 After batch_1 + batch_2 (P0 + P1), revisit for `almost_ready_after_p0_p1`. P2/P3 are non-blocking polish.
 
-Final distribution after pass-3 reverify: **P0=2, P1=7, P2=5, P3=5 — total 19 issues** (pass-3 added STATE-ARCH-001 expanding the original REACT-ARCH-001 to cover 4 modules, plus DEEPLINK-001 P1 and DEV-001 P3 found while verifying ADR-0005 + AndroidManifest + dev folder coverage).
+Final distribution after pass-3+pass-4 reverify: **P0=2, P1=7, P2=5, P3=6 — total 20 issues**.
+
+Pass-3 added: STATE-ARCH-001 (expanded REACT-ARCH-001 to cover 4 modules), DEEPLINK-001 (P1), DEV-001 (P3).
+Pass-4 added: ARCH-004 (P3 — auth.md gen-file commit policy vs `.gitignore` drift), expanded ARCH-002 file list from 3 → 20 files (>300 lines threshold).
+Pass-4 confirmations: file naming (all snake_case), no `getIt`/global singletons, async ref.onDispose discipline holds for all 24 stream subs.
 
 ## self_verification_log
 
@@ -641,3 +693,13 @@ pass_3_reverify_notes (second user-requested deep-verify — checked AndroidMani
 - FACT CONFIRMATION (chat module status): conversation_repository is FirebaseConversationRepository wired in main.dart:104; FakeConversationRepository exists only as test fixture. Chat module Tier 1 scope acceptable — not a P3 gap.
 - FACT CONFIRMATION (ADR-0005): explicitly documents `assetlinks.json` and `meep.app` host as deferred to prod. Out-of-scope per scope_filter for prod-deploy-checklist items. But scheme-drift (DEEPLINK-001) is NOT in ADR-0005's deferred list — that's a runtime smell not a deploy gate.
 - COUNT UPDATE: 17 → 19 issues. Distribution: P0=2, P1=7 (added DEEPLINK-001), P2=5 (REACT-ARCH-001 renamed STATE-ARCH-001, scope expanded but stays P2), P3=5 (added DEV-001).
+
+pass_4_reverify_notes (third user-requested deep-verify — fully exhaustive grep):
+- ARCH-002 EXPANSION: pass-2 listed only 3 feed files >300 lines. Pass-4 `find apps/mobile/lib -name "*.dart" ! -name "*.g.dart" ! -name "*.freezed.dart" -exec wc -l {} \; | sort -rn | head -20` returns 20 files >300 lines across 6 modules + core/router + shared/widgets + dev/. friend_sheet.dart (941) is the worst non-feed; app_router.dart (546) is core/. Updated file list and fix step to address breadth — kept severity at P1 since same root cause.
+- ISSUE ADD 3 (ARCH-004 P3): root `.gitignore` contains `**/*.g.dart` + `**/*.freezed.dart` (verified via `grep -E "\.g\.dart|\.freezed\.dart" .gitignore`), AND `find apps/mobile/lib -name "*.g.dart" -o -name "*.freezed.dart"` returns 0 hits — gen files are NOT in working tree. But `auth.md` Pattern #1 says "generated, commit cùng" for both. Docs/code drift.
+- FACT CONFIRMATION (Firebase singleton scope): `grep -rn "FirebaseFirestore.instance\|FirebaseAuth.instance.currentUser" apps/mobile/lib --include="*.dart"` outside `main.dart` + `firebase_*_repository.dart` returns ONLY the 5 sites already in LAYER-001 + LAYER-002. No additional leaks. Confirms feed module is the SOLE Firebase-singleton offender — bounds the P0 work.
+- FACT CONFIRMATION (file naming): `find apps/mobile/lib -name "*.dart" ! -name "*.g.dart" ! -name "*.freezed.dart" | grep -E '[A-Z]'` returns 0 hits — all snake_case per `CLAUDE.md §Naming`. Pattern #11 holds.
+- FACT CONFIRMATION (no service locator): `grep -rn "getIt\|GetIt"` returns 0 hits. `static final` usages limited to `RegExp` constants (`auth_validators.dart:5,8`) + chat_seed_data fixtures — Pattern #5 DI discipline holds outside FEED-ARCH-001.
+- FACT CONFIRMATION (async state ownership Pattern checklist item): 24 sites of `StreamSubscription | .listen(` in features/; spot-checked each module's controller paired with `ref.onDispose` — no leaks. Pattern checklist Section 6 confirmed clean.
+- TIER 2 SCOPE NOTE (out of architecture scope): `GroupChatScreen` + `/group-chat/:conversationId` + `space/spacePostFanOut` CF + `Conversation.spaceId` field — all shipped. `CLAUDE.md §Tier 2` lists `group chat in Space` as "Won't have". This is scope creep, but belongs to 02_code_quality / process-discipline audit, not architecture. Logged in no_issue_notes for cross-audit awareness, not as an ARCH issue.
+- COUNT UPDATE: 19 → 20 issues. Distribution: P0=2, P1=7 (unchanged), P2=5 (unchanged), P3=6 (added ARCH-004).
