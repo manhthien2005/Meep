@@ -43,7 +43,7 @@
 
 - core/config/: checked — `app_config.dart` read; thin config wrapper, no architectural smell
 - core/error/: checked — `app_error.dart` read; sealed family complete per Pattern #3
-- core/router/: checked — `app_router.dart` read end-to-end (547 lines); routing concerns noted in ROUTER-001
+- core/router/: checked — `app_router.dart` read end-to-end (546 lines); routing concerns noted in ROUTER-001
 - core/theme/: partial — `hex_color.dart` duplicate vs `core/utils/hex_color.dart` confirmed; theme tokens listed via Glob, not deep-read (not architectural scope)
 - core/utils/: checked — `pair_id.dart` + `hex_color.dart` listed; duplicate flagged CORE-001
 - core/validators/: partial — listed only; auth_validators tested per inventory map; no architectural smell expected
@@ -186,7 +186,13 @@ Only P0/P1.
   - `FirebaseReactionRepository.{watchReactions,upsertReaction,deleteReaction,getMyReaction}`
   - `FirebaseNotificationRepository.{saveFcmToken,deleteFcmToken,getNotifications,markAsRead}`
   - `FirebaseStorageRepository.uploadImage`
-- evidence: `await ref.set(data);` (no try/catch + mapXxxError) at `firebase_post_repository.dart:31`; `PostController._errorMessage` at `post_controller.dart:251-270` reimplements `FirebaseException.code → user message` mapping that should live in the repo — confirms the gap
+- evidence:
+  - `firebase_post_repository.dart:31` — `await ref.set(data);` (no try/catch + no `_mapXxxError`); also `firebase_post_repository.dart:150` rethrows raw `FirebaseException` from `_watchSpaceFeed`'s `.handleError` block (`// ignore: only_throw_errors — preserve original error type` + `throw e`)
+  - `firebase_storage_repository.dart:37` — only handles `object-not-found` then `rethrow`s every other `FirebaseException` raw
+  - `firebase_friend_repository.dart` — `grep` for `AppError|on FirebaseException` returns 0 matches across the file
+  - `firebase_reaction_repository.dart` — `grep` returns 0 `AppError`/exception-mapping matches; only a comment at line 45 references idempotent delete
+  - `firebase_notification_repository.dart` — only `ArgumentError.value` (input validation); no `FirebaseException` → `AppError` boundary
+  - `PostController._errorMessage` at `post_controller.dart:251-270` reimplements `FirebaseException.code → user message` mapping that should live in the repo — confirms the gap on the consumer side
 - risk: Raw `FirebaseException` reaches every controller; each consumer (post_controller, friend_controller, reaction_controller, etc.) implements its own `error.toString()` scrape or switch-on-code logic, producing inconsistent VN copy and duplicating the mapping the repo should own. When `post_controller.dart:251 _errorMessage` and a future `delete_post_controller._errorMessage` diverge, two screens will say different things for the same backend error. Also blocks `_afterFailure(e)` pattern from `auth.md` Pattern #4 because `AppError.fromUnknown` returns `UnexpectedError` for raw `FirebaseException` instead of a meaningful subclass.
 - fix: Copy the `_mapXxxError` pattern from `firebase_auth_repository.dart:50` to each impl. Minimum:
   - `_mapPostError(FirebaseException)` → `ForbiddenError` (permission-denied), `NetworkError` (unavailable/deadline-exceeded), `NotFoundError` (not-found), default `UnexpectedError`.
@@ -220,25 +226,29 @@ Only P0/P1.
 - blocker: no
 - area: Module responsibility — shared entity in feature folder
 - files:
-  - `apps/mobile/lib/features/feed/data/post.dart`
-  - `apps/mobile/lib/features/streak/data/streak_repository.dart`
-  - `apps/mobile/lib/features/streak/data/firebase_streak_repository.dart`
-  - `apps/mobile/lib/features/streak/application/streak_state.dart`
-  - `apps/mobile/lib/features/streak/presentation/widgets/streak_calendar.dart`
-  - `apps/mobile/lib/features/profile/application/friend_posts_provider.dart`
-  - `apps/mobile/lib/features/profile/application/profile_posts_provider.dart`
-  - `apps/mobile/lib/features/chat/application/chat_providers.dart`
-  - `apps/mobile/lib/features/chat/data/chat_seed_data.dart`
-  - `apps/mobile/lib/shared/widgets/post_card.dart`
+  - `apps/mobile/lib/features/feed/data/post.dart` (the model)
+  - cross-module importers (non-feed production code, 11 files):
+    - `apps/mobile/lib/core/router/app_router.dart`
+    - `apps/mobile/lib/features/chat/application/chat_providers.dart`
+    - `apps/mobile/lib/features/chat/data/chat_seed_data.dart`
+    - `apps/mobile/lib/features/profile/application/friend_posts_provider.dart`
+    - `apps/mobile/lib/features/profile/application/profile_posts_provider.dart`
+    - `apps/mobile/lib/features/streak/application/streak_controller.dart`
+    - `apps/mobile/lib/features/streak/application/streak_state.dart`
+    - `apps/mobile/lib/features/streak/data/streak_repository.dart`
+    - `apps/mobile/lib/features/streak/data/firebase_streak_repository.dart`
+    - `apps/mobile/lib/features/streak/presentation/widgets/streak_calendar.dart`
+    - `apps/mobile/lib/shared/widgets/{photo_detail_screen,post_card,share_modal,share_photo_sheet}.dart`
+  - 11 dependent test files (see test/features/{profile,streak,shared}/)
 - loc: symbol-level
 - symbols:
   - `Post` (freezed class — `feed/data/post.dart`)
-  - `AudienceType`, `CaptionType` (enums same file)
-  - All 10 importers listed above
-- evidence: `import 'package:meep/features/feed/data/post.dart';` in `streak/data/streak_repository.dart:1` (an abstract repo interface of the streak module) + same in 9 other files across 4 modules + `shared/widgets/`
-- risk: Per `CLAUDE.md §Cross-module touch — FORBIDDEN by default` + ADR-0004 `Strict gate`, "đổi field trong freezed model leader đã chốt" requires leader sign-off. Today, the model lives under `feed/` so any feed owner change ripples silently into 4 other modules. Streak's abstract interface depends on a feature module's data class — pure direction-inversion violation. New devs cannot tell who owns `Post`. Long-term: when Streak owner needs `Post.streakMonth`, the change pressure lands on Feed owner.
+  - `AudienceType`, `CaptionType`, `TimestampConverter` (same file)
+  - 27 production files import this path (4 modules + core/router + shared/widgets), plus 11 test files — total 38 importers (verified via `grep -rln "import 'package:meep/features/feed/data/post.dart'"`).
+- evidence: `import 'package:meep/features/feed/data/post.dart';` in `streak/data/streak_repository.dart:1` (an abstract repo interface of a different module) + 37 other files including `core/router/app_router.dart` and 4 `shared/widgets/*` files
+- risk: Per `CLAUDE.md §Cross-module touch — FORBIDDEN by default` + ADR-0004 `Strict gate`, "đổi field trong freezed model leader đã chốt" requires leader sign-off. Today, the model lives under `feed/` so any feed owner change ripples silently into 4 modules + core/router + shared/widgets. Streak's abstract interface depends on a feature module's data class — pure direction-inversion violation. New devs cannot tell who owns `Post`. Long-term: when Streak owner needs `Post.streakMonth`, the change pressure lands on Feed owner. Even `core/router/app_router.dart:26` imports the feature-module model directly.
 - fix: One of:
-  - (preferred) move `Post`, `AudienceType`, `CaptionType`, `TimestampConverter` to `apps/mobile/lib/shared/models/post.dart` and update 10 import paths. Keep generation outputs in sync.
+  - (preferred) move `Post`, `AudienceType`, `CaptionType`, `TimestampConverter` to `apps/mobile/lib/shared/models/post.dart` and update 27 production import paths + 11 test paths. Keep generation outputs in sync.
   - or document `feed/data/post.dart` as the de-facto shared contract: add a header comment + add a `CLAUDE.md` rule + open a tracking issue assigning Leader as the owner.
 - authority: `CLAUDE.md §Cross-module touch` + ADR-0004 Strict Gate + `apps/mobile/CLAUDE.md §File organization` ("Feature-first, not layer-first")
 - test: After move, `flutter analyze --no-pub` must stay green and `flutter test` must pass without changes beyond imports. Add `test/shared/models/post_test.dart` covering `Post.fromJson` round-trip if moved (mirrors current implicit coverage from feed tests).
@@ -298,8 +308,8 @@ Only P0/P1.
 - symbols:
   - `HomePage` (skeleton — `home/`)
   - `HomeScreen` (real shell — `feed/`)
-- evidence: `home_page.dart:9` comment `Skeleton HomePage — module owner sẽ implement Feed/Camera/Grid scaffold theo Figma (FE/T15/KhoaLND).`; router wires `HomeScreen` to `/home` and `HomePage` only to `/invite/:uid` (one untested deeplink route)
-- risk: Two artifacts with conflicting names ("HomePage" vs "HomeScreen") for the same conceptual screen. Inventory map lists `home` as a `shell` module — but the actual shell lives in feed. Dev opening `features/home/` expects the home tree and finds a 56-line skeleton; misleads `/start` and `/build` tooling. The `/invite/:uid` deeplink renders only a dev-mode sign-out button — friend-invite landing for prod ships an empty `Text('Home — TODO')`.
+- evidence: `home_page.dart:9` comment `Skeleton HomePage — module owner sẽ implement Feed/Camera/Grid scaffold theo Figma (FE/T15/KhoaLND).`; router wires `HomeScreen` to `/home` (`app_router.dart:259`) and `HomePage` only to `/invite/:uid` (`app_router.dart:344-345`); `home_page.dart:27` body is `const Text('Home — TODO')` plus an `if (kDebugMode)` sign-out branch
+- risk: Two artifacts with conflicting names ("HomePage" vs "HomeScreen") for the same conceptual screen. Inventory map lists `home` as a `shell` module — but the actual shell lives in feed. Dev opening `features/home/` expects the home tree and finds a 56-line skeleton; misleads `/start` and `/build` tooling. The `/invite/:uid` deeplink renders `Text('Home — TODO')` + profile email (and a `Sign out (dev)` button gated by `kDebugMode`) — for production users this is just a "Home — TODO" placeholder, not actual invite landing UX.
 - fix: Pick one:
   - Rename `HomePage` → `InviteLandingPage` and move to `features/auth/presentation/` (it owns sign-out + profile preview — auth concerns); keep `/invite/:uid` route, drop `features/home/` folder.
   - Or implement the actual invite landing UI per Figma and rename to match its purpose.
@@ -337,8 +347,8 @@ Only P0/P1.
 - symbols:
   - `parseHexColor(String? hex) → Color?` (`core/utils/`)
   - `hexToColor(String hex, {Color fallback}) → Color` (`core/theme/`)
-- evidence: two files, same purpose. `parseHexColor` returns nullable, `hexToColor` returns non-null with default fallback `Color(0xFF656C6D)`.
-- risk: Callers (mostly Space color rendering) sometimes import `core/utils/hex_color.dart` (Glob: 0 imports currently — TBD verify), sometimes `core/theme/hex_color.dart` (`app_router.dart:25` imports the latter). Future dev grepping for "hexToColor" misses the other. Two slightly different fallback contracts produce drift when one path renders gray and another renders the requested color.
+- evidence: two files, same purpose. `parseHexColor` returns nullable, `hexToColor` returns non-null with default fallback `Color(0xFF656C6D)`. Both currently in use: `parseHexColor` at `features/space/presentation/widgets/space_context_badge.dart:23` + `space_list_tile.dart:98`; `hexToColor` at `core/router/app_router.dart:532` and several presentation files.
+- risk: Two helpers for the same task. Space module's `space_context_badge.dart:23` and `space_list_tile.dart:98` import `core/utils/hex_color.dart` (returns nullable + needs caller fallback `?? AppColors.bw700`); router + most other places import `core/theme/hex_color.dart` (returns non-null with built-in `0xFF656C6D` fallback). New dev grepping for one name misses the other. Two slightly different fallback contracts produce drift when one path renders gray and another renders the requested color.
 - fix: Pick one canonical (recommend `core/theme/hex_color.dart hexToColor` since it has the better default + already imported by the router). Add a `// TODO(remove)` to the other and update all importers in one PR. Delete after merge.
 - authority: `apps/mobile/CLAUDE.md` Common gotchas section spirit + `CLAUDE.md §Surgical changes` (no duplicate helpers)
 - test: `rg "parseHexColor\|hexToColor" apps/mobile/lib apps/mobile/test` after change should show 0 references to the deleted symbol.
@@ -363,20 +373,20 @@ Only P0/P1.
 
 ### ISSUE LAYER-004
 
-- sev: P2
+- sev: P3
 - blocker: no
-- area: Layering — Firebase type in widget (debug-only)
+- area: Layering — Firebase type in widget (debug-only diagnostic)
 - files:
   - `apps/mobile/lib/features/chat/presentation/widgets/debug_error_view.dart`
 - loc: 3 (import), 90 (`if (e is FirebaseException)`)
 - symbols:
   - `DebugErrorView._extractDetails`
-- evidence: `import 'package:cloud_firestore/cloud_firestore.dart';` + `if (e is FirebaseException) { return _ErrorDetails(...) }`
-- risk: Same "no Firebase types in widget" rule as LAYER-001, but the widget is opt-in / debug-only (file comment: "DEBUG ONLY — render chi tiết error ... Sau khi root cause confirmed, replace bằng generic message production."). Lower severity because this is a knowingly-temporary diagnostic view. Still, it ships with the binary and surfaces only when DATA-ARCH-001 fires (raw FirebaseException) — solving DATA-ARCH-001 makes this widget useless and removable.
-- fix: After DATA-ARCH-001 is fixed (Conversation repo wraps errors as `AppError`), this debug widget receives only `AppError` — delete the `FirebaseException` branch + the `cloud_firestore` import. If we want to keep diagnostic detail, move the FirebaseException extraction to `core/error/firebase_error_inspector.dart` and call it from the repository's catch block (logs only, never crosses the boundary into UI).
-- authority: file's own header comment ("Sau khi root cause confirmed, replace bằng generic message production") + `apps/mobile/CLAUDE.md §Layering`
-- test: After cleanup, `rg "FirebaseException" apps/mobile/lib/features/**/presentation` must return zero hits.
-- deps: DATA-ARCH-001
+- evidence: `import 'package:cloud_firestore/cloud_firestore.dart';` at `debug_error_view.dart:3` + `if (e is FirebaseException) { return _ErrorDetails(...) }` at line 90; file header self-comment line 17: "Sau khi root cause confirmed, replace bằng generic message production."
+- risk: Same "no Firebase types in widget" rule as LAYER-001, but lower severity for three reasons: (a) the widget is opt-in / debug-only per its own header comment; (b) `firebase_conversation_repository.dart` already wraps Firestore errors as `AppError` via `_mapFirestoreException` (lines 53, 90, 145, 195) — meaning the `FirebaseException` branch in the widget is effectively dead code today; (c) no production code path wires `DebugErrorView(...)` (grep returns only the class definition, no construction calls). Demoted from P2 → P3 because the widget exists but is unreferenced. Still leaves a Firestore import in `presentation/` that drift will reactivate.
+- fix: Either delete `debug_error_view.dart` entirely (unused widget — Pattern: "no dead code"), or keep it for ad-hoc diagnostics but: (1) delete the `FirebaseException` branch since the repo already maps to `AppError`, (2) drop the `cloud_firestore` import, (3) document in the header that the widget consumes `AppError` only.
+- authority: file's own header comment + `apps/mobile/CLAUDE.md §Layering` + `CLAUDE.md §Testing & Verification — What "done" means` ("No commented-out dead code")
+- test: After cleanup, `rg "FirebaseException" apps/mobile/lib/features/**/presentation` returns 0 hits; `rg "DebugErrorView" apps/mobile/lib` returns 0 hits (if deleted) or 1 (definition only, if kept).
+- deps: none (no longer depends on DATA-ARCH-001 because conversation repo already maps errors)
 
 ### ISSUE ROUTER-001
 
@@ -461,10 +471,10 @@ Only P0/P1.
 11. **SETTINGS-ARCH-001** — extract logout/delete fan-out to `core/lifecycle/` or `AuthRepository.signOut`.
 12. **CORE-001** — dedupe hex-color helpers.
 13. **SHARED-001** — auto-resolved by ARCH-001.
-14. **LAYER-004** — clean up `debug_error_view.dart` after DATA-ARCH-001.
 
 ### batch_4_p3
 
+14. **LAYER-004** — delete or trim `debug_error_view.dart` (unused; FirebaseException branch dead code since conversation repo already maps).
 15. **ROUTER-001** — delete chat-route auth bypass.
 16. **PUBSPEC-001** — remove `sign_in_with_apple` dep.
 17. **ARCH-003** — leader decision: scaffold or descope RollCall.
@@ -518,15 +528,26 @@ Compact notes for important areas checked with no issue found.
 
 verdict: not_ready
 
-Rationale: 2× P0 (Firebase leaks in feed widget + controller layer) block the layering invariant that all other audits implicitly rely on (test override, repository contract). 7× P1 cluster around Feed module taking shortcuts vs the canonical auth pattern (provider DI, error mapping, friend-graph access, file size). Until LAYER-001 + LAYER-002 are fixed, feed-feature tests cannot be added meaningfully — golden-path coverage is structurally blocked.
+Rationale: 2× P0 (Firebase leaks in feed widget + controller layer) block the layering invariant that all other audits implicitly rely on (test override, repository contract). 6× P1 cluster around Feed module taking shortcuts vs the canonical auth pattern (provider DI, error mapping, friend-graph access, file size, shared Post model owner ambiguity, state type leak). Until LAYER-001 + LAYER-002 are fixed, feed-feature widget tests cannot be added meaningfully — golden-path coverage is structurally blocked.
 
 After batch_1 + batch_2 (P0 + P1), revisit for `almost_ready_after_p0_p1`. P2/P3 are non-blocking polish.
 
+Final distribution after pass-2 reverify: **P0=2, P1=6, P2=5, P3=4 — total 17 issues** (LAYER-004 demoted P2→P3 after re-verifying `firebase_conversation_repository.dart` already maps to `AppError` and `DebugErrorView` has no production usage).
+
 ## self_verification_log
 
-<!-- 4 passes recorded after first draft per audit prompt. -->
+<!-- 4 passes recorded after first draft per audit prompt. Pass-2 reverify run as follow-up; see notes per pass. -->
 
-pass_1_checklist: N=14 sub-sections (~45 line items), M=15 issues, K=10 no_issue_notes, gap=0 — each prompt checklist sub-section sub-mapped: Feature-first→HOME-ARCH-001+no_issue; Data layer→LAYER-003+DATA-ARCH-001+no_issue (VN msg 8/13); Firebase leakage→LAYER-001+LAYER-002+LAYER-004; Cross-module→FEED-ARCH-002+ARCH-001+SHARED-001; Provider scope→FEED-ARCH-001+no_issue (keepAlive); Async state→no_issue (ref.onDispose confirmed); Routing→ROUTER-001+no_issue; Error abstraction→DATA-ARCH-001+no_issue (AppError family); Model/freezed→REACT-ARCH-001+no_issue; Bootstrap→no_issue (main.dart order); Client/backend→partial (deep boundary blocked); Shared widget→CORE-001+SHARED-001+no_issue; Docs/ADR→PUBSPEC-001; Module responsibility→HOME-ARCH-001+ARCH-003.
-pass_2_schema: total=15, missing_field_fixed=0, severity_demoted=0, evidence_failed_grep=0 — re-grep all 15 evidence quotes against source files via Bash (LAYER-001 @ feed_section.dart:80, home_screen.dart:589; LAYER-002 @ post_controller.dart:107; LAYER-003 @ feed_state.dart:14; FEED-ARCH-001 @ feed_controller.dart:33; FEED-ARCH-002 @ firebase_post_repository.dart:260; ARCH-001 @ streak_repository.dart:1 + post_card.dart:5; ROUTER-001 @ app_router.dart:72; PUBSPEC-001 @ pubspec.yaml:58 + 0 SDK usages; CORE-001 both files present; HOME-ARCH-001 @ home_page.dart:9,27 + app_router.dart:344-345; REACT-ARCH-001 @ reaction_controller.dart:14; ARCH-003 rollcall folder absent confirmed twice). FEED-ARCH-001 quote 95 chars (over 80) — kept whole because trimming loses the `FirebaseFirestore.instance` smoking gun.
-pass_3_dedupe: before=15, after=15, consolidations=0 — verified no two issues share files[0]+symbols+root_cause+fix: LAYER-001 (presentation widget files) vs LAYER-002 (application controller files) — different layer, different fix. SHARED-001 + ARCH-001 share `post.dart` but SHARED-001 is the consequence (one file), ARCH-001 is the cause (multi-file architecture call), fix orderings differ. DATA-ARCH-001 already consolidates 5 repository files into one batched issue. LAYER-004 explicitly links to DATA-ARCH-001 as dependent cleanup (different fix scope).
-pass_4_coverage: checked=17, partial=7, blocked=1, total=25, verdict=partial — coverage matches log evidence: blocked is `features/rollcall` (folder genuinely absent — ARCH-003); partial covers core/theme + core/validators (listed-only, theme tokens out of architectural scope), diary + space (file inventory + cross-edge analysis only, no smell flagged → deep-read not justified for arch first-pass), shared/widgets (head sampled), firebase/ client/backend boundary (per-handler typecheck would require running tooling), ADR/docs match (skim only). `flutter analyze --no-pub` recorded as blocked in commands table (audit-only constraint); not in coverage area count.
+pass_1_checklist: N=14 sub-sections (~45 line items), M=17 issues, K=10 no_issue_notes, gap=0 — each prompt checklist sub-section sub-mapped: Feature-first→HOME-ARCH-001+no_issue; Data layer→LAYER-003+DATA-ARCH-001+no_issue (VN msg 8/13 modules); Firebase leakage→LAYER-001+LAYER-002+LAYER-004; Cross-module→FEED-ARCH-002+ARCH-001+SHARED-001; Provider scope→FEED-ARCH-001+no_issue (keepAlive); Async state→no_issue (ref.onDispose confirmed); Routing→ROUTER-001+no_issue; Error abstraction→DATA-ARCH-001+no_issue (AppError family); Model/freezed→REACT-ARCH-001+no_issue; Bootstrap→no_issue (main.dart order); Client/backend→partial (deep boundary blocked); Shared widget→CORE-001+SHARED-001+no_issue; Docs/ADR→PUBSPEC-001; Module responsibility→HOME-ARCH-001+ARCH-003.
+pass_2_schema: total=17, missing_field_fixed=0, severity_demoted=1 (LAYER-004 P2→P3 after re-verifying `firebase_conversation_repository.dart:53,90,145,195` already maps `FirebaseException` → `AppError` and `DebugErrorView` has zero construction sites — original "leaks when DATA-ARCH-001 fires" premise wrong because the path it diagnoses is already mapped), evidence_failed_grep=0 — re-grep all 17 evidence quotes via Bash against source files: LAYER-001 @ feed_section.dart:80, home_screen.dart:589; LAYER-002 @ post_controller.dart:107; LAYER-003 @ feed_state.dart:14; FEED-ARCH-001 @ feed_controller.dart:33; FEED-ARCH-002 @ firebase_post_repository.dart:260; ARCH-001 importers re-counted via `grep -rln` (27 production + 11 test = 38, corrected from earlier "10"); ROUTER-001 @ app_router.dart:72; PUBSPEC-001 @ pubspec.yaml:58 + `grep -rn` on lib/test for `sign_in_with_apple\|SignInWithApple\|AppleAuthProvider` returns 0; CORE-001 both files confirmed + importers traced (parseHexColor used in `space_context_badge.dart:23` + `space_list_tile.dart:98`; hexToColor at `app_router.dart:532` etc.); HOME-ARCH-001 @ home_page.dart:9,27 + app_router.dart:344-345 + risk corrected ("Sign out (dev)" gated by `kDebugMode`, not the entire screen); REACT-ARCH-001 @ reaction_controller.dart:14; ARCH-003 rollcall folder absent re-confirmed; LAYER-004 evidence verified + risk premise rewritten based on conversation_repo + DebugErrorView grep results. Pass-2 reverify also corrected: `app_router.dart` line count 547→546, DATA-ARCH-001 evidence enumerated per-file (instead of single sentence), final_verdict tallies recomputed.
+pass_3_dedupe: before=17, after=17, consolidations=0 — verified no two issues share files[0]+symbols+root_cause+fix: LAYER-001 (presentation widget files) vs LAYER-002 (application controller files) — different layer, different fix. SHARED-001 + ARCH-001 share `post.dart` but SHARED-001 is the consequence (one file), ARCH-001 is the cause (multi-file architecture call), fix orderings differ. DATA-ARCH-001 already consolidates 5 repository files into one batched issue. LAYER-004 explicitly linked as dependent cleanup of DATA-ARCH-001 in batch 4 but with different fix (delete vs. add mapping).
+pass_4_coverage: checked=17, partial=7, blocked=1, total=25, verdict=partial — coverage matches log evidence: blocked is `features/rollcall` (folder genuinely absent — ARCH-003); partial covers core/theme + core/validators (listed-only, theme tokens out of architectural scope), diary + space (file inventory + cross-edge analysis only, no smell flagged → deep-read not justified for arch first-pass; pass-2 re-grep confirmed AppError boundary already in place for both), shared/widgets (head sampled), firebase/ client/backend boundary (per-handler typecheck would require running tooling), ADR/docs match (skim only). `flutter analyze --no-pub` recorded as blocked in commands table (audit-only constraint); not in coverage area count.
+
+pass_2_reverify_notes (post-commit follow-up after user request):
+- FACT FIX 1 (LAYER-004 demote): originally P2 with claim "depends on DATA-ARCH-001"; verified `firebase_conversation_repository.dart:53,90,145,195` already throws `_mapFirestoreException → AppError`, AND `grep DebugErrorView` returns only class definition (0 production wires). Demoted to P3, fix changed to "delete or trim", deps cleared.
+- FACT FIX 2 (ARCH-001 importer count): originally "10 import paths"; `grep -rln "import 'package:meep/features/feed/data/post.dart'"` returns 38 paths (27 production incl. `core/router/app_router.dart` + 11 test). Updated file list and fix step.
+- FACT FIX 3 (HOME-ARCH-001 risk): originally "renders only a dev-mode sign-out button"; verified `home_page.dart:27 const Text('Home — TODO')` + profile email always rendered; sign-out gated by `kDebugMode`. Corrected.
+- FACT FIX 4 (CORE-001 risk premise): originally "Glob: 0 imports currently — TBD verify" for `parseHexColor`; verified actual importers: `features/space/presentation/widgets/space_context_badge.dart:23` + `space_list_tile.dart:98`. Updated evidence + risk.
+- FACT FIX 5 (DATA-ARCH-001 evidence enum): originally a single sentence pointing at one line; per-file evidence now enumerates: post_repo:31+150, storage_repo:37 (rethrow non-`object-not-found`), friend_repo (0 mappings), reaction_repo (0 mappings), notification_repo (only `ArgumentError`). Confirms 5/5 in batch — all genuinely missing `AppError` boundary.
+- FACT FIX 6 (app_router.dart line count): 547 → 546 (off-by-one from blank trailing line).
+- COUNT CORRECTION: blockers_summary table previously framed P1=7, actual P1=6 (FEED-ARCH-001, LAYER-003, DATA-ARCH-001, FEED-ARCH-002, ARCH-001, ARCH-002). Total = 2 P0 + 6 P1 + 5 P2 + 4 P3 = 17. PR summary text from prior commit needs follow-up note (numbers there based on pre-reverify P0=2,P1=7,P2=5,P3=3 = 17 same total but different bucket).
