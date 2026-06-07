@@ -85,9 +85,10 @@ Only P0/P1.
 | FRIEND-PERF-001 | P0 | Firestore N+1 reads | `apps/mobile/lib/features/friend/data/firebase_friend_repository.dart` | `watchFriends` re-fetches every friend's `/users/{fuid}` doc on EVERY `/friendships` snapshot emit → 20 docs/emit, fires whenever any friendship doc updates |
 | FEED-REBUILD-001 | P1 | UI rebuild excess + perf cost | `apps/mobile/lib/features/feed/presentation/feed_section.dart` | `addPostFrameCallback` scheduled in `SliverChildBuilderDelegate.itemBuilder` on every visible item rebuild → `onItemVisible` fires N×scroll-frames |
 | NOTIF-PERF-001 | P1 | Firestore over-fetch | `apps/mobile/lib/features/notification/data/firebase_notification_repository.dart` | `getNotifications` has no `.limit()` → loads entire `/users/{uid}/notifications` collection in one `get()` |
-| IMG-PERF-001 | P1 | Image memory pressure | `apps/mobile/lib/features/feed/presentation/grid_photo_tile.dart`, `apps/mobile/lib/shared/widgets/post_card.dart`, `apps/mobile/lib/shared/widgets/app_avatar.dart` | `CachedNetworkImage` everywhere without `memCacheWidth/memCacheHeight` — 1080px source decoded for 120px grid tile, 40px avatar |
+| IMG-PERF-001 | P1 | Image memory pressure | 13 sites (post_card×2, app_avatar, grid_photo_tile, photo_detail_screen×2, profile_screen, friend_profile_screen, edit_profile_screen, calendar_day_cell, message_quoted_post, quoted_photo_block, camera_section history thumb) | `CachedNetworkImage` codebase-wide without `memCacheWidth/memCacheHeight` — 1080px source decoded for 37×35px calendar cell + 60px thumb + 40px avatar |
 | PROFILE-PERF-001 | P1 | Firestore over-fetch | `apps/mobile/lib/features/profile/application/{profile_posts_provider,friend_posts_provider}.dart`, `apps/mobile/lib/features/feed/data/firebase_post_repository.dart` | `getPostsByAuthor` returns the entire author history with no `.limit()` — profile screen + friend profile screen both call it |
 | WIDGET-PERF-001 | P1 | Battery + user-data drain | `apps/mobile/android/app/src/main/kotlin/dev/meep/meep/WidgetSyncWorker.kt` | `WidgetSyncWorker` uses `NetworkType.CONNECTED` — image-heavy 15-min sync runs over mobile data (no UNMETERED gate, no battery-not-low constraint) |
+| FUNC-PERF-003 | P1 | CF query schema drift — dead cleanup | `firebase/functions/src/friend/onFriendshipDeleted.ts` | Line 60-66 filters feed docs by `where('spaceId', '==', null)` but feed/post docs use `spaceIds` (plural array) — query NEVER matches → unfriend leaves stale feed entries forever |
 
 ## issues
 
@@ -212,21 +213,27 @@ Only P0/P1.
 - sev: P1
 - blocker: no
 - area: Image memory pressure — decoded bitmap size mismatch
-- files:
-  - `apps/mobile/lib/features/feed/presentation/grid_photo_tile.dart`
-  - `apps/mobile/lib/shared/widgets/post_card.dart`
-  - `apps/mobile/lib/shared/widgets/app_avatar.dart`
-- loc: `grid_photo_tile.dart:28-34`; `post_card.dart:78-87, 153-170`; `app_avatar.dart:61-79`
+- files (13 sites — `rg "CachedNetworkImage\(" apps/mobile/lib` returns 13 hits, 0 of them set memCacheWidth):
+  - `apps/mobile/lib/features/feed/presentation/grid_photo_tile.dart` (3-col grid, ~120px)
+  - `apps/mobile/lib/shared/widgets/post_card.dart` (full-width cover + dual PiP)
+  - `apps/mobile/lib/shared/widgets/app_avatar.dart` (28-50px avatar)
+  - `apps/mobile/lib/shared/widgets/photo_detail_screen.dart` (350px carousel + 60px thumbnail strip)
+  - `apps/mobile/lib/features/profile/presentation/profile_screen.dart` (92px profile avatar)
+  - `apps/mobile/lib/features/profile/presentation/friend_profile_screen.dart` (92px friend avatar)
+  - `apps/mobile/lib/features/profile/presentation/edit_profile_screen.dart` (72px avatar)
+  - `apps/mobile/lib/features/streak/presentation/widgets/calendar_day_cell.dart` (37×35px calendar cell)
+  - `apps/mobile/lib/features/chat/presentation/widgets/message_quoted_post.dart` (270×270 quoted thumb)
+  - `apps/mobile/lib/features/chat/presentation/widgets/quoted_photo_block.dart` (301×301 quoted block)
+  - `apps/mobile/lib/features/feed/presentation/camera_section.dart` (26×26 history button thumbnail)
+- loc: `grid_photo_tile.dart:28-34`; `post_card.dart:78-87, 153-170`; `app_avatar.dart:61-79`; `photo_detail_screen.dart:344-350, 562-568`; `profile_screen.dart:282-287`; `friend_profile_screen.dart:354`; `edit_profile_screen.dart:344-351`; `calendar_day_cell.dart:57-64`; `message_quoted_post.dart:44-59`; `quoted_photo_block.dart:43-60`; `camera_section.dart:560-567`
 - symbols:
-  - `GridPhotoTile.build` (`CachedNetworkImage` no memCacheWidth)
-  - `PostCard._build` cover image
-  - `_NetworkImage.build` (dual)
-  - `AppAvatar.build` (CachedNetworkImage)
+  - `GridPhotoTile.build` / `PostCard._build` / `_NetworkImage.build` (dual) / `AppAvatar.build` / `_PhotoCarousel.build` / `_ThumbnailStrip._thumbImage` / `_ProfileAvatar.build` (×2) / `_AvatarSection.build` / `_CalendarDayCell.build` / `MessageQuotedPost.build` / `QuotedPhotoBlock.build` / `_HistoryButton.build`
 - evidence:
   - `grid_photo_tile.dart:28`: `CachedNetworkImage(imageUrl: post.coverImageUrl, fit: BoxFit.cover, placeholder: ..., errorWidget: ...)` — no `memCacheWidth`/`memCacheHeight`/`maxWidthDiskCache`.
-  - `app_avatar.dart:61-79`: same shape, displayed at `inner` size (computed from `size` param, range 28-50px in callers).
-  - `rg cacheWidth|memCacheWidth apps/mobile/lib` returns 0 hits → no image is sized to display dimensions anywhere in the codebase.
-- cost_model: post compress target (post_controller.dart:24 `_maxWidthPx = 1080`). 1080×1080 RGBA decoded = 1080×1080×4 bytes = 4.67 MB per bitmap in memory. Grid tile renders at 3-col layout (~120 px on Android 360-dp screens). Memory waste per tile = 4.67 MB - (120×120×4 = 56 KB) ≈ 4.6 MB. With 30 visible/cached tiles in `GridView.builder`, memory waste ≈ 138 MB. On a low-end Android with 2 GB RAM, this triggers `LowMemoryKiller` and the OS drops the app. Avatar case: 50 visible avatars × 4.67 MB = 233 MB.
+  - `calendar_day_cell.dart:57`: same shape, displayed at 37×35px. Worst-case ratio: 4.67 MB decoded into ~5 KB display = 99.9% waste.
+  - `photo_detail_screen.dart:562`: thumbnail strip at 36-60px renders full 1080px source.
+  - `rg "cacheWidth|memCacheWidth" apps/mobile/lib` returns 0 hits → no image is sized to display dimensions anywhere in the codebase.
+- cost_model: post compress target (post_controller.dart:24 `_maxWidthPx = 1080`). 1080×1080 RGBA decoded = 1080×1080×4 bytes = 4.67 MB per bitmap in memory. Worst case = streak calendar 30 days × 1 image each = 140 MB sitting in Flutter `ImageCache` (default cap 100 MB → starts evicting → flash on re-scroll). Grid tile: 30 cached tiles × 4.6 MB waste each = 138 MB. Avatar in 50-friend inbox: 50 × 4.6 MB = 230 MB. On a low-end Android with 2 GB RAM, this triggers `LowMemoryKiller` and the OS drops the app.
 - risk: Android crash on low-end devices (Galaxy A-series, Xiaomi Redmi entry-level — both within Meep target user base); jank during grid/feed scroll due to GC pressure; `Image cache` defaults to 100 MB max — Flutter starts dropping cached entries → flash on re-scroll → users feel app is slow.
 - fix:
   - `grid_photo_tile.dart:28` — add `memCacheWidth: (MediaQuery.sizeOf(context).width / 3 * MediaQuery.devicePixelRatioOf(context)).round()` (or accept the tile width as a constructor arg and compute from it).
@@ -312,32 +319,73 @@ Only P0/P1.
   - unit test `apps/mobile/android/app/src/test/kotlin/dev/meep/meep/WidgetSyncWorkerTest.kt` using `work-testing` artifact (already in inventory map `android_native.test_deps`): seed `TestDriver.setAllConstraintsMet(false)` then assert no execution.
 - deps: none
 
+### ISSUE FUNC-PERF-003
+
+- sev: P1
+- blocker: no
+- area: Cloud Function query schema drift — cleanup query never matches
+- files:
+  - `firebase/functions/src/friend/onFriendshipDeleted.ts`
+- loc: 57-89
+- symbols:
+  - `onFriendshipDeleted` Step 3 cross-feed cleanup
+- evidence:
+  ```ts
+  // Step 3: Batch delete cross-feed entries (preserve Space posts)
+  const uid1FeedQuery = db.collection('users').doc(uid1).collection('feed')
+    .where('authorId', '==', uid2)
+    .where('spaceId', '==', null);
+  const uid2FeedQuery = db.collection('users').doc(uid2).collection('feed')
+    .where('authorId', '==', uid1)
+    .where('spaceId', '==', null);
+  ```
+  (`onFriendshipDeleted.ts:57-66`). BUT feed docs are written by `onPostCreated.ts:83-88` as `{postId, authorId, spaceIds: [] as string[], createdAt}` and by `spacePostFanOut.ts:74-79` as `{postId, authorId, spaceIds: FieldValue.arrayUnion(spaceId), createdAt}`. Neither writes a `spaceId` singular field. Same drift documented for streak in `firebase_streak_repository.dart:10-16`: "Post documents không có field `spaceId` (chỉ có `spaceIds` plural) ... query null trên field absent return empty trong production".
+- cost_model: query `.where('spaceId', '==', null)` against feed docs that have no `spaceId` field → returns 0 docs in production (fake_cloud_firestore is lenient and may pass tests). Result: every unfriend leaves N stale feed entries per side (where N = friend's post count) forever orphaned in `/users/{uid}/feed/`. Each orphan doc costs 1 read on every subsequent `watchFeed` call. After 1 unfriend with 50 posts: +100 orphans (50 each side). After 10 unfriend cycles over user lifetime: +1000 orphans. Each home feed open then pays +1000 reads even though only 10 are rendered. Compounds with FEED-PERF-001's fan-out cost.
+- risk: 3 concrete failure modes:
+  1. **Correctness**: unfriended user's posts continue showing in `/users/{uid}/feed/` query — UX bug (privacy boundary leak — same data class as `SEC-USER-SEC-001` but via stale denormalized doc).
+  2. **Cost**: orphan feed docs accumulate forever → linear Firestore read growth per user lifetime.
+  3. **Server side log noise**: CF runs the batch but `deleteCount` stays 0 → looks like CF succeeded but did nothing.
+  Pair concern with `firebase/firestore.indexes.json:19-35` declaring 2 indexes on `posts(authorId, spaceId, createdAt)` (singular `spaceId`) — dead index noted in `no_issue_notes` further confirms `spaceId` was the old field name that got refactored to `spaceIds` plural; the CF was missed in the refactor.
+- fix: 2 options:
+  1. (minimal correctness fix) change query to filter post-fetch: drop the `.where('spaceId', '==', null)` constraint, fetch all `authorId == uid2` feed docs, then `.filter(d => !(d.data().spaceIds as string[]).length)` in Node before deleting. Cost: 1 extra round-trip if Space posts dominate, but the cleanup actually runs.
+  2. (preferred — match Space exclusion semantically) since Space posts already have lifecycle handled by `onSpaceMemberRemoved` (member removal triggers their own feed cleanup), we can delete ALL feed entries authored by the now-ex-friend, including Space posts. The non-friend can still get them re-added on next `spacePostFanOut` if both are in the same Space. Drop `.where('spaceId', '==', null)` entirely:
+     ```ts
+     const uid1FeedQuery = db.collection('users').doc(uid1).collection('feed')
+       .where('authorId', '==', uid2);
+     ```
+     Simpler + idempotent — re-running unfriend produces correct state. Caveat: if both ex-friends share a Space, the ex-friend's Space posts get briefly removed from uid1's feed until next Space post fan-out re-includes uid1 → spec decision needed.
+  3. (additional cleanup) sweep firestore.indexes.json:19-35 of the legacy `(authorId, spaceId, createdAt)` indexes which are no longer queried by anyone.
+- authority: `firebase/functions/CLAUDE.md §Firestore data modeling` ("`serverTimestamp()` for `createdAt`/`updatedAt` — **never trust client clocks**") spirit of "the doc shape is the contract"; `firebase_streak_repository.dart:10-16` documents the same trap from the client side; CLAUDE.md §LAYER-A "Firestore cost = ranked P1 minimum"
+- test:
+  - vitest `firebase/functions/src/friend/onFriendshipDeleted.test.ts` (new): seed user-A feed with `{authorId: B, spaceIds: []}`, delete friendship A-B, assert feed doc is deleted (currently fails because of the bug — that's the regression test).
+  - vitest extra case: seed Space post in user-A feed `{authorId: B, spaceIds: ['spaceX']}`, delete friendship, assert behavior matches whichever fix option (1 or 2) is chosen.
+  - emulator integration test: setup CF + friendship, unfriend, verify `/users/{uid}/feed` does not contain ex-friend's posts after CF completion.
+- deps: none — independent of FEED-PERF-001 fix (different code path) but compounds the cost; should fix in same sprint
+
 ### ISSUE IMG-PERF-002
 
 - sev: P2
 - blocker: no
-- area: Image caching — wrong primitive
-- files:
-  - `apps/mobile/lib/features/profile/presentation/widgets/photo_grid.dart`
-- loc: 55-61
+- area: Image caching — wrong primitive (Image.network vs CachedNetworkImage)
+- files (3 sites — `rg "Image\.network" apps/mobile/lib` returns 3 hits):
+  - `apps/mobile/lib/features/profile/presentation/widgets/photo_grid.dart` (profile grid 120px)
+  - `apps/mobile/lib/features/diary/presentation/diary_canvas_screen.dart` (mood cover 102px height)
+  - `apps/mobile/lib/features/diary/presentation/widgets/polaroid_image_block.dart` (inline polaroid 247×247)
+- loc: `photo_grid.dart:55-61`; `diary_canvas_screen.dart:641-649`; `polaroid_image_block.dart:50-56`
 - symbols:
-  - `_PhotoItem.build` (`Image.network`)
+  - `_PhotoItem.build` / `_DiaryCanvasScreen._buildMoodZone` / `PolaroidImageBlock.build`
 - evidence:
-  ```dart
-  child: Image.network(
-    url,
-    fit: BoxFit.cover,
-    errorBuilder: (_, __, ___) => Container(color: AppColors.bw700),
-    loadingBuilder: (_, child, progress) =>
-        progress == null ? child : Container(color: AppColors.bw800),
-  ),
-  ```
-  (`photo_grid.dart:55-61`) — uses `Image.network` instead of the project-standard `CachedNetworkImage`.
-- cost_model: `Image.network` only does in-memory cache via `ImageCache`. On screen pop + push, cached image survives only if still in the LRU (default 100 MB / 1000 entries). For a 30+ post profile, navigating away → 30+ images re-downloaded next visit. Storage egress cost on the Firebase project; latency cost for the user.
-- risk: inconsistent cache strategy across the app (cached_network_image elsewhere → disk cache survives process restart; here doesn't); friend-profile photo grid feels slower than feed/grid view on re-open. Pure code-consistency issue.
-- fix: replace `Image.network(...)` with `CachedNetworkImage(imageUrl: ..., fit: BoxFit.cover, memCacheWidth: ..., placeholder: ..., errorWidget: ...)` matching `grid_photo_tile.dart:28-34`. Also wire `memCacheWidth` per IMG-PERF-001 fix recommendation.
+  - `photo_grid.dart:55`: `Image.network(url, fit: BoxFit.cover, errorBuilder: ..., loadingBuilder: ...)`
+  - `diary_canvas_screen.dart:641`: `Image.network(coverUrl, fit: BoxFit.contain, errorBuilder: ...)`
+  - `polaroid_image_block.dart:50`: `Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: ..., loadingBuilder: ...)`
+- cost_model: `Image.network` only does in-memory cache via `ImageCache`. On screen pop + push, cached image survives only if still in the LRU (default 100 MB / 1000 entries). For a 30+ post profile + 5+ diary entries with inline images, navigating away → all images re-downloaded next visit. Storage egress cost on the Firebase project; latency cost for the user. Diary entries can hold up to 5 inline images per entry — multiply the egress.
+- risk: inconsistent cache strategy across the app (cached_network_image elsewhere → disk cache survives process restart; here doesn't); friend-profile photo grid + diary read mode feel slower than feed/grid view on re-open. Pure code-consistency issue.
+- fix: replace `Image.network(...)` with `CachedNetworkImage(imageUrl: ..., fit: ..., memCacheWidth: ..., placeholder: ..., errorWidget: ...)` matching `grid_photo_tile.dart:28-34`. Also wire `memCacheWidth` per IMG-PERF-001 fix recommendation.
 - authority: `apps/mobile/CLAUDE.md §Common gotchas` (consistency); `pubspec.yaml` already has `cached_network_image: ^3.4`; every other grid in the codebase uses it.
-- test: widget test `test/features/profile/presentation/widgets/photo_grid_test.dart` — render with 5 urls, assert the rendered widget tree contains `CachedNetworkImage` (not `Image`).
+- test:
+  - widget test `test/features/profile/presentation/widgets/photo_grid_test.dart` — render with 5 urls, assert the rendered widget tree contains `CachedNetworkImage` (not `Image`).
+  - widget test `test/features/diary/presentation/widgets/polaroid_image_block_test.dart` — render with URL, assert `CachedNetworkImage` used + `memCacheWidth` set.
+  - widget test `test/features/diary/presentation/diary_canvas_screen_test.dart` (or section thereof) — mood cover region renders `CachedNetworkImage`.
 - deps: pair with IMG-PERF-001 fix to set memCacheWidth at the same site
 
 ### ISSUE PERF-LOG-001
@@ -345,23 +393,29 @@ Only P0/P1.
 - sev: P2
 - blocker: no
 - area: Debug logging in hot path — string-interpolation cost in release
-- files:
-  - `apps/mobile/lib/features/feed/data/firebase_post_repository.dart`
-  - `apps/mobile/lib/features/feed/application/feed_controller.dart`
-  - `apps/mobile/lib/features/feed/presentation/home_screen.dart`
-  - `apps/mobile/lib/features/feed/presentation/grid_view_screen.dart`
-  - `apps/mobile/lib/features/feed/application/feed_filter_controller.dart`
+- files (9 files — `rg "debugPrint" apps/mobile/lib` returns 57 total):
+  - `apps/mobile/lib/features/feed/data/firebase_post_repository.dart` (16)
+  - `apps/mobile/lib/features/feed/application/feed_controller.dart` (6)
+  - `apps/mobile/lib/features/feed/presentation/home_screen.dart` (4)
+  - `apps/mobile/lib/features/feed/presentation/grid_view_screen.dart` (4)
+  - `apps/mobile/lib/features/feed/application/feed_filter_controller.dart` (4)
+  - `apps/mobile/lib/features/feed/data/image_flip.dart` (14)
+  - `apps/mobile/lib/features/feed/application/app_camera_controller.dart` (3)
+  - `apps/mobile/lib/features/feed/application/post_controller.dart` (2)
+  - `apps/mobile/lib/features/widget/application/widget_data_service.dart` (4)
 - loc: per-file
 - symbols:
-  - 16 `debugPrint` in `firebase_post_repository.dart`
-  - 6 in `feed_controller.dart`
-  - 4 in `home_screen.dart`
-  - 4 in `grid_view_screen.dart`
-  - 4 in `feed_filter_controller.dart`
+  - 16 `debugPrint` in `firebase_post_repository.dart` (Space feed instrumentation)
+  - 14 in `image_flip.dart` (orientation/flip instrumentation — fires on every capture)
+  - 6 in `feed_controller.dart` (stream listener callback)
+  - 4 each in home_screen / grid_view_screen / feed_filter_controller / widget_data_service
+  - 3 in app_camera_controller (capture path)
+  - 2 in post_controller (compress path)
 - evidence:
-  - `rg -c "debugPrint" apps/mobile/lib/features/feed` returns 53 hits across 8 files.
+  - `rg -c "debugPrint" apps/mobile/lib` returns 57 hits across 9 files.
   - `firebase_post_repository.dart:88-91`: `debugPrint('[Space Feed] _watchSpaceFeed snapshot — caller=$callerUid trả về ${snap.docs.length} doc (raw, chưa filter spaceId)',);` — fires on every snapshot emit (potentially per-friend-listener per change).
   - `feed_controller.dart:93-96`: similar inside the `.listen((posts) { ... debugPrint... })` callback.
+  - `image_flip.dart:11-110`: 14 `debugPrint('[ImageOrientation] ...')` interleaved through `fixOrientationInPlace` + `flipImageHorizontallyInPlace`. Fires per capture even in release.
 - cost_model: `debugPrint` itself is a no-op in release for the FINAL print call (it routes through `debugPrint` static, which checks `kDebugMode` and `Zone.current[#flutter.trackPrintCalls]`). BUT string interpolation `'... ${snap.docs.length} ... ${spaceId}'` is evaluated BEFORE the function call → release mode still allocates the string + boxed primitives + concatenates, then throws it away. With FEED-PERF-001 listener fan-out (21 streams × 5 emits/sec scroll) → 100+ throwaway string allocs/sec.
 - risk: GC pressure during scroll (already low-margin given IMG-PERF-001 bitmap waste); minor perf bug. Not catastrophic. Easy to fix.
 - fix: wrap each `debugPrint` site in `if (kDebugMode) debugPrint(...)`. This makes the WHOLE expression dead-code in release, including the interpolation. Or remove the logs entirely once the Space-feed debugging session is finished — these logs are clearly diagnostic per the `[Space Feed]` prefix and `[DEBUG/Space Feed]` comments throughout. CLAUDE.md §Cấm bans "debug logs in production code".
@@ -606,11 +660,12 @@ Only P0/P1.
 
 ### batch_2_p1
 
-3. **NOTIF-PERF-001** — `.limit(50)` + cursor pagination on `getNotifications`. 1-line change for the limit; interface change for cursor.
-4. **PROFILE-PERF-001** — `.limit(30)` + cursor on `getPostsByAuthor`; pushes audience filter server-side for friend-profile path.
-5. **IMG-PERF-001** — wire `memCacheWidth`/`memCacheHeight` in `AppAvatar`, `PostCard`, `GridPhotoTile`. Cap decoded bitmap memory.
-6. **FEED-REBUILD-001** — delete `addPostFrameCallback` from `feed_section.dart:69-78`; rely on `_HomeScreenState._onPageChanged` as single source of truth.
-7. **WIDGET-PERF-001** — `NetworkType.UNMETERED` + `setRequiresBatteryNotLow(true)` for periodic; settings toggle for mobile-data sync.
+3. **FUNC-PERF-003** — fix `onFriendshipDeleted` cleanup query (drop `.where('spaceId', '==', null)` or filter post-fetch). 1-PR fix; pair with index sweep of dead `(authorId, spaceId, createdAt)` composite indexes.
+4. **NOTIF-PERF-001** — `.limit(50)` + cursor pagination on `getNotifications`. 1-line change for the limit; interface change for cursor.
+5. **PROFILE-PERF-001** — `.limit(30)` + cursor on `getPostsByAuthor`; pushes audience filter server-side for friend-profile path.
+6. **IMG-PERF-001** — wire `memCacheWidth`/`memCacheHeight` in 13 sites (AppAvatar, PostCard, GridPhotoTile, photo_detail carousel/thumb, 3× profile avatars, calendar_day_cell, 2× chat quoted post widgets, camera_section history thumb). Cap decoded bitmap memory.
+7. **FEED-REBUILD-001** — delete `addPostFrameCallback` from `feed_section.dart:69-78`; rely on `_HomeScreenState._onPageChanged` as single source of truth.
+8. **WIDGET-PERF-001** — `NetworkType.UNMETERED` + `setRequiresBatteryNotLow(true)` for periodic; settings toggle for mobile-data sync.
 
 ### batch_3_p2
 
@@ -632,6 +687,7 @@ Only P0/P1.
 
 - `FEED-PERF-001`: `flutter test test/features/feed/data/firebase_post_repository_test.dart` — seed 25 posts × 20 authors, assert `.snapshots()` call count ≤ 2 (1 whereIn + 1 arrayContains).
 - `FRIEND-PERF-001`: `flutter test test/features/friend/data/firebase_friend_repository_test.dart` — seed 10 friendships + 10 user docs; assert N `/users/{fuid}.get()` ≤ 10 on first emit AND 0 on subsequent emits when no friendship changes.
+- `FUNC-PERF-003`: vitest `firebase/functions/src/friend/onFriendshipDeleted.test.ts` — seed user-A feed `{authorId: B, spaceIds: []}`, delete friendship A-B, assert feed doc IS deleted (currently fails). Add Space-post variant to lock chosen fix option behavior.
 - `FEED-REBUILD-001`: `flutter test test/features/feed/presentation/feed_section_test.dart` — verify `mockFeedController.onItemVisibleCallCount` matches visible-item-enter events, not frame count. Requires ARCH-LAYER-001 (Phase A) fix first.
 - `NOTIF-PERF-001`: `flutter test test/features/notification/data/firebase_notification_repository_test.dart` — seed 200 notif docs, assert `getNotifications(uid)` returns ≤ 50 AND query carries `.limit(50)`.
 - `IMG-PERF-001`: `flutter test test/shared/widgets/app_avatar_test.dart test/features/feed/presentation/grid_photo_tile_test.dart` — assert rendered `CachedNetworkImage.memCacheWidth ≈ display_size × pxRatio`.
@@ -722,6 +778,7 @@ Compact notes for important areas checked with no NEW issue found.
   - PERF-DIARY-001 vs PROFILE-PERF-001 vs NOTIF-PERF-001 — all "no limit on get()" pattern but on different repos with different fix details (page size + audience filter + cursor strategy differ per call site). Logged separately so each module owner can claim.
   - CHAT-PERF-001 (ListView constructor) vs CHAT-PERF-002 (didChangeMetrics scroll storm) — different mechanisms.
 - pass_4_coverage: checked=10, partial=0, blocked=1 (`flutter analyze --no-pub` blocked by audit-only constraint per LAYER-B), total=11, verdict=full — every "checked" area backed by file reads enumerated in `commands` table:
+  pass_5_deep_scan + pass_6_cross_cutting + pass_7_evidence_reverify + pass_8_antidupe — see notes blocks below.
   - UI rebuild patterns: read feed (4 files), home (1), streak (1), chat (3), inbox (1), diary (2), profile (3) + grep for `Consumer*Widget`/`ref.watch`.
   - Firestore queries client: read all 9 Firebase*Repository implementations + their abstract interfaces.
   - Firestore queries functions: read 6 CF files (onPostCreated, spacePostFanOut, onReactionCreated, createSpace, onSpaceMemberAdded, _fcm) + index.ts.
@@ -737,8 +794,58 @@ Compact notes for important areas checked with no NEW issue found.
 
 verdict: not_ready
 
-**Rationale:** 2× P0 (FEED-PERF-001 perAuthor fan-out + FRIEND-PERF-001 watchFriends N+1) cause Firebase quota exhaust at single-digit active-user count on Spark plan — explicit violation of CLAUDE.md §LAYER-A "Firestore cost = ranked P1 minimum". 5× P1 cluster around unbounded queries (notif/profile/diary) + image memory waste + widget battery — all real user-impact concerns for Locket-parity MVP. P2/P3 are polish.
+**Rationale:** 2× P0 (FEED-PERF-001 perAuthor fan-out + FRIEND-PERF-001 watchFriends N+1) cause Firebase quota exhaust at single-digit active-user count on Spark plan — explicit violation of CLAUDE.md §LAYER-A "Firestore cost = ranked P1 minimum". 6× P1 (NOTIF/PROFILE unbounded reads + IMG memory + FEED rebuild + WIDGET battery + FUNC-PERF-003 schema-drift cleanup that leaves orphan feed docs forever) — all real user-impact + cost-growth concerns for Locket-parity MVP. P2/P3 are polish.
 
-**Recommended path:** Fix batch_1_p0 (2 issues) in the same sprint as `ARCH-FEED-ARCH-001` + `SEC-USER-SEC-001` so the data-layer rewrite happens once for perf + arch + sec. Then batch_2_p1 (5 issues, 2-3 days dev). Re-audit after both batches, then ship M3.
+**Recommended path:** Fix batch_1_p0 (2 issues) in the same sprint as `ARCH-FEED-ARCH-001` + `SEC-USER-SEC-001` so the data-layer rewrite happens once for perf + arch + sec. Then batch_2_p1 (6 issues, 2-3 days dev). Re-audit after both batches, then ship M3.
 
-Final distribution: **P0=2, P1=5, P2=5, P3=5 — total 17 issues**.
+Final distribution: **P0=2, P1=6, P2=5, P3=5 — total 18 issues** (pass 5-8 reverify added FUNC-PERF-003 P1 + expanded IMG-PERF-001 from 3→13 sites + IMG-PERF-002 from 1→3 sites + PERF-LOG-001 from 53→57 hits across 9 files).
+
+pass_5_deep_scan_notes (reverify per user request):
+- READ FULL: photo_detail_screen, share_modal, share_photo_sheet, profile_screen, friend_profile_screen, edit_profile_screen, notification_banner, space_management_sheet, message_quoted_post, quoted_photo_block, calendar_day_cell, polaroid_image_block, diary_canvas_screen (mood region), onSpaceMemberRemoved.ts, onSpaceDeleted.ts, deleteAccount.ts, leaveSpace.ts, kickMember.ts, transferOwnership.ts, updateSpace.ts, blockUser.ts, acceptFriendRequest.ts, onFriendRequestCreated.ts, onFriendshipDeleted.ts.
+- NEW ISSUE FUNC-PERF-003 (P1): `onFriendshipDeleted.ts:60-66` queries `where('spaceId', '==', null)` but feed docs use `spaceIds` (plural). Cross-feed cleanup never matches → orphan feed entries forever. Confirmed by reading `onPostCreated.ts:83-88` feedDoc schema + `spacePostFanOut.ts:74-79` feedDoc schema (both use `spaceIds`, not `spaceId`). Compounds Firestore read cost over user lifetime and leaks unfriended-user posts in feed.
+- IMG-PERF-001 file list EXPANDED 3 → 13: `rg "CachedNetworkImage\(" apps/mobile/lib` returns 13 hits; verified each is missing memCacheWidth. Worst-case offender: `calendar_day_cell.dart:57` renders 1080px source into 37×35px cell (99.9% waste).
+- IMG-PERF-002 file list EXPANDED 1 → 3: `rg "Image\.network" apps/mobile/lib` returns 3 hits (photo_grid + diary_canvas mood cover + polaroid_image_block).
+- PERF-LOG-001 expanded 53 → 57 across 9 files: `widget_data_service.dart` has 4 more debugPrint calls not counted before.
+- IMAGE.FILE sites flagged in IMG-PERF-003 confirmed: `camera_section.dart:452` + `capture_preview_screen.dart:197,743,759` — 4 sites, fix bundles with IMG-PERF-001.
+- N+1 in `space_management_sheet._loadMemberProfiles` (line 21-36): cap ≤ 10 members per Space + self-documented at line 18-20. Acknowledged, not a new issue. Worth noting that profiles re-fetched per sheet open (no cache) — minor cost.
+- No issue from share_modal http.get / share_photo_sheet http.get re-download cost — fires once on user-explicit tap, < 5 MB image, acceptable for MVP.
+
+pass_6_cross_cutting_notes:
+- Timer / TextEditingController / ScrollController / FocusNode / AnimationController disposal — re-grep `Timer\(|Timer\.periodic` returns 11 sites; spot-checked login_password_page._cooldownTimer (line 50 cancel), widget_confirm_sheet._autoDismissTimer (line 253 cancel), notification_controller._bannerTimer (line 53 cancel) — all paired with cancel in dispose. No leak.
+- setState patterns: `_ComposerSheetState._controller.addListener(() => setState({}))` at feed_section.dart:708 fires on every keystroke — bounded subtree (modal sheet only), acceptable.
+- `.select()` discipline: 13 sites use `.select((s) => s.field)` for granular rebuild; rest uses full state. Profile screen could improve with `.select((s) => s.profile)` — minor polish, not flagged.
+- collectionGroup usage: 1 site (`onPostDeleted.ts:38 collectionGroup('feed')`) — correct for cross-uid feed cleanup. No client-side collectionGroup → no missing `__name__` index gap.
+- Setting state in build: feed_section.dart:69 `addPostFrameCallback` in itemBuilder — already covered by FEED-REBUILD-001.
+- jsonDecode/Encode in build: `rg "jsonDecode|jsonEncode" apps/mobile/lib` returns 0 hits — clean.
+- FieldValue.increment / runTransaction: `rg "FieldValue.increment|runTransaction|WriteBatch" apps/mobile/lib` returns 0 hits — all write batch + increment lives server-side in CF (correct).
+
+pass_7_evidence_reverify_notes:
+- 17 evidence quotes re-grep'd in source on 2026-06-08. All locations confirmed:
+  - `feed_section.dart:69` addPostFrameCallback ✓
+  - `feed_section.dart:80` FirebaseAuth.instance.currentUser ✓ (noted as ARCH-LAYER-001 cite)
+  - `firebase_post_repository.dart:176 perAuthorStreams take(30)` ✓ + `:280 getPostsByAuthor` ✓
+  - `firebase_friend_repository.dart:49-51 Future.wait + users get` ✓
+  - `firebase_notification_repository.dart:66 orderBy createdAt no limit` ✓
+  - `WidgetSyncWorker.kt:302 NetworkType.CONNECTED` ✓
+  - `main.dart:74 await revalidateSession` ✓
+  - `firebase_diary_repository.dart:73 watchEntries no limit` ✓ + `:101 getPublicEntries no limit` ✓ + `:115 searchEntries client filter` ✓
+  - `chat_thread_view.dart:93 ListView(children: [...])` ✓ + `:64 didChangeMetrics jumpToBottom` ✓
+  - `post_controller.dart:23 _compressQuality = 85, :25 _maxSizeBytes 1MB, :288 _compress, :298 quality 60 fallback` ✓
+  - `onFriendshipDeleted.ts:60 .where('spaceId', '==', null)` ✓ (NEW for FUNC-PERF-003)
+  - `onPostCreated.ts:83-86 feedDoc spaceIds plural` ✓ + `spacePostFanOut.ts:74-79 feedDoc spaceIds plural` ✓
+- 1 evidence size correction: previously claimed `_perAuthorBuffer = 20` — verified `:156 static const _perAuthorBuffer = 20` ✓.
+
+pass_8_antidupe_recheck_notes:
+- Re-walked Phase A `00_inventory_map.md` + `A_PHASE_BASELINE_SUMMARY.md` anti-duplicate map.
+- ARCH-001 (Post model misplaced): not a perf concern — skip.
+- ARCH-002 (oversized widgets): perf consequence covered as DEPS of FEED-REBUILD-001; not re-flagged.
+- ARCH-LAYER-001/002 (Firebase singleton): cited as `deps` of FEED-REBUILD-001 only; my perf issues describe different code paths.
+- ARCH-FEED-ARCH-001 (self-construct provider): cited as `deps` of FEED-PERF-001 fix; not re-flagged.
+- ARCH-FEED-ARCH-002 (`_getFriendUids` direct query): the same `_getFriendUids` triggers FEED-PERF-001's fan-out cascade — cited as related but the perf fix collapses the fan-out regardless of which repo issues the friend query.
+- ARCH-DATA-ARCH-001 (raw FirebaseException): orthogonal to perf — skip.
+- SEC-APPCHECK-001 (App Check): noted in no_issue_notes as security concern outside perf scope.
+- SEC-USER-SEC-001 (`/users/{uid}` read): cited as `deps` of FRIEND-PERF-001 fix option 1.
+- SEC-STORAGE-001/002 (Storage friend boundary): orthogonal to perf — skip.
+- No new duplicate detected. All my P0/P1 issues describe code paths/symptoms that Phase A did not cover.
+
+
