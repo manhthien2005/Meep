@@ -102,7 +102,14 @@
 - evidence: `allow read: if isAuthed();` (firestore.rules:62) cho /users/{uid} — không có check `isOwner(uid) || isFriend(uid)`; doc chứa `email` field (rule `create` line 64 enforce `keys().hasAll(['uid', 'email', 'displayName', 'username', 'createdAt'])`)
 - access_path: bất cứ user nào sau khi signup (email signup không enforce verify, hoặc Google login) → đọc `/users/<otherUid>` → nhận về `email` + `displayName` + `username` + `avatarUrl` + `friendCount` + `postCount`. Kết hợp với USERNAME-SEC-001 (P2) — bất kỳ client iterate `/usernames/{name}` (public read) lấy uid, rồi `/users/{uid}` lấy email + profile
 - risk: data leak — email là PII; CLAUDE.md §PII handling list "email, phone, displayNames" là PII Meep. Friend graph privacy CLAUDE.md §Domain "Friend graph private" cũng bị compromise (friendCount leak relationship size)
-- fix: tách read rule thành minimal-profile + full-profile. Option A (dễ): `allow read: if isOwner(uid) || isFriend(uid)` cho doc gốc, tạo subcollection `/users/{uid}/public/profile` chứa CHỈ `displayName + avatarUrl` cho lookup stranger. Option B (rule-only): dùng `resource.data` field-mask không khả thi (Firestore rules không filter field) → bắt buộc tách doc. Update `FirebaseUserRepository.watchUser` đọc `/users/{uid}/public/profile` cho stranger; `/users/{uid}` cho self+friend. Đồng bộ với client share_profile_sheet / friend search flow
+- fix: tách read rule thành minimal-profile + full-profile. Option A (đề xuất): `allow read: if isOwner(uid) || isFriend(uid)` cho doc gốc, tạo subcollection `/users/{uid}/public/profile` chứa CHỈ `displayName + avatarUrl + username` cho lookup stranger. Option B (rule-only): dùng `resource.data` field-mask không khả thi (Firestore rules không filter field per-read) → bắt buộc tách doc.
+  Implementation chi tiết (Option A):
+  1. **Firestore rule:** đổi line 62 `allow read: if isAuthed();` → `allow read: if isOwner(uid) || isFriend(uid);`. Thêm match block `/users/{uid}/public/profile` với `allow read: if isAuthed(); allow write: if false;` (server-only).
+  2. **CF onUserCreated trigger** (mới): trigger `onDocumentWritten('/users/{uid}')` — denormalize `displayName + avatarUrl + username` từ /users xuống /users/{uid}/public/profile. Hoặc update `signUp.ts` server-side. Đơn giản hơn: dùng CF `onDocumentWritten('/users/{uid}')` để keep public/profile sync với parent doc khi displayName/avatarUrl thay đổi.
+  3. **Client repository:** `FirebaseUserRepository.watchUser(uid)` hiện đọc `/users/{uid}` trực tiếp. Tách thành 2 method: `watchSelfOrFriendProfile(uid)` đọc /users/{uid} (full); `watchPublicProfile(uid)` đọc /users/{uid}/public/profile (minimal). Caller side: feed (friend post author) → watchPublicProfile; profile screen self → watchSelfOrFriendProfile; friend search (stranger lookup pre-friend) → watchPublicProfile.
+  4. **Touch points:** `firebase_user_repository.dart`, `share_profile_sheet.dart`, `friend_search_screen.dart`, `profile_controller.dart`, `feed_controller.dart` (nếu cache author name).
+  5. **Migration:** existing /users docs cần backfill /users/{uid}/public/profile. Viết 1-shot CF `migratePublicProfiles` (admin-triggered) chạy collection-group iterate /users → batch.set(/users/{uid}/public/profile). Idempotent qua set merge.
+  6. **Rollout order:** (a) deploy CF trigger + migration; (b) wait until public/profile populated; (c) deploy client đọc public/profile; (d) deploy rule tighten read. Đảo ngược thứ tự sẽ break friend lookup trong window.
 - authority: CLAUDE.md §Security Guardrails "Owner check: `isOwner(uid) := isAuthed() && request.auth.uid == uid`. Never just check 'is authenticated' when you really mean 'is owner / is friend'"; tmp prompt §Friend graph privacy checklist item "Read /users/{uid} cho stranger → return profile minimal hay block hoàn toàn"
 - test: thêm `firestore.rules.test.ts` test case `describe('/users/{uid} — stranger read')` với 4 assertion: owner allow, friend allow, stranger DENY, unauth DENY. Verify field-mask hoặc minimal-doc structure post-fix
 - deps: blocks USERNAME-SEC-001 mitigation (P2)
@@ -239,6 +246,32 @@
 - authority: tmp prompt §Default-deny posture "Mọi `allow read|write` đều có điều kiện?" + "KHÔNG có `if true` ở bất cứ rule nào?"
 - test: sau khi switch sang CF, viết `__tests__/checkUsernameAvailable.test.ts` verify CF không leak uid trong response; xóa `/usernames` `if true` rule và thêm rules test deny unauth read
 - deps: pair với USER-SEC-001 (cùng story user enumeration)
+
+### ISSUE USERNAME-SEC-002
+
+- sev: P3
+- blocker: no
+- area: rules
+- files:
+  - `firebase/firestore.rules`
+- loc: 105-109 (/usernames create + delete rules)
+- symbols:
+  - `match /usernames/{username}` → `allow create` + `allow delete`
+- evidence: `allow create: if isAuthed() && request.resource.data.uid == request.auth.uid;` (firestore.rules:105-106) — chỉ check `uid` field trong /usernames doc khớp `request.auth.uid`. KHÔNG check `/users/{auth.uid}.username == username` (path param). User có username="alice" có thể tạo `/usernames/<any_string>` với `{uid: auth.uid}`. Rule không enforce "username trong /usernames doc match username trong /users doc của cùng uid".
+- access_path: user A (username="alice") authed → gọi `firestore.collection('usernames').doc('bob').set({uid: A.uid})` → rule pass vì `request.resource.data.uid == A.uid`. Doc `/usernames/bob = {uid: A.uid}` được tạo. Khi user X sau này signup với username="bob", `sign_up_controller.dart` check `/usernames/bob` → exists → "bob taken". X bị block khỏi username "bob" dù A không thực sự own nó. Lặp lại với nhiều username → squat hàng loạt.
+- risk: namespace squatting; impact thấp cho MVP vì user base nhỏ + username không phải resource đắt + delete account cascade chỉ xóa username trong /users/{uid}.username (line 234-245 deleteAccount.ts) — squatted usernames mồ côi forever. Defense-in-depth issue.
+- fix: enforce cross-doc invariant trong create rule:
+  ```
+  allow create: if isAuthed()
+    && request.resource.data.uid == request.auth.uid
+    && username == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username;
+  ```
+  Tradeoff: thêm 1 `get()` call mỗi create (rule eval budget 10 get/exists per request) — chấp nhận được vì /usernames create chạy 1 lần mỗi user lifecycle (signup). Cảnh báo: pattern này yêu cầu /users doc tồn tại trước /usernames doc. Signup flow hiện tại của `sign_up_controller.dart` tạo /users trước /usernames — verify lại order.
+  
+  Alternative (cleaner): move toàn bộ /usernames write vào CF `claimUsername` onCall function. Server validate username match + atomic transaction `/users + /usernames`. Khử client-side write hoàn toàn — rule `allow create, delete: if false`. Pair với USERNAME-SEC-001 fix (move /usernames read sang CF).
+- authority: tmp prompt §Per-collection ownership "/usernames create với uid match"; CLAUDE.md §Security Guardrails "Never just check 'is authenticated' when you really mean 'is owner / is friend'" — owner ở đây là "user thực sự sở hữu username string"
+- test: `firestore.rules.test.ts describe('/usernames create — squat protection')` — user A (username='alice' trong /users) try create `/usernames/bob` với `{uid: A.uid}` → assertFails post-fix; A create `/usernames/alice` → assertSucceeds
+- deps: pair với USERNAME-SEC-001 (cùng module /usernames); shared CF approach trong alternative fix có thể bundle
 
 ### ISSUE REACTION-SEC-001
 
@@ -449,6 +482,7 @@
 - FRIEND-SEC-001 — pid invariant guard /friendships
 - FUNC-SEC-001 — `.strict()` trên mọi zod schema
 - FUNC-SEC-002 — Event marker idempotent cho onSpaceMember{Added,Removed}
+- USERNAME-SEC-002 — Enforce /users/{uid}.username match /usernames/{name}.uid trong create rule (added pass-4)
 
 ## test_plan_after_fix
 
@@ -470,6 +504,7 @@
 - `FRIEND-SEC-001`: rules test admin SDK seed friendship với pid sai → member read assertFails
 - `FUNC-SEC-001`: vitest each callable gọi với excess keys → throw `invalid-argument`
 - `FUNC-SEC-002`: vitest simulate trigger 2x cùng event → assert spaceCount idempotent
+- `USERNAME-SEC-002`: rules test user A (username='alice') try create /usernames/bob với uid=A → assertFails post-fix; A create /usernames/alice → assertSucceeds. Hoặc nếu chuyển sang CF `claimUsername`, vitest test direct rule create → assertFails (deny client write)
 
 ## no_issue_notes
 
@@ -580,8 +615,15 @@
 
 - pass_1_checklist: N=88 items, M=17 issues, K=88 no_issue_notes mappings (each checklist item mapped to ≥1 issue or note via cross-reference; 6 additional gap items added — imageUrl regex, CAMERA, READ_MEDIA_IMAGES, branch protection, callable unauth test, trigger invalid-input test), gap=0
 - pass_2_schema: total=17, missing_field_fixed=0 (every issue has sev/blocker/area/files/loc/symbols/evidence/access_path/risk/fix/authority/test/deps), severity_demoted=1 in pass-2 reverify (WIDGET-SEC-001 P2→P3: pass-1 claim "logout missing clearData" SAI — verified `settings_controller.dart:94-99` đã có `clearData()` trong try/catch; chỉ deleteAccount path line 127-158 còn miss → scope hẹp lại, server cascade làm cache stale → URL invalid trong window ~15min nên impact thấp). Pre-pass-2 demotions (in original draft): RULES-004 streaks → no_issue (verified `firebase_streak_repository.dart:8` "không có collection riêng"); RULES-008 diary privacy update P1→P2 (read rule fail-safe denies invalid privacy). evidence_failed_grep=0 — pass-2 re-grep all 17 evidence quotes against source files; 3 line drifts corrected in-place: STORAGE-002 storage.rules:31→30, FUNC-SEC-002 onSpaceMemberAdded.ts:14-19→12-17, WIDGET-SEC-001 settings_controller.dart loc range. Reframed offensive phrasing in 6 issues (APPCHECK-001, USER-SEC-001, STORAGE-001, CHAT-SEC-001, AUTH-SEC-001, USERNAME-SEC-001, REACTION-SEC-001) to defensive language without changing technical content.
-- pass_3_dedupe: before=17, after=18 sau pass-3 (added CHAT-SEC-002 P2 from gap scan — /conversations update value-validation gap discovered when re-reading rules cross-reference REACTION-SEC-001 pattern). Consolidations=0 (STORAGE-001 vs STORAGE-002 share root cause "Storage read auth-only doesn't mirror Firestore friend boundary" but distinct files+symbols /posts vs /diary — kept separate per "no duplicate cùng file+symbol+root_cause" criterion. USER-SEC-001 vs USERNAME-SEC-001 share story "user enumeration" but distinct rule blocks + fix paths — kept separate with USERNAME-SEC-001.deps linking. CHAT-SEC-001 vs CHAT-SEC-002: distinct rule blocks — create vs update; CHAT-SEC-002.deps reference cùng test plan TESTING-SEC-001)
+- pass_3_dedupe: before=17, after=18 sau pass-3 (added CHAT-SEC-002 P2 from gap scan — /conversations update value-validation gap discovered when re-reading rules cross-reference REACTION-SEC-001 pattern). Consolidations=0 (STORAGE-001 vs STORAGE-002 share root cause "Storage read auth-only doesn't mirror Firestore friend boundary" but distinct files+symbols /posts vs /diary — kept separate per "no duplicate cùng file+symbol+root_cause" criterion. USER-SEC-001 vs USERNAME-SEC-001 share story "user enumeration" but distinct rule blocks + fix paths — kept separate with USERNAME-SEC-001.deps linking. CHAT-SEC-001 vs CHAT-SEC-002: distinct rule blocks — create vs update; CHAT-SEC-002.deps reference cùng test plan TESTING-SEC-001).
+  Pass-4 update: 18 → 19 (added USERNAME-SEC-002 P3 — namespace squatting gap in /usernames create rule). Consolidations=0 (USERNAME-SEC-001 vs USERNAME-SEC-002 share collection but distinct rule actions — read vs create — and distinct fix paths, kept separate with cross-dep linking).
 - pass_4_coverage: checked=11, partial=1 (client Firebase usage boundary — sampled feed/notification/chat/widget/settings/auth, not every feature module), blocked=0, total=12, verdict=full (every "checked" area backed by grep evidence + file read in commands table)
+
+pass_4_reverify_notes (expand existing + 1 new):
+- EXPAND USER-SEC-001: fix section mở rộng thành 6-step implementation plan — (1) rule split + public subcollection match block, (2) CF onDocumentWritten denormalize trigger, (3) repository tách watchSelfOrFriendProfile vs watchPublicProfile, (4) liệt kê 5 touch points client, (5) 1-shot migrate CF cho existing /users docs, (6) rollout order CF→migrate→client→rule. Mục đích: leader assign T6 follow-up có thể fork ra 6 sub-task ngay.
+- NEW ISSUE USERNAME-SEC-002 P3: discovered khi re-read /usernames create rule (line 105-106) cho USERNAME-SEC-001 fix design — rule chỉ check `uid == auth.uid` mà KHÔNG check username path param khớp /users/{auth.uid}.username. Squatting vector. Pair với USERNAME-SEC-001 trong fix CF approach. Note: deleteAccount cascade chỉ xóa username trong /users/{uid}.username → squatted usernames mồ côi nếu fix không bundle.
+- COUNT TALLY: pass-3 total 18 → pass-4 total 19 (+1 USERNAME-SEC-002 P3). Distribution: P0=2, P1=5, P2=6, P3=6.
+- VERDICT: vẫn not_ready — không có sev escalate, P0 không thay đổi.
 
 pass_3_reverify_notes (gap scan + new issue):
 - NEW ISSUE 1 (CHAT-SEC-002 P2): /conversations update rule line 294-302 có field whitelist nhưng KHÔNG có value validation. Participant có thể tamper `lastSenderId` thành uid khác (impersonation inbox preview), `lastMessage` không cap size, `lastReadAt` không shape-check. Defense-in-depth gap. Discovered khi re-read firestore.rules:294-302 đối chiếu với /reactions update pattern (REACTION-SEC-001) — cùng class lỗi (whitelist OK, value-validation missing). Mirror fix style.
@@ -615,3 +657,5 @@ verdict: not_ready
 Final distribution after pass-2 reverify: **P0=2, P1=5, P2=5, P3=5 — total 17 issues** (WIDGET-SEC-001 demoted P2→P3 sau khi verify logout path đã clear cache; chỉ deleteAccount path còn missing — impact thấp vì server cascade làm URL invalid trong 15min).
 
 Final distribution after pass-3 reverify: **P0=2, P1=5, P2=6, P3=5 — total 18 issues** (CHAT-SEC-002 P2 added: /conversations update rule cho phép tamper lastSenderId/lastMessage/lastReadAt mà không value-validate; defense-in-depth gap discovered khi cross-reference với REACTION-SEC-001 pattern).
+
+Final distribution after pass-4 reverify: **P0=2, P1=5, P2=6, P3=6 — total 19 issues** (USERNAME-SEC-002 P3 added: /usernames create rule không check `username == /users/{auth.uid}.username` → squatting vector. Pair với USERNAME-SEC-001 fix; deleteAccount cascade chỉ cleanup username trong /users.username nên squatted usernames sẽ mồ côi nếu fix không bundle). USER-SEC-001 fix section expanded với 6-step implementation plan để leader có thể assign T6 sub-tasks ngay (rule split → CF denormalize → repository tách read → client touch points → migrate CF → rollout order).
