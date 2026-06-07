@@ -106,8 +106,8 @@
   Implementation chi tiết (Option A):
   1. **Firestore rule:** đổi line 62 `allow read: if isAuthed();` → `allow read: if isOwner(uid) || isFriend(uid);`. Thêm match block `/users/{uid}/public/profile` với `allow read: if isAuthed(); allow write: if false;` (server-only).
   2. **CF onUserCreated trigger** (mới): trigger `onDocumentWritten('/users/{uid}')` — denormalize `displayName + avatarUrl + username` từ /users xuống /users/{uid}/public/profile. Hoặc update `signUp.ts` server-side. Đơn giản hơn: dùng CF `onDocumentWritten('/users/{uid}')` để keep public/profile sync với parent doc khi displayName/avatarUrl thay đổi.
-  3. **Client repository:** `FirebaseUserRepository.watchUser(uid)` hiện đọc `/users/{uid}` trực tiếp. Tách thành 2 method: `watchSelfOrFriendProfile(uid)` đọc /users/{uid} (full); `watchPublicProfile(uid)` đọc /users/{uid}/public/profile (minimal). Caller side: feed (friend post author) → watchPublicProfile; profile screen self → watchSelfOrFriendProfile; friend search (stranger lookup pre-friend) → watchPublicProfile.
-  4. **Touch points:** `firebase_user_repository.dart`, `share_profile_sheet.dart`, `friend_search_screen.dart`, `profile_controller.dart`, `feed_controller.dart` (nếu cache author name).
+  3. **Client repository:** `FirebaseUserRepository.watchProfile(uid)` (auth/data/firebase_user_repository.dart:46) + `FirebaseProfileRepository.watchUserProfile(uid)` (profile/data/firebase_profile_repository.dart:80) + `FirebaseFriendRepository.searchUser(username)` (friend/data/firebase_friend_repository.dart:13) + `FirebaseFriendRepository.watchFriends(uid)` batch reads /users/{fuid} (friend/data/firebase_friend_repository.dart:49-52) — TẤT CẢ đọc `/users/{uid}` trực tiếp. Tách: thêm method `watchPublicProfile(uid)` đọc /users/{uid}/public/profile (minimal: displayName/avatarUrl/username) cho stranger lookup; giữ `watchProfile`/`watchUserProfile` cho self+friend only.
+  4. **Touch points cần đổi (verified grep):** `firebase_user_repository.dart` (watchProfile, getProfile, isUsernameAvailable), `firebase_profile_repository.dart` (getUserProfile, watchUserProfile, updateProfile, updateAvatar, removeAvatar), `firebase_friend_repository.dart` (searchUser dùng .where('username') — stranger search, cần switch sang public/profile subcollection query hoặc CF), notification CFs `_helpers.ts readDisplayName` (đọc /users để denormalize tên — server-side OK vì Admin SDK bypass rules, KHÔNG cần đổi).
   5. **Migration:** existing /users docs cần backfill /users/{uid}/public/profile. Viết 1-shot CF `migratePublicProfiles` (admin-triggered) chạy collection-group iterate /users → batch.set(/users/{uid}/public/profile). Idempotent qua set merge.
   6. **Rollout order:** (a) deploy CF trigger + migration; (b) wait until public/profile populated; (c) deploy client đọc public/profile; (d) deploy rule tighten read. Đảo ngược thứ tự sẽ break friend lookup trong window.
 - authority: CLAUDE.md §Security Guardrails "Owner check: `isOwner(uid) := isAuthed() && request.auth.uid == uid`. Never just check 'is authenticated' when you really mean 'is owner / is friend'"; tmp prompt §Friend graph privacy checklist item "Read /users/{uid} cho stranger → return profile minimal hay block hoàn toàn"
@@ -269,9 +269,78 @@
   Tradeoff: thêm 1 `get()` call mỗi create (rule eval budget 10 get/exists per request) — chấp nhận được vì /usernames create chạy 1 lần mỗi user lifecycle (signup). Cảnh báo: pattern này yêu cầu /users doc tồn tại trước /usernames doc. Signup flow hiện tại của `sign_up_controller.dart` tạo /users trước /usernames — verify lại order.
   
   Alternative (cleaner): move toàn bộ /usernames write vào CF `claimUsername` onCall function. Server validate username match + atomic transaction `/users + /usernames`. Khử client-side write hoàn toàn — rule `allow create, delete: if false`. Pair với USERNAME-SEC-001 fix (move /usernames read sang CF).
+
+  **CAVEAT pass-6:** Proposed `get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username` SẼ FAIL signup flow hiện tại. `FirebaseUserRepository.createProfile` (auth/data/firebase_user_repository.dart:14-27) write `/users/{uid}` + `/usernames/{username}` trong cùng Firestore batch. Rule eval cho /usernames create KHÔNG thấy uncommitted /users write trong cùng batch (Firestore rule transaction isolation) → get() return null → rule fail → signup break. **Bắt buộc** split sang 2-step write (create /users TRƯỚC, commit, rồi /usernames sau) HOẶC switch hoàn toàn sang CF `claimUsername` alternative — không có cách giữ batch atomicity với cross-doc rule check.
 - authority: tmp prompt §Per-collection ownership "/usernames create với uid match"; CLAUDE.md §Security Guardrails "Never just check 'is authenticated' when you really mean 'is owner / is friend'" — owner ở đây là "user thực sự sở hữu username string"
 - test: `firestore.rules.test.ts describe('/usernames create — squat protection')` — user A (username='alice' trong /users) try create `/usernames/bob` với `{uid: A.uid}` → assertFails post-fix; A create `/usernames/alice` → assertSucceeds
 - deps: pair với USERNAME-SEC-001 (cùng module /usernames); shared CF approach trong alternative fix có thể bundle
+
+### ISSUE AUTH-SEC-002
+
+- sev: P1
+- blocker: yes (kết hợp USER-SEC-001 = email PII leak path)
+- area: client
+- files:
+  - `apps/mobile/lib/main.dart`
+  - `apps/mobile/lib/features/auth/` (toàn bộ flow signup)
+- loc: main.dart (Firebase.initializeApp không kèm verifyEmail enforce); grep `sendEmailVerification|emailVerified` trong features/auth = 0 hits
+- symbols:
+  - `FirebaseAuth.instance.currentUser.sendEmailVerification` (NOT CALLED)
+  - `User.emailVerified` (NOT CHECKED)
+- evidence: grep `sendEmailVerification|emailVerified|email_verified|isEmailVerified` trên `apps/mobile/lib/features/auth/` returns 0 files. Signup flow tạo Firebase Auth user + Firestore /users doc với email string mà KHÔNG enforce verification. Anyone có thể signup với email không sở hữu (ví dụ `victim@example.com`) → /users doc tạo với email field → nếu USER-SEC-001 chưa fix, có thể đọc back email của uid khác qua /users/{uid}.
+- access_path: bất kỳ ai signup với arbitrary email → tạo /users doc chứa unverified email → nếu chính email đó là email thật của user khác đang dùng app, có duplicate user records hoặc enumeration path. Quan trọng hơn: kết hợp USER-SEC-001 (stranger reads /users) → unverified email PII của signup user bị expose qua /usernames → uid → /users.email pipeline.
+- risk: PII unverified — email field trong /users không có guarantee ownership. CLAUDE.md §PII handling "email là PII". CLAUDE.md §Security Guardrails "Never just check 'is authenticated' when you really mean 'is owner'" — auth-only is not enough cho email PII.
+- fix: 2 lớp defense:
+  1. **Client-side gate signup completion:** sau `createUserWithEmailAndPassword`, ngay lập tức gọi `await user.sendEmailVerification()`. Block continue-to-app flow cho đến khi `user.reload(); user.emailVerified == true`. Thêm verify-email screen vào router; redirect signup → verify-email khi `!emailVerified`.
+  2. **Server-side enforce ở rule + CF:** trong `/users` create rule, thêm `&& request.auth.token.email_verified == true` (Firebase Auth token tự inject claim). Áp dụng cho mọi CF callable destructive (deleteAccount, blockUser, acceptFriendRequest, createSpace) tương tự: check `request.auth.token.email_verified` đầu function.
+- authority: CLAUDE.md §Security Guardrails "isOwner(uid) := isAuthed() && request.auth.uid == uid. Never just check 'is authenticated'"; Firebase Auth docs "email_verified token claim"; pair với USER-SEC-001 đóng pipeline email enumeration
+- test:
+  - widget test verify signup flow redirect sang verify-email screen khi `emailVerified == false`;
+  - rules test `firestore.rules.test.ts describe('/users create — email verification gate')` — assert token với `email_verified: false` create /users → assertFails post-fix;
+  - vitest CF `deleteAccount.test.ts` — gọi với token email_verified=false → throw `failed-precondition` post-fix.
+- deps: pair với USER-SEC-001 — defense in depth cho email PII boundary
+
+### ISSUE FRIEND-SEC-002
+
+- sev: P2
+- blocker: yes (cho USER-SEC-001 rollout — implementation blocker)
+- area: client
+- files:
+  - `apps/mobile/lib/features/friend/data/firebase_friend_repository.dart`
+- loc: 13-26 (`searchUser` method)
+- symbols:
+  - `FirebaseFriendRepository.searchUser(username)` → `_firestore.collection('users').where('username', isEqualTo: query).limit(1).get()`
+- evidence: `searchUser` (firebase_friend_repository.dart:13-26) chạy collection query `/users where username == X`. Stranger lookup (user A search user B chưa friend) — query phải pass /users read rule. Hiện tại rule `allow read: if isAuthed()` (firestore.rules:62) cho phép, nhưng SAU KHI USER-SEC-001 fix tighten read rule thành `isOwner(uid) || isFriend(uid)`, collection query KHÔNG thể prove tĩnh "mọi doc match query là friend của caller" → Firestore engine reject toàn query với PERMISSION_DENIED. Friend search BREAK.
+- access_path: USER-SEC-001 fix deploy theo rollout order đề xuất (CF migrate → client public/profile → rule tighten). Bước rule tighten breaks friend search vì client chưa migrate sang query `/users/{uid}/public/profile`. UX: user mở "Tìm bạn" → search "alice" → snapshot error PERMISSION_DENIED. Nếu fix release trước migration done → app crash UX.
+- risk: implementation correctness — USER-SEC-001 rollout step (c) "deploy client đọc public/profile" PHẢI bao gồm refactor searchUser TRƯỚC step (d) rule tighten. Không phải security risk độc lập, là blocker dependency.
+- fix: 2 option:
+  1. **Server-side search qua CF `searchUserByUsername`:** client gọi callable, server query `/users` qua Admin SDK (bypass rule), return minimal profile (`{uid, displayName, avatarUrl, username}`). Pair tự nhiên với USERNAME-SEC-001 CF refactor.
+  2. **Client query collection-group `/users/{uid}/public/profile` filtered by username:** yêu cầu /users/{uid}/public/profile có index trên username field + denormalized. Phức tạp hơn CF approach vì cần composite index.
+  
+  Đề xuất option 1 (CF) — đơn giản + match USERNAME-SEC-001 pattern.
+- authority: phụ thuộc USER-SEC-001 fix; tmp prompt §Friend graph privacy "stranger lookup pre-friend"
+- test: integration test `friend_search_test.dart` post-fix: stranger search "alice" → return UserProfile minimal (no email/no counters). Vitest CF `searchUserByUsername.test.ts` verify response shape.
+- deps: blocks USER-SEC-001 rollout step (c)
+
+### ISSUE CI-SEC-001
+
+- sev: P3
+- blocker: no
+- area: ci
+- files:
+  - `.github/workflows/pr-check.yml`
+- loc: 153-160 (firestore-rules job)
+- symbols:
+  - `firestore-rules` job → `firebase emulators:exec ... npm run test:rules || echo "::warning::..."`
+- evidence: `pr-check.yml:160` có fallback `|| echo "::warning::Rules tests skipped (chưa có script test:rules — sẽ enable khi có rules tests đầu tiên)"`. Nếu `test:rules` script không tồn tại HOẶC fail vì lý do gì khác, job vẫn pass với warning. CI không enforce rules tests.
+- access_path: dev push PR với rules change → CI emit warning nhưng pass → merge sang develop → silent regression rules. Tương đương zero coverage cho firestore.rules trong CI. TESTING-SEC-001 propose thêm describe blocks nhưng nếu fallback `||` còn đó, coverage không enforce được.
+- risk: defense-in-depth CI gate; toàn bộ TESTING-SEC-001 work bị undermined nếu script chạy fail silently. Sau khi rules tests có sẵn, phải REMOVE fallback.
+- fix: 2 step:
+  1. Xóa `|| echo "::warning::..."` line 160 → job fail khi `test:rules` script missing hoặc tests fail.
+  2. Verify `firebase/functions/package.json` có `"test:rules": "vitest run firestore.rules.test.ts storage.rules.test.ts"` (đã có test files trong src/ — `firestore.rules.test.ts`, `storage.rules.test.ts`).
+- authority: CLAUDE.md §Verification Before Claiming Done "Linter clean, Build OK, Tests pass" — CI fallback `||` violates evidence rule; tmp prompt §CI/CD hardening
+- test: smoke test sau fix — verify CI job fail khi `npm run test:rules` exit non-zero (cố intentionally break 1 rules test → push PR → CI red); chuẩn CI workflow.
+- deps: blocks TESTING-SEC-001 — nếu không xóa fallback, test coverage không enforce được dù viết tests.
 
 ### ISSUE REACTION-SEC-001
 
@@ -467,11 +536,13 @@
 - STORAGE-001 + STORAGE-002 — Mirror friend boundary ở Storage cho /posts + /diary (cùng pattern)
 - POST-SEC-001 — Field whitelist + caption cap trên /posts update
 - AUTH-SEC-001 — auth_time check trong deleteAccount CF
+- AUTH-SEC-002 — Email verification enforce (client gate + rule + CF token claim check) — added pass-6
 
 ### batch_3_p2
 - USERNAME-SEC-001 — Move username lookup vào CF (depends USER-SEC-001)
 - REACTION-SEC-001 — Type+size guard trên /reactions update
 - CHAT-SEC-002 — Value validation trên /conversations update (lastMessage size, lastSenderId == auth.uid, lastReadAt shape) — added pass-3
+- FRIEND-SEC-002 — Move searchUser sang CF `searchUserByUsername` (blocks USER-SEC-001 rollout step c) — added pass-6
 - USER-SEC-002 — Length cap displayName trong /users update
 - DIARY-SEC-001 — Privacy enum + type guard trên /diary update
 - TESTING-SEC-001 — Coverage gap fix cuối cùng (cover toàn bộ collection rule mới fix)
@@ -483,6 +554,7 @@
 - FUNC-SEC-001 — `.strict()` trên mọi zod schema
 - FUNC-SEC-002 — Event marker idempotent cho onSpaceMember{Added,Removed}
 - USERNAME-SEC-002 — Enforce /users/{uid}.username match /usernames/{name}.uid trong create rule (added pass-4)
+- CI-SEC-001 — Xóa `|| echo warning` fallback trong pr-check.yml firestore-rules job (blocks TESTING-SEC-001) — added pass-6
 
 ## test_plan_after_fix
 
@@ -505,6 +577,9 @@
 - `FUNC-SEC-001`: vitest each callable gọi với excess keys → throw `invalid-argument`
 - `FUNC-SEC-002`: vitest simulate trigger 2x cùng event → assert spaceCount idempotent
 - `USERNAME-SEC-002`: rules test user A (username='alice') try create /usernames/bob với uid=A → assertFails post-fix; A create /usernames/alice → assertSucceeds. Hoặc nếu chuyển sang CF `claimUsername`, vitest test direct rule create → assertFails (deny client write)
+- `AUTH-SEC-002`: widget test `signup_controller_test.dart` mock FirebaseAuth, verify `sendEmailVerification()` called sau `createUserWithEmailAndPassword` + redirect tới verify-email screen khi `!emailVerified`. Rules test create /users với token `email_verified=false` → assertFails. Vitest CF `deleteAccount.test.ts` với token email_verified=false → throw `failed-precondition`.
+- `FRIEND-SEC-002`: integration test `friend_search_test.dart` post-fix: stranger search "alice" qua CF → return UserProfile minimal (no email field, no friendCount). Vitest CF `searchUserByUsername.test.ts` verify response shape không leak PII.
+- `CI-SEC-001`: smoke test verify CI fail-mode — intentionally break 1 rules test, push PR → CI job firestore-rules đỏ. Verify `package.json` có script `test:rules`.
 
 ## no_issue_notes
 
@@ -619,6 +694,35 @@
   Pass-4 update: 18 → 19 (added USERNAME-SEC-002 P3 — namespace squatting gap in /usernames create rule). Consolidations=0 (USERNAME-SEC-001 vs USERNAME-SEC-002 share collection but distinct rule actions — read vs create — and distinct fix paths, kept separate with cross-dep linking).
 - pass_4_coverage: checked=11, partial=1 (client Firebase usage boundary — sampled feed/notification/chat/widget/settings/auth, not every feature module), blocked=0, total=12, verdict=full (every "checked" area backed by grep evidence + file read in commands table)
 
+pass_6_reverify_notes (deep audit per user request — go as kỹ as possible):
+- SCOPE: re-grep 3 issues mới (CHAT-SEC-002, USERNAME-SEC-002, USER-SEC-001 expanded); sample 7 module client chưa cover (post=feed/post, diary, profile, space, rollcall, streak, friend); verify 2 CF files pass-3 claim; re-check 2 note-only decisions + CI/CD + email verify.
+- FACT FIX 1 (USER-SEC-001 step 3 symbol): pass-4 claim `FirebaseUserRepository.watchUser` SAI — actual method là `watchProfile` (auth/data/firebase_user_repository.dart:46). Cũng phát hiện thêm 2 method khác đọc /users trực tiếp: `FirebaseProfileRepository.watchUserProfile` (profile/data/firebase_profile_repository.dart:80) + `FirebaseFriendRepository.searchUser` (friend/data/firebase_friend_repository.dart:13). Step 3-4 rewritten với verified symbols + path.
+- FACT FIX 2 (USERNAME-SEC-002 fix caveat): proposed `get(/users/{auth.uid}).data.username` cross-doc check SẼ BREAK signup vì `FirebaseUserRepository.createProfile` (auth/data/firebase_user_repository.dart:14-27) write /users + /usernames trong cùng batch — rule eval không thấy uncommitted /users. Bắt buộc split batch HOẶC switch CF `claimUsername` alternative. Caveat added vào fix section.
+- NEW ISSUE AUTH-SEC-002 P1 BLOCKER (email verification): grep `sendEmailVerification|emailVerified|email_verified|isEmailVerified` trên `apps/mobile/lib/features/auth/` = 0 hits. Signup tạo Firebase Auth user + /users doc với unverified email. Kết hợp USER-SEC-001 = pipeline username → uid → unverified email PII leak. Fix: client gate + rule `email_verified` claim + CF destructive ops check. Blocker vì làm USER-SEC-001 fix mất ý nghĩa nếu không cover.
+- NEW ISSUE FRIEND-SEC-002 P2 BLOCKER (rollout): `FirebaseFriendRepository.searchUser` (friend/data/firebase_friend_repository.dart:13-26) chạy collection query `/users where username == X`. Sau USER-SEC-001 fix tighten rule, query này BREAK với PERMISSION_DENIED vì Firestore không prove tĩnh stranger là friend. Phải refactor TRƯỚC khi deploy USER-SEC-001 step (d) rule tighten. Implementation blocker, không phải security gap độc lập.
+- NEW ISSUE CI-SEC-001 P3 (CI fallback): `pr-check.yml:160` có `|| echo "::warning::Rules tests skipped"` — silent pass khi script missing/fail. Toàn bộ TESTING-SEC-001 coverage work bị undermined nếu fallback còn. Fix: xóa fallback `||`. Blocks TESTING-SEC-001.
+- GAP SCAN client modules — verified files đã đọc:
+  - post (feed/data/firebase_post_repository.dart, feed/application/feed_controller.dart, feed/application/post_controller.dart): query patterns OK với rule, dùng arrayContains đúng disjunct. Không phát hiện gap mới.
+  - diary (diary/data/firebase_diary_repository.dart): repository đọc Firestore + Storage trực tiếp, OK với owner rule. Note: `getPublicEntries` query `where('privacy', isEqualTo: 'public')` lookup ai khác — sẽ bị STORAGE-002 fix (read author-only) cover, không cần issue mới.
+  - profile (profile/data/firebase_profile_repository.dart): updateProfile có client-side `_allowedFields` whitelist mirror rule. Avatar upload 5MB cap mà storage.rules ship 2MB → drift đã được note trong code (line 65), không escalate issue mới vì README spec sẽ sync 5MB.
+  - space (space/data/firebase_space_repository.dart): hầu hết mutations qua CF (createSpace, updateSpace, kickMember, transferOwnership, leaveSpace) — gate ở server. `deleteSpace` client-side update `deletedAt` — rule whitelist line 244 cover. Watch query OK.
+  - rollcall: KHÔNG TỒN TẠI feature folder (`apps/mobile/lib/features/` không có `rollcall/`) — bị mention trong tmp prompt nhưng module chưa implement. Skip — không phải gap audit.
+  - streak (streak/data/firebase_streak_repository.dart): read-only từ /posts, OK với rule (query authorId == uid pass disjunct 1).
+  - friend (friend/data/firebase_friend_repository.dart + friend_request_repository.dart): `searchUser` → FRIEND-SEC-002 phát hiện. `watchFriends` batch reads /users/{fuid} — sẽ break tương tự nếu không refactor. `sendFriendRequest` có client-side dedupe race comment chính code đã flag (line 65-68) → leader đã biết, không escalate.
+- VERIFY 2 CF FILES pass-3 claim audited: ĐÃ ĐỌC FULL onReactionCreated.ts + onFriendRequestCreated.ts. Cả 2 idempotent qua `notifRef.create()` collision, sender narrow đúng, không phát hiện gap mới. Pass-3 claim "re-read 6 files" đếm sai nhưng kết luận audit không bị ảnh hưởng.
+- NOTE-ONLY DECISIONS re-evaluated:
+  - MESSAGE createdAt validation gap (pass-3 note): vẫn note-only — impact thấp, sender pinned. Nếu CHAT-SEC-002 fix bundle thêm `createdAt is timestamp` check trong messages create rule (firestore.rules:308-322) thì free. Recommend bundle.
+  - imageUrl regex domain match (pass-1 note): vẫn note-only — client luôn upload qua Storage SDK trả `firebasestorage.googleapis.com` URL. Không phải attack vector hiện tại.
+- ADDITIONAL CF AUDIT (pass-6 không đếm thêm issue mới):
+  - `acceptFriendRequest.ts` (friend/acceptFriendRequest.ts): well-structured, idempotent check (line 97), friendCount cap 20 cả 2 phía. Race window khi 2 user accept simultaneously có thể vượt cap → minor, không escalate.
+  - `blockUser.ts` (settings/blockUser.ts): atomic batch, idempotent. No security gap.
+  - `onPostDeleted.ts` (feed/onPostDeleted.ts): collection-group query xóa feed entries — well structured. Storage delete với try/catch 404 — OK.
+  - `index.ts` (functions/src/index.ts): có 1 stub `sendFriendRequest` (line 39-58) với "TODO(impl)" — KHÔNG implement nhưng KHÔNG được export ở entry point nào (client gọi qua FirebaseFriendRequestRepository.sendFriendRequest đi Firestore direct, không qua CF). Stub có thể removed nhưng không phải security gap.
+  - 1 `console.warn` trong onFriendshipDeleted.ts:25 → code quality, không security. Pass-3 đã note. Defer.
+- COUNT TALLY: pass-4 total 19 → pass-6 total 22 (+3: AUTH-SEC-002 P1, FRIEND-SEC-002 P2, CI-SEC-001 P3). Distribution: P0=2, P1=6, P2=7, P3=7.
+- VERDICT: vẫn not_ready. AUTH-SEC-002 thêm P1 blocker — kết hợp USER-SEC-001 P0 form 1 pipeline email PII. FRIEND-SEC-002 không phải security gap nhưng MUST-FIX trước khi USER-SEC-001 deploy (rollout dependency).
+- COVERAGE UPDATE: client module sampling từ partial → full (7/7 modules sampled với evidence file reads). CF coverage từ "6 files re-read" → 10+ files (acceptFriendRequest, blockUser, deleteAccount, onFriendRequestCreated, onReactionCreated, onPostDeleted, onFriendshipDeleted, _fcm, _helpers, index, createSpace + 4 space CFs).
+
 pass_5_reverify_notes (final cross-check before PR):
 - COUNT CROSS-CHECK: grep `^### ISSUE ` = 19 entries; grep `^- sev: P0` = 2, `P1` = 5, `P2` = 6, `P3` = 6. Sum 2+5+6+6 = 19. Khớp với pass-4 distribution.
 - BATCH SUM CROSS-CHECK: batch_1_p0 (2) + batch_2_p1 (5 incl STORAGE-001+STORAGE-002 bundled line) + batch_3_p2 (6) + batch_4_p3 (6) = 19. Khớp.
@@ -659,10 +763,14 @@ verdict: not_ready
 
 **Rationale:** 2 P0 issues (APPCHECK-001, USER-SEC-001) block MVP launch per CLAUDE.md §Security Guardrails Production blocker + PII bar HIGH. 5 P1 issues (STORAGE-001/002, POST-SEC-001, CHAT-SEC-001, AUTH-SEC-001) cần fix trước Tier 0+ ship (privacy boundary + validation gaps không chấp nhận được cho photo-sharing app intimate friends). P2/P3 issues có thể bundle sau MVP.
 
-**Recommended path:** Fix batch_1_p0 + batch_2_p1 (7 issues) trong 1 sprint (3-5 ngày dev), re-audit, then ship M3.
+**Recommended path:** Fix batch_1_p0 + batch_2_p1 (7 issues) trong 1 sprint (3-5 ngày dev), re-audit, then ship M3. — SUPERSEDED bởi pass-6 recommended path bên dưới.
 
 Final distribution after pass-2 reverify: **P0=2, P1=5, P2=5, P3=5 — total 17 issues** (WIDGET-SEC-001 demoted P2→P3 sau khi verify logout path đã clear cache; chỉ deleteAccount path còn missing — impact thấp vì server cascade làm URL invalid trong 15min).
 
 Final distribution after pass-3 reverify: **P0=2, P1=5, P2=6, P3=5 — total 18 issues** (CHAT-SEC-002 P2 added: /conversations update rule cho phép tamper lastSenderId/lastMessage/lastReadAt mà không value-validate; defense-in-depth gap discovered khi cross-reference với REACTION-SEC-001 pattern).
 
 Final distribution after pass-4 reverify: **P0=2, P1=5, P2=6, P3=6 — total 19 issues** (USERNAME-SEC-002 P3 added: /usernames create rule không check `username == /users/{auth.uid}.username` → squatting vector. Pair với USERNAME-SEC-001 fix; deleteAccount cascade chỉ cleanup username trong /users.username nên squatted usernames sẽ mồ côi nếu fix không bundle). USER-SEC-001 fix section expanded với 6-step implementation plan để leader có thể assign T6 sub-tasks ngay (rule split → CF denormalize → repository tách read → client touch points → migrate CF → rollout order).
+
+Final distribution after pass-6 reverify (deep audit): **P0=2, P1=6, P2=7, P3=7 — total 22 issues** (+3 vs pass-5: AUTH-SEC-002 P1 email verification not enforced = blocker cho USER-SEC-001 PII boundary; FRIEND-SEC-002 P2 searchUser collection query sẽ break sau USER-SEC-001 rule tighten = implementation blocker; CI-SEC-001 P3 pr-check.yml fallback `|| echo warning` undermines TESTING-SEC-001 coverage gate). Fact fixes: USER-SEC-001 step 3-4 sửa symbol `watchUser` → `watchProfile` + thêm 2 method khác đọc /users (watchUserProfile, searchUser); USERNAME-SEC-002 fix caveat — proposed cross-doc `get()` check sẽ break signup batch atomicity, cần CF claimUsername alternative.
+
+**Updated recommended path:** Fix batch_1_p0 (2) + batch_2_p1 (8 issues, +1 AUTH-SEC-002) + 1 P2 blocker FRIEND-SEC-002 — total **11 must-fix** trong 1 sprint (5-7 ngày dev với scope expanded), re-audit, then ship M3.
