@@ -81,6 +81,7 @@ Only P0/P1.
 | FEED-ARCH-002 | P1 | Cross-module data layer bypass | `feed/data/firebase_post_repository.dart` | `_getFriendUids` queries `/friendships` directly instead of `FriendRepository` — comment cites stale "FriendRepository is stub" reason |
 | ARCH-001 | P1 | Shared entity in feature folder | `feed/data/post.dart`, `streak/data/streak_repository.dart`, `profile/application/friend_posts_provider.dart`, `chat/application/chat_providers.dart`, `shared/widgets/post_card.dart` | `Post` model lives in `features/feed/data/` but is imported by streak, profile, chat, shared/widgets — de-facto shared entity, misleading owner |
 | ARCH-002 | P1 | Widget files exceed split threshold | `feed/presentation/feed_section.dart` (1031 lines), `feed/presentation/capture_preview_screen.dart` (771), `feed/presentation/home_screen.dart` (630) | Far above `apps/mobile/CLAUDE.md` ≤300-line / 150-line widget thresholds |
+| DEEPLINK-001 | P1 | Invite/share link drift + missing intent-filter | `app_config.dart`, `friend_sheet.dart`, `share_profile_sheet.dart`, `AndroidManifest.xml` | Profile share `meep://profile/...` vs friend invite `https://meep.app/invite/...` — AndroidManifest registers neither; `/invite/:uid` routes to `HomePage` placeholder |
 
 ## issues
 
@@ -278,21 +279,29 @@ Only P0/P1.
 - test: After split, `flutter test test/features/feed/` must stay green; add widget tests for any newly extracted reusable widget under `test/features/feed/presentation/widgets/`.
 - deps: LAYER-001 (touches same files; sequence: fix LAYER-001 first since both edits hit the same call sites)
 
-### ISSUE REACT-ARCH-001
+### ISSUE STATE-ARCH-001
 
 - sev: P2
 - blocker: no
-- area: Module layout — state colocated in controller file
+- area: Module layout — state classes colocated in controller files (4 modules)
 - files:
-  - `apps/mobile/lib/features/reaction/application/reaction_controller.dart`
-- loc: 13-32
+  - `apps/mobile/lib/features/reaction/application/reaction_controller.dart` (lines 13-32: `ReactionState` `@freezed`)
+  - `apps/mobile/lib/features/diary/application/diary_controller.dart` (lines 39-?: `DiaryState` `@freezed`)
+  - `apps/mobile/lib/features/profile/application/profile_controller.dart` (lines 20-?: `ProfileState` `@freezed`)
+  - `apps/mobile/lib/features/space/application/space_controller.dart` (lines 16-?: `SpaceState` `@freezed`)
+- loc: per-file ranges above
 - symbols:
-  - `ReactionState` (`@freezed`) inside controller file
-- evidence: `@freezed\nclass ReactionState with _$ReactionState { ... }` at lines 13-32 of `reaction_controller.dart`; no separate `reaction_state.dart` file present (verified via Glob)
-- risk: Inconsistent with `auth/application/login_state.dart`, `sign_up_state.dart`, `password_reset_state.dart`, `feed/application/feed_state.dart`, `post_state.dart`, `friend/application/friend_state.dart`, `settings/application/settings_state.dart`, `notification/application/notification_state.dart`, `streak/application/streak_state.dart`. New owner copying the module forks the convention; testing the state alone (without spinning up the controller's stream subscription) becomes harder.
-- fix: Move `ReactionState` + its `topNReactors` helper into a new `apps/mobile/lib/features/reaction/application/reaction_state.dart` with `part 'reaction_state.freezed.dart';`. Keep the controller importing the state. Re-run `dart run build_runner build --delete-conflicting-outputs` to regenerate the freezed file.
-- authority: `auth.md` Pattern #1 (folder layout) + Pattern #8 (State model)
-- test: `flutter test test/features/reaction/application/` must pass with no behavior change.
+  - `ReactionState` / `DiaryState` / `ProfileState` / `SpaceState` (all `@freezed`)
+- evidence: `grep -c "@freezed"` returns 1 in each of the 4 controllers above; `ls features/<module>/application/` shows NO sibling `*_state.dart` for these 4 modules. Compare with auth/feed/friend/notification/settings/streak which DO ship separate state files (`ls features/{auth,feed,friend,notification,settings,streak}/application/*_state.dart` returns 10 matches).
+- risk: 4 of 10 stateful modules deviate from the auth canonical layout (Pattern #1 ↔ #8). New owner copying any of the 4 modules forks the convention; tests must spin up the controller's stream subscription to instantiate the state. Inconsistency makes `/start` / `/build` skill output drift between modules. Note: `chat/application/chat_controller.dart:139 ChatSendStatus` is also inline but uses a plain class (not `@freezed`) — different smell, kept out of scope here.
+- fix: Move each `@freezed` state into a sibling `*_state.dart` file:
+  - `reaction_controller.dart` → `reaction_state.dart` (move `ReactionState` + `topNReactors` helper)
+  - `diary_controller.dart` → `diary_state.dart`
+  - `profile_controller.dart` → `profile_state.dart`
+  - `space_controller.dart` → `space_state.dart`
+  Re-run `dart run build_runner build --delete-conflicting-outputs` for each. Controller imports new state file.
+- authority: `auth.md` Pattern #1 (folder layout) + Pattern #8 (State model in `*_state.dart`) — confirmed by 6/10 modules already following it
+- test: `flutter test test/features/{reaction,diary,profile,space}/application/` must pass unchanged after extraction. No behavior change.
 - deps: none
 
 ### ISSUE HOME-ARCH-001
@@ -448,6 +457,73 @@ Only P0/P1.
 - test: After scaffolding, `flutter analyze --no-pub` clean and `flutter test` passes (no behavior added — skeleton only).
 - deps: none
 
+### ISSUE DEEPLINK-001
+
+- sev: P1
+- blocker: no
+- area: Routing — invite/share link scheme drift + AndroidManifest mismatch
+- files:
+  - `apps/mobile/lib/core/config/app_config.dart`
+  - `apps/mobile/lib/features/friend/presentation/friend_sheet.dart`
+  - `apps/mobile/lib/features/settings/application/settings_controller.dart`
+  - `apps/mobile/lib/features/profile/application/profile_controller.dart`
+  - `apps/mobile/lib/shared/widgets/share_profile_sheet.dart`
+  - `apps/mobile/lib/core/router/app_router.dart`
+  - `apps/mobile/android/app/src/main/AndroidManifest.xml`
+- loc:
+  - `app_config.dart:2` — `shareBaseUrl = 'meep://profile'`
+  - `friend_sheet.dart:68, 81` — `final link = 'https://meep.app/invite/$uid';`
+  - `share_profile_sheet.dart:48` — `'meep://profile/${username ?? uid}'`
+  - `app_router.dart:344` — `path: '/invite/:uid'` builder `HomePage()`
+  - AndroidManifest: only `meep-staging.firebaseapp.com` + `meep-staging.web.app` hosts registered
+- symbols:
+  - `AppConfig.shareBaseUrl` vs `friend_sheet._copyLink` / `_shareInviteLink`
+- evidence:
+  - `app_config.dart:2`: `static const shareBaseUrl = 'meep://profile';`
+  - `friend_sheet.dart:68`: `final link = 'https://meep.app/invite/$uid';` (hardcoded, bypasses `AppConfig`)
+  - `settings_controller.dart:27` comment confirms intent: `URL format: ${AppConfig.shareBaseUrl}/{username}` (vd `meep://profile/ngantran`)
+  - AndroidManifest registers neither `meep://` scheme nor `meep.app` host — only Firebase password reset hosts
+  - ADR-0005 checklist (§Checklist trước khi deploy production) explicitly lists "thêm `android:host='meep.app'` vào `intent-filter`" as outstanding
+- risk: Three drifts at once:
+  1. **Link format inconsistency.** Profile share uses `meep://profile/{username}` (custom scheme); friend invite uses `https://meep.app/invite/{uid}` (HTTPS web). User on the receiving side sees two completely different link styles depending on who shared what.
+  2. **No external reachability.** Neither `meep://` nor `meep.app` is registered in AndroidManifest — clicking the shared link from Gmail/Messenger/SMS opens browser instead of the app. Friend invite via Share Sheet is functionally dead for Android external apps.
+  3. **`/invite/:uid` lands on TODO page.** Even if the link did open the app, `app_router.dart:344` routes `/invite/:uid` to `HomePage` (which renders `Text('Home — TODO')` per HOME-ARCH-001). No actual invite UX.
+  ADR-0005 acknowledges parts 2-3 as deferred-to-prod, but it does NOT acknowledge the scheme drift (1) — that's a runtime bug present TODAY in staging.
+- fix:
+  1. Pick ONE canonical link format. Recommend `https://meep.app/invite/{uid}` (HTTPS, matches ADR-0005's prod-domain plan).
+  2. Centralize in `AppConfig`: rename `shareBaseUrl` → `inviteLinkPrefix = 'https://meep.app/invite'` and `profileLinkPrefix = 'https://meep.app/profile'`. Delete `meep://` hardcoded strings.
+  3. Update `friend_sheet.dart:68,81` to read from `AppConfig` instead of inlining the URL.
+  4. AndroidManifest: add `android:host="meep.app"` to the existing `intent-filter` (ADR-0005 already lists this as a pre-prod TODO — pull forward).
+  5. Implement `/invite/:uid` route properly (or document deferred and route to a real "Add friend" sheet, not `HomePage` placeholder).
+- authority: ADR-0005 `§Checklist trước khi deploy production` + `CLAUDE.md §Cross-module touch` (no scattered link constants)
+- test: Manual: tap `https://meep.app/invite/test-uid` from device's Gmail → app opens at `/invite/test-uid`. Unit: `test/core/config/app_config_test.dart` asserts `inviteLinkPrefix.startsWith('https://')`. Widget: `friend_sheet_test.dart` asserts copied clipboard text matches `AppConfig.inviteLinkPrefix`.
+- deps: HOME-ARCH-001 (both touch `/invite/:uid` target — fix HOME-ARCH-001 first)
+
+### ISSUE DEV-001
+
+- sev: P3
+- blocker: no
+- area: Routing — dev-only route exposed in production build
+- files:
+  - `apps/mobile/lib/core/router/app_router.dart`
+  - `apps/mobile/lib/dev/widget_catalog_page.dart`
+- loc: `app_router.dart:443-445`
+- symbols:
+  - `WidgetCatalogPage` registered at `/dev/widgets`
+- evidence:
+  ```dart
+  GoRoute(
+    path: '/dev/widgets',
+    builder: (_, __) => const WidgetCatalogPage(),
+  ),
+  ```
+  Path registered unconditionally — no `if (kDebugMode)` gate; the same route ships in release APK.
+- risk: Dev catalog page is reachable in production builds via `https://app.go('/dev/widgets')`. The page imports friend/space internals (`widget_catalog_page.dart:10-16`) and would render dev-only UI to end-users if they (or QA, or a curious user via deep link) hit the path. `authRedirect` does treat `/dev` as auth-route (allowed when uid=null per `app_router.dart:83`), which makes it even more reachable. Not P2 because no production path navigates to it and no external trigger exists — but the surface should be gated.
+- fix: Wrap registration in `if (kDebugMode)` at the routes-list build site, or only register it when `AppConfig._env != 'prod'`. Same pattern as `home_page.dart:41 if (kDebugMode) ...[ TextButton(...) ]` already uses elsewhere.
+- authority: `home_page.dart:41` precedent + `CLAUDE.md §Cấm` ("dev-only flags shipping to prod")
+- test: After fix, `if (kDebugMode)` strips the route from release; `flutter build apk --release` and grep apk for `/dev/widgets` returns no hits (alternative: integration test in profile mode navigating to `/dev/widgets` should redirect to `/intro` or 404).
+- deps: none
+
 ## fix_order
 
 ### batch_1_p0
@@ -463,21 +539,23 @@ Only P0/P1.
 6. **FEED-ARCH-002** — inject `FriendRepository` into `FirebasePostRepository`; delete direct `friendships` query.
 7. **ARCH-001** — move `Post` (and audience/caption enums) to `shared/models/` (or document as canonical shared model).
 8. **ARCH-002** — split `home_screen.dart` / `feed_section.dart` / `capture_preview_screen.dart` per CLAUDE.md thresholds.
+9. **DEEPLINK-001** — unify share/invite link via `AppConfig`; AndroidManifest add `meep.app` host; route `/invite/:uid` to real UI (depends on HOME-ARCH-001).
 
 ### batch_3_p2
 
-9. **REACT-ARCH-001** — extract `ReactionState` into `reaction_state.dart`.
-10. **HOME-ARCH-001** — collapse `home/` skeleton (rename to InviteLandingPage in auth/, drop `features/home/`).
-11. **SETTINGS-ARCH-001** — extract logout/delete fan-out to `core/lifecycle/` or `AuthRepository.signOut`.
-12. **CORE-001** — dedupe hex-color helpers.
-13. **SHARED-001** — auto-resolved by ARCH-001.
+10. **STATE-ARCH-001** — extract `ReactionState` / `DiaryState` / `ProfileState` / `SpaceState` into sibling `*_state.dart` files.
+11. **HOME-ARCH-001** — collapse `home/` skeleton (rename to InviteLandingPage in auth/, drop `features/home/`).
+12. **SETTINGS-ARCH-001** — extract logout/delete fan-out to `core/lifecycle/` or `AuthRepository.signOut`.
+13. **CORE-001** — dedupe hex-color helpers.
+14. **SHARED-001** — auto-resolved by ARCH-001.
 
 ### batch_4_p3
 
-14. **LAYER-004** — delete or trim `debug_error_view.dart` (unused; FirebaseException branch dead code since conversation repo already maps).
-15. **ROUTER-001** — delete chat-route auth bypass.
-16. **PUBSPEC-001** — remove `sign_in_with_apple` dep.
-17. **ARCH-003** — leader decision: scaffold or descope RollCall.
+15. **LAYER-004** — delete or trim `debug_error_view.dart` (unused; FirebaseException branch dead code since conversation repo already maps).
+16. **ROUTER-001** — delete chat-route auth bypass.
+17. **PUBSPEC-001** — remove `sign_in_with_apple` dep.
+18. **DEV-001** — gate `/dev/widgets` route behind `kDebugMode`.
+19. **ARCH-003** — leader decision: scaffold or descope RollCall.
 
 ## test_plan_after_fix
 
@@ -489,7 +567,9 @@ Only P0/P1.
 - `FEED-ARCH-002`: `flutter test test/features/feed/data/firebase_post_repository_test.dart` — `MockFriendRepository` returns `['friend-uid']`; assert no Firestore call to `/friendships`.
 - `ARCH-001`: `flutter analyze --no-pub` clean; `flutter test` full suite.
 - `ARCH-002`: `flutter test test/features/feed/presentation/` — widget tests for newly extracted widgets.
-- `REACT-ARCH-001`: `flutter test test/features/reaction/application/reaction_controller_test.dart` — unchanged behavior.
+- `STATE-ARCH-001`: `flutter test test/features/{reaction,diary,profile,space}/application/` — unchanged behavior after state extraction.
+- `DEEPLINK-001`: `test/core/config/app_config_test.dart` asserts `inviteLinkPrefix.startsWith('https://')`; widget test on `friend_sheet.dart` asserts clipboard text uses `AppConfig`; manual: tap `https://meep.app/invite/test-uid` from external app.
+- `DEV-001`: `flutter build apk --release && grep -r "/dev/widgets" build/app/outputs/` returns 0 hits.
 - `HOME-ARCH-001`: `flutter test test/core/router/app_router_test.dart` — `/invite/:uid` test renders without crash.
 - `SETTINGS-ARCH-001`: `flutter test test/features/settings/application/settings_controller_test.dart` — mocks one orchestrator; existing test moves to new lifecycle location.
 - `CORE-001`: `rg "parseHexColor|hexToColor" apps/mobile` shows 0 references to deleted symbol.
@@ -507,7 +587,7 @@ Compact notes for important areas checked with no issue found.
 - `main.dart` bootstrap order: `WidgetsFlutterBinding.ensureInitialized()` → `Firebase.initializeApp()` → emulator wiring (`USE_EMULATOR` env) → `SharedPreferences.getInstance()` → `revalidateSession` (auth) → `runApp(ProviderScope(overrides: [...]))`. Matches Pattern #5 + checklist item "Firebase.initializeApp → Crashlytics → Riverpod scope → router" (Crashlytics opt-in via dep but no explicit init — outside architecture audit's scope; flagged by 05_security audit if relevant).
 - All abstract repository stubs (`auth`, `user`, `friend`, `friend_request`, `space`, `block`, `conversation`, `profile`, `widget_data`, `reaction`, `notification`, `notification_preferences`, `diary`, `diary_storage_client`, `image_picker_service`, `streak`) wired in `main.dart:76-140`. No `UnimplementedError` leak detected outside FEED-ARCH-001 (which bypasses the stub pattern).
 - `firebase_diary_repository.dart`: `DocumentSnapshot<Map<String,dynamic>>` usage stays inside the data layer (lines 153/212/276) — boundary respected. Internal repo helpers, not exposed to controllers.
-- Friend / Reaction / Diary / Profile / Space modules: 3-layer folder layout per Pattern #1 (`data/`, `application/`, `presentation/`). State files (`*_state.dart`) split correctly for all except Reaction (see REACT-ARCH-001).
+- Friend / Notification / Settings / Streak / Auth / Feed modules: 3-layer folder layout per Pattern #1 (`data/`, `application/`, `presentation/`) AND state in sibling `*_state.dart` (verified via `ls features/*/application/*_state.dart` returning 10 matches across 6 modules). Reaction / Diary / Profile / Space deviate — see STATE-ARCH-001.
 - Notification controller imports `firebase_messaging` directly — FCM stream API is callback-shaped and difficult to abstract cleanly into a repository without a wrapper that hurts clarity. Accept with note: if a future test needs to fake FCM, extract `MessagingClient` wrapper.
 - Vietnamese error messaging present at boundary in 8/13 modules (auth, chat, diary, friend_request, profile, settings/block, space, streak per Grep). VN-at-boundary discipline (Pattern #10) holds for those — DATA-ARCH-001 callouts are the remaining 5.
 - `shared/widgets/` has 22 files all real-name shared components (`AppAvatar`, `AppPhotoFrame`, `AppPrimaryButton`, ...). Spot-check shows no false reuse beyond `post_card.dart` coupling captured in SHARED-001.
@@ -528,11 +608,11 @@ Compact notes for important areas checked with no issue found.
 
 verdict: not_ready
 
-Rationale: 2× P0 (Firebase leaks in feed widget + controller layer) block the layering invariant that all other audits implicitly rely on (test override, repository contract). 6× P1 cluster around Feed module taking shortcuts vs the canonical auth pattern (provider DI, error mapping, friend-graph access, file size, shared Post model owner ambiguity, state type leak). Until LAYER-001 + LAYER-002 are fixed, feed-feature widget tests cannot be added meaningfully — golden-path coverage is structurally blocked.
+Rationale: 2× P0 (Firebase leaks in feed widget + controller layer) block the layering invariant that all other audits implicitly rely on (test override, repository contract). 7× P1 cluster around Feed module shortcuts vs the canonical auth pattern (provider DI, error mapping, friend-graph access, file size, shared Post model owner ambiguity, state type leak) PLUS the deeplink scheme drift (DEEPLINK-001) that breaks external app sharing today on staging. Until LAYER-001 + LAYER-002 are fixed, feed-feature widget tests cannot be added meaningfully — golden-path coverage is structurally blocked.
 
 After batch_1 + batch_2 (P0 + P1), revisit for `almost_ready_after_p0_p1`. P2/P3 are non-blocking polish.
 
-Final distribution after pass-2 reverify: **P0=2, P1=6, P2=5, P3=4 — total 17 issues** (LAYER-004 demoted P2→P3 after re-verifying `firebase_conversation_repository.dart` already maps to `AppError` and `DebugErrorView` has no production usage).
+Final distribution after pass-3 reverify: **P0=2, P1=7, P2=5, P3=5 — total 19 issues** (pass-3 added STATE-ARCH-001 expanding the original REACT-ARCH-001 to cover 4 modules, plus DEEPLINK-001 P1 and DEV-001 P3 found while verifying ADR-0005 + AndroidManifest + dev folder coverage).
 
 ## self_verification_log
 
@@ -551,3 +631,13 @@ pass_2_reverify_notes (post-commit follow-up after user request):
 - FACT FIX 5 (DATA-ARCH-001 evidence enum): originally a single sentence pointing at one line; per-file evidence now enumerates: post_repo:31+150, storage_repo:37 (rethrow non-`object-not-found`), friend_repo (0 mappings), reaction_repo (0 mappings), notification_repo (only `ArgumentError`). Confirms 5/5 in batch — all genuinely missing `AppError` boundary.
 - FACT FIX 6 (app_router.dart line count): 547 → 546 (off-by-one from blank trailing line).
 - COUNT CORRECTION: blockers_summary table previously framed P1=7, actual P1=6 (FEED-ARCH-001, LAYER-003, DATA-ARCH-001, FEED-ARCH-002, ARCH-001, ARCH-002). Total = 2 P0 + 6 P1 + 5 P2 + 4 P3 = 17. PR summary text from prior commit needs follow-up note (numbers there based on pre-reverify P0=2,P1=7,P2=5,P3=3 = 17 same total but different bucket).
+
+pass_3_reverify_notes (second user-requested deep-verify — checked AndroidManifest deeplink, async state ownership, dev folder, state-file colocation breadth, ADR-0005 drift):
+- FACT FIX 7 (REACT-ARCH-001 → STATE-ARCH-001 expand): pass-2 claim was "state colocated in controller" applies only to Reaction. Verified via `grep "@freezed" features/*/application/*_controller.dart` + `ls features/*/application/*_state.dart`: 4 modules collocate (`reaction`, `diary`, `profile`, `space`), 6 modules split correctly (`auth`, `feed`, `friend`, `notification`, `settings`, `streak`). Issue scope tripled. ChatSendStatus (`chat_controller.dart:139`) is plain (non-`@freezed`) class — left out of issue.
+- FACT FIX 8 (no_issue_note about state-file split corrected): note previously read "Friend / Reaction / Diary / Profile / Space modules: 3-layer... State files split correctly for all except Reaction (see REACT-ARCH-001)". This was factually wrong (Reaction/Diary/Profile/Space all colocate). Rewrote to reflect actual 6 split / 4 collocate.
+- ISSUE ADD 1 (DEEPLINK-001 P1): re-reading ADR-0005 + `grep "meep://" "https://meep.app/"` exposed scheme drift between `AppConfig.shareBaseUrl = 'meep://profile'` (used by profile/settings/share_profile_sheet) and `friend_sheet.dart:68,81 https://meep.app/invite/...` (used by friend invite). AndroidManifest registers neither scheme/host. `/invite/:uid` route lands on `HomePage` placeholder (HOME-ARCH-001). P1 because it breaks current staging UX for external share.
+- ISSUE ADD 2 (DEV-001 P3): `app_router.dart:443-445` registers `/dev/widgets` route unconditionally — ships in release APK and reachable via deep-link. Not P2 because no production trigger exists; P3 for cleanup.
+- FACT CONFIRMATION (async state ownership): grep `StreamSubscription | .listen(` across `features/` returned 24 sites. Spot-checked notification_controller (line 49-54 `ref.onDispose` cancels all 3 + bannerTimer), friend_controller (line 57-66 cancels all subs + retry timers), space_controller, streak_controller, profile_controller, diary_controller, feed_controller (line 125), reaction_controller (line 51) — every one of them paired with `ref.onDispose`. No leaks. no_issue_note for "Async state ownership" verified.
+- FACT CONFIRMATION (chat module status): conversation_repository is FirebaseConversationRepository wired in main.dart:104; FakeConversationRepository exists only as test fixture. Chat module Tier 1 scope acceptable — not a P3 gap.
+- FACT CONFIRMATION (ADR-0005): explicitly documents `assetlinks.json` and `meep.app` host as deferred to prod. Out-of-scope per scope_filter for prod-deploy-checklist items. But scheme-drift (DEEPLINK-001) is NOT in ADR-0005's deferred list — that's a runtime smell not a deploy gate.
+- COUNT UPDATE: 17 → 19 issues. Distribution: P0=2, P1=7 (added DEEPLINK-001), P2=5 (REACT-ARCH-001 renamed STATE-ARCH-001, scope expanded but stays P2), P3=5 (added DEV-001).
