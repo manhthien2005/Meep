@@ -88,6 +88,7 @@ Only P0/P1. CQ found **0 P0** + **2 P1** (none release-blockers in code quality 
 |---|---|---|---|---|
 | CQ-001 | P1 | Production noise — Dart logging | `apps/mobile/lib/features/{feed,widget}/**` (9 files) | `debugPrint` 57 occurrences ships in release; throttles output but still logs to logcat — `apps/mobile/CLAUDE.md` "no logs in production code" spirit + analysis_options.yaml `avoid_print: true` lints `print` but not `debugPrint` (Dart gotcha) |
 | CQ-002 | P1 | Duplicate logic — `TimestampConverter` | 12 data files in 12 modules (`auth/data/user_profile.dart`, `chat/data/{message,conversation}.dart`, `diary/data/diary_entry.dart`, `feed/data/post.dart`, `friend/data/{friend_request,friendship}.dart`, `notification/data/app_notification.dart`, `reaction/data/reaction.dart`, `settings/data/block.dart`, `space/data/{space,space_member}.dart`) | Same `class TimestampConverter implements JsonConverter<DateTime, Object>` body duplicated 12x; small drift (Object vs Object?) introduces subtle bugs (post.dart strict Object → freeze if Firestore returns null) |
+| CQ-014 | P1 | Duplicate logic — `_mapXxxException` helpers across repos | `block/space` (`_mapFunctionsException` byte-for-byte), `conversation/block` (`_mapFirestoreException` byte-for-byte), `diary/profile/streak` (`_mapFirestoreError` near-identical) — 7 repo files | 5 repos copy-paste the same generic Firestore/Functions/Storage error mapping switch with VN action verb. Drift bug if new error code added to one but not others. Blocks ARCH-DATA-ARCH-001 wave (else 5 new repos re-duplicate this boilerplate) |
 
 ## issues
 
@@ -342,6 +343,7 @@ Only P0/P1. CQ found **0 P0** + **2 P1** (none release-blockers in code quality 
   - `apps/mobile/lib/features/friend/data/firebase_friend_request_repository.dart:17,37,70,78,95,103` (`'friend_requests'`)
   - `apps/mobile/lib/features/notification/data/firebase_notification_repository.dart:16,19` (`'users'`, `'fcmTokens'`, `'notifications'`)
   - `apps/mobile/lib/features/reaction/data/firebase_reaction_repository.dart:11` (`'posts'`, `'reactions'`)
+  - `apps/mobile/lib/features/auth/data/firebase_user_repository.dart:13,16,21,24,32,38,46` (`'users/'`, `'usernames/'` — template-string literals, 7 sites; pass-5 finding)
   - `apps/mobile/lib/features/chat/data/firebase_conversation_repository.dart:17,18` (`_conversationsCol`, `_messagesSub` — already const, GOOD pattern)
   - `apps/mobile/lib/features/diary/data/firebase_diary_repository.dart:37` (`_collection = 'diary'` — already const, GOOD)
   - `apps/mobile/lib/features/space/data/firebase_space_repository.dart:15` (`_spacesCollection = 'spaces'` — already const, GOOD)
@@ -598,6 +600,8 @@ Only P0/P1. CQ found **0 P0** + **2 P1** (none release-blockers in code quality 
   - Mobile client `firebase_friend_request_repository.dart:78-85` writes `/friend_requests` Firestore doc DIRECTLY (`_firestore.collection('friend_requests').add({...})`) — does NOT call the CF.
   - `acceptFriendRequest` IS implemented as a separate CF (line 66 — `friend/acceptFriendRequest.ts`).
   - This `sendFriendRequest` is a placeholder from an earlier design draft.
+  - **Signature drift (pass-9 finding):** CF schema `{toUid: string}` (1 param, index.ts:24); mobile abstract `Future<void> sendFriendRequest({required String senderUid, required String receiverUid})` (2 params, friend_request_repository.dart:14). If a future dev tries to wire mobile → CF without re-checking shape, payload mismatch will throw `invalid-argument` at runtime.
+  - `firebase/functions/src/index.test.ts` (28 lines, 4 tests) covers `sendFriendRequestSchema` ONLY — orphans together with the stub. Delete both in Option A.
 - risk:
   - **Cost:** zero — CF deployed but not invoked.
   - **Confusion:** new dev seeing `sendFriendRequest` in Firebase Console function list may assume the friend-request flow goes through it. Wasted onboarding time.
@@ -605,7 +609,7 @@ Only P0/P1. CQ found **0 P0** + **2 P1** (none release-blockers in code quality 
   - **Lower than P2 because:** no deployment cost concern, no client integration, no test impact.
 - fix:
   - Decision needed: delete the stub OR implement it.
-  - **Option A — delete (recommended):** Remove `sendFriendRequest` CF export + schema + comment block (`index.ts:24-58`). Run `firebase deploy --only functions` to remove from production. Doesn't break client (client uses direct Firestore write).
+  - **Option A — delete (recommended):** Remove `sendFriendRequest` CF export + schema + comment block (`index.ts:24-58`) **AND** delete `index.test.ts` (4 orphan tests cover only the deleted schema). Run `firebase deploy --only functions` to remove from production. Doesn't break client (client uses direct Firestore write).
   - **Option B — implement:** if leader wants server-side validation (block check, dedupe), implement per the 4 TODO bullets. But this competes with FRIEND-SEC-002 (SEC audit) which proposes a different CF `searchUserByUsername`. Defer to leader.
 - authority:
   - `CLAUDE.md §Surgical changes` "Mỗi line code mới phải trace được về yêu cầu. Nếu không trace được → bỏ."
@@ -653,6 +657,112 @@ Only P0/P1. CQ found **0 P0** + **2 P1** (none release-blockers in code quality 
   - After fix: `rg "saveFcm\|saveEntry" apps/mobile" returns 0 hits.
   - Full test suite passes.
 - deps: none
+
+### ISSUE CQ-014
+
+- sev: P1
+- blocker: no
+- area: Duplicate logic — `_mapFunctionsException` + `_mapFirestoreException` + `_mapFirestoreError` duplicated across repos
+- files:
+  - `apps/mobile/lib/features/space/data/firebase_space_repository.dart:184-222` — `_mapFunctionsException`
+  - `apps/mobile/lib/features/settings/data/firebase_block_repository.dart:127-167` — `_mapFunctionsException` (byte-for-byte identical to space version, self-comment line 126 admits "Pattern theo `firebase_space_repository.dart`")
+  - `apps/mobile/lib/features/chat/data/firebase_conversation_repository.dart:221-251` — `_mapFirestoreException(FirebaseException, String action)`
+  - `apps/mobile/lib/features/settings/data/firebase_block_repository.dart:96-124` — `_mapFirestoreException(FirebaseException, String action)` (byte-for-byte identical to conversation version)
+  - `apps/mobile/lib/features/diary/data/firebase_diary_repository.dart:284-296` — `_mapFirestoreError(FirebaseException)` (no action param, different shape)
+  - `apps/mobile/lib/features/profile/data/firebase_profile_repository.dart:165-178` — `_mapFirestoreError(FirebaseException)` (same shape as diary)
+  - `apps/mobile/lib/features/streak/data/firebase_streak_repository.dart:84-95` — `_mapStreakError(FirebaseException)` (same shape as diary/profile)
+  - `apps/mobile/lib/features/auth/data/firebase_auth_repository.dart:290-326` — 3 variants `_mapSignUpError` / `_mapSignInError` / `_mapGenericError` (FirebaseAuthException-specific, OK pattern for auth-specific codes)
+- loc: 5 byte-for-byte / near-identical implementations across 5 repos
+- symbols:
+  - `_mapFunctionsException(FirebaseFunctionsException, String action) → AppError` — 2 copies (block + space)
+  - `_mapFirestoreException(FirebaseException, String action) → AppError` — 2 copies (conversation + block)
+  - `_mapFirestoreError(FirebaseException) → AppError` — 3 copies (diary + profile + streak), no `action` param
+  - `_mapStorageError(FirebaseException) → AppError` — 2 copies (diary + profile)
+- evidence:
+  - `firebase_block_repository.dart:125` self-comment: `/// Pattern theo `firebase_space_repository.dart`.` — copy acknowledged in source.
+  - Bodies verified identical via paired `sed -n` read:
+    ```dart
+    // _mapFunctionsException — IDENTICAL in block + space:
+    switch (e.code) {
+      case 'invalid-argument':
+      case 'failed-precondition':
+        return ValidationError(message: serverMessage ?? 'Không thể $action: dữ liệu không hợp lệ', code: e.code, cause: e);
+      case 'permission-denied':
+        return ForbiddenError(action);
+      case 'not-found':
+        return NotFoundError(serverMessage ?? action);
+      case 'unauthenticated':
+        return UnauthenticatedError(message: serverMessage ?? 'Cần đăng nhập để $action', code: e.code, cause: e);
+      case 'unavailable':
+      case 'deadline-exceeded':
+        return NetworkError(message: serverMessage ?? 'Mất kết nối khi $action. Thử lại sau.', code: e.code, cause: e);
+      default:
+        return UnexpectedError(message: serverMessage ?? 'Không thể $action. Thử lại sau.', code: e.code, cause: e);
+    }
+    ```
+  - `_mapFirestoreException` (conversation + block): handles `permission-denied / not-found / unavailable / deadline-exceeded / cancelled / failed-precondition` — also identical bodies.
+  - `_mapFirestoreError` (diary + profile + streak): handles `permission-denied / not-found / unavailable / cancelled / deadline-exceeded / network-request-failed` — shape differs only by which fixed-string action label gets passed to the AppError ctor.
+- risk:
+  - **Drift bug:** if leader adds a new error code (e.g. `'aborted'` → `NetworkError`) to `_mapFunctionsException`, the dev MUST update both block + space repos. Forgetting one → block CF errors render via `UnexpectedError` fallback (wrong VN message) while space CF errors render properly. Same risk for the 3-way `_mapFirestoreError` variant.
+  - **Onboarding cost:** new module owner (e.g. future T-friend module owner) faces a forking decision: 4 repos use long-form (5-case switch + AppError ctor), 3 repos use sugar `=> switch ... =>` expression. Convention split increases cognitive load.
+  - **Test duplication:** each repo's error-mapping test re-tests the same 5-6 codes (permission-denied / not-found / unavailable / ...). Extracting to shared mapper deduplicates ~30 lines of test boilerplate per repo.
+  - **Pattern #2 spirit violation:** `auth.md` Pattern #2 says "Private `_mapXxxError` ... switch trên `e.code` → `AppError` subclass" — meant per-module customization (auth has unique codes like `wrong-password`, `email-already-in-use`). For generic Firestore/Functions errors, the codes are identical → mapper is the same. Pattern was misapplied as "every repo copies the same generic mapping" instead of "each repo customizes when it has unique codes."
+  - **Combined with ARCH-DATA-ARCH-001 fix wave:** when ARCH fixes the 5 missing mappers (feed/friend/reaction/notification/storage), the additions WILL re-duplicate this same code unless extracted to shared helper FIRST.
+- fix:
+  1. Extract 3 shared mappers to `apps/mobile/lib/core/error/firebase_error_mapper.dart`:
+     ```dart
+     import 'package:cloud_firestore/cloud_firestore.dart';
+     import 'package:cloud_functions/cloud_functions.dart';
+     import 'package:firebase_storage/firebase_storage.dart';
+
+     import 'package:meep/core/error/app_error.dart';
+
+     /// Map Firestore exception → AppError. Pattern #2 generic baseline.
+     /// Module repos call this for non-customized codes; only override when
+     /// module-specific codes need different handling (e.g. auth's wrong-password).
+     AppError mapFirestoreException(FirebaseException e, String action) {
+       final serverMessage = e.message;
+       switch (e.code) {
+         case 'permission-denied':
+           return ForbiddenError(action);
+         case 'not-found':
+           return NotFoundError(serverMessage ?? action);
+         case 'unavailable':
+         case 'deadline-exceeded':
+         case 'cancelled':
+           return NetworkError(message: serverMessage ?? 'Mất kết nối khi $action. Thử lại sau.', code: e.code, cause: e);
+         case 'failed-precondition':
+           return ValidationError(message: serverMessage ?? 'Không thể $action: dữ liệu không hợp lệ', code: e.code, cause: e);
+         default:
+           return UnexpectedError(message: serverMessage ?? 'Không thể $action. Thử lại sau.', code: e.code, cause: e);
+       }
+     }
+
+     /// Map Functions callable exception → AppError. Includes auth/permission/
+     /// argument-validation codes that Firestore doesn't have.
+     AppError mapFunctionsException(FirebaseFunctionsException e, String action) {
+       // ... (combined block from block + space repos)
+     }
+
+     /// Map Storage exception → AppError.
+     AppError mapStorageException(FirebaseException e, String action) {
+       // ... (combined block from diary + profile repos)
+     }
+     ```
+  2. Delete 7 local copies. Each repo imports the helper + calls `mapFirestoreException(e, 'tạo Space')` etc.
+  3. `_mapFirestoreError` (no action param) in diary/profile/streak: pass the fixed action string at call site (e.g. `mapFirestoreException(e, 'truy cập hồ sơ')` instead of having a no-arg variant). Reduces repo-local boilerplate by 12 lines each.
+  4. **Don't unify auth's `_mapSignInError` / `_mapSignUpError`** — those handle Auth-specific codes (`wrong-password`, `email-already-in-use`, `requires-recent-login`) that aren't applicable to Firestore/Functions. Keep auth's per-flow mappers.
+  5. **Order of operations:** do BEFORE ARCH-DATA-ARCH-001 fix wave so the 5 new mappers (feed/friend/reaction/notification/storage) just `import + call helper` instead of re-creating the boilerplate. Saves ~150 lines across the 5 new repos.
+- authority:
+  - `CLAUDE.md §Surgical changes` "Mỗi line code mới phải trace được về yêu cầu" + DRY
+  - `auth.md` Pattern #1 — `core/error/` is canonical home for error infrastructure
+  - `auth.md` Pattern #2 spirit — per-module mappers for module-specific codes, shared mapper for generic Firestore/Functions/Storage codes
+  - `firebase_block_repository.dart:125` self-comment acknowledges copy
+- test:
+  - After refactor: `rg "_mapFunctionsException\|_mapFirestoreException\|_mapFirestoreError" apps/mobile/lib/features` returns 0 hits (all moved to `core/error/firebase_error_mapper.dart`).
+  - Add `test/core/error/firebase_error_mapper_test.dart` covering 6 codes × 3 mappers = 18 cases.
+  - Existing repo tests continue to pass — just verify call site invokes the helper.
+- deps: blocks ARCH-DATA-ARCH-001 (do CQ-014 FIRST to avoid re-duplicating boilerplate in the 5 new repos)
 
 ### ISSUE CQ-013
 
@@ -755,25 +865,26 @@ None. (CQ found 0 P0; all release blockers covered by ARCH/SEC audits.)
 
 ### batch_2_p1
 
-1. **CQ-002** — extract `TimestampConverter` to `core/utils/`. Independent fix, ~ 30 min. Delete 12 duplicates → uniform null-tolerance → reduces 156 boilerplate lines.
-2. **CQ-001** — `debugPrint` cleanup wave. Pairs naturally with ARCH-LAYER-002 fix (same files in feed module).
+1. **CQ-014** — extract `mapFirestoreException` / `mapFunctionsException` / `mapStorageException` to `core/error/firebase_error_mapper.dart` FIRST. Delete 7 repo-local copies. **Must precede ARCH-DATA-ARCH-001** to avoid creating 5 new copies in feed/friend/reaction/notification/storage repos.
+2. **CQ-002** — extract `TimestampConverter` to `core/utils/`. Independent fix, ~30 min. Delete 12 duplicates → uniform null-tolerance → reduces ~156 boilerplate lines.
+3. **CQ-001** — `debugPrint` cleanup wave. Pairs naturally with ARCH-LAYER-002 fix (same files in feed module).
 
 ### batch_3_p2
 
-3. **CQ-005** — Firestore path constants. Bundle with ARCH-DATA-ARCH-001 fix wave to avoid double-touching the same 5 repos.
-4. **CQ-008** — `[CHAT-DEBUG]` cleanup in `onMessageCreated.ts`. Small focused PR.
-5. **CQ-003** — hardcoded `Color(0x..)` → theme tokens. Leader-gated `core/theme/` additions per `apps/mobile/CLAUDE.md §Solo-dev module scope`. Per-module rollout.
-6. **CQ-004** — hardcoded `TextStyle(fontSize:)` → `AppTextStyles`. Pairs with CQ-003 (same theme-token effort).
-7. **CQ-006** — `Future.delayed` usages: convert friend_sheet to `Timer`; document exception for signup/reset success-hold pattern.
-8. **CQ-007** — TODO format sweep. Leader assigns ownership.
+4. **CQ-005** — Firestore path constants. Bundle with ARCH-DATA-ARCH-001 fix wave to avoid double-touching the same 5 repos.
+5. **CQ-008** — `[CHAT-DEBUG]` cleanup in `onMessageCreated.ts`. Small focused PR.
+6. **CQ-003** — hardcoded `Color(0x..)` → theme tokens. Leader-gated `core/theme/` additions per `apps/mobile/CLAUDE.md §Solo-dev module scope`. Per-module rollout.
+7. **CQ-004** — hardcoded `TextStyle(fontSize:)` → `AppTextStyles`. Pairs with CQ-003 (same theme-token effort).
+8. **CQ-006** — `Future.delayed` usages: convert friend_sheet to `Timer`; document exception for signup/reset success-hold pattern.
+9. **CQ-007** — TODO format sweep. Leader assigns ownership.
 
 ### batch_4_p3
 
-9. **CQ-009** — `console.warn` → `logger.warn` in `onFriendshipDeleted.ts:25`. 1-line fix.
-10. **CQ-010** — delete `sendFriendRequest` stub from `index.ts` (Option A recommended).
-11. **CQ-011** — rename `saveFcmToken` → `upsertFcmToken`; `saveEntry` → `submitEntry`.
-12. **CQ-012** — update stale comment in `settings_controller.dart:84-88, 139-142`.
-13. **CQ-013** — split 4 test files > 500 lines (`space_controller_test.dart`, `diary_controller_test.dart`, `firebase_conversation_repository_test.dart`, `firebase_diary_repository_test.dart`).
+10. **CQ-009** — `console.warn` → `logger.warn` in `onFriendshipDeleted.ts:25`. 1-line fix.
+11. **CQ-010** — delete `sendFriendRequest` stub from `index.ts` (Option A recommended). Note: also deletes orphan `index.test.ts` (4 tests cover stub schema only).
+12. **CQ-011** — rename `saveFcmToken` → `upsertFcmToken`; `saveEntry` → `submitEntry`.
+13. **CQ-012** — update stale comment in `settings_controller.dart:84-88, 139-142`.
+14. **CQ-013** — split 4 test files > 500 lines (`space_controller_test.dart`, `diary_controller_test.dart`, `firebase_conversation_repository_test.dart`, `firebase_diary_repository_test.dart`).
 
 ## test_plan_after_fix
 
@@ -790,6 +901,7 @@ None. (CQ found 0 P0; all release blockers covered by ARCH/SEC audits.)
 - `CQ-011`: `rg "\bsave[A-Z]" apps/mobile/lib --glob '!*.g.dart' --glob '!test/**'` returns 0 hits in feature code; tests updated to new names pass.
 - `CQ-012`: `rg "notificationRepositoryProvider throws" apps/mobile/lib` returns 0; `settings_controller_test.dart` continues to pass.
 - `CQ-013`: `find apps/mobile/test -name "*.dart" -exec wc -l {} \; | awk '$1 > 500 { print }'` returns 0; `flutter test test/features/{space,diary,chat}` passes unchanged.
+- `CQ-014`: `rg "_mapFunctionsException\|_mapFirestoreException\|_mapFirestoreError\|_mapStorageError" apps/mobile/lib/features` returns 0 hits (moved to `core/error/firebase_error_mapper.dart`); new `test/core/error/firebase_error_mapper_test.dart` covers 6 codes × 3 mappers = 18 cases; existing repo tests pass (call site invokes helper).
 
 ## no_issue_notes
 
@@ -910,15 +1022,15 @@ Compact notes for areas checked with no new issue (or item covered by Phase A an
 
 verdict: ready_with_polish
 
-**Rationale:** CQ found 0 P0 issues (no release-blocker in code quality dimension — all P0s already covered by Phase A ARCH-LAYER-001/002 and SEC APPCHECK-001 / USER-SEC-001). 2 P1 issues (CQ-001 debugPrint flood, CQ-002 TimestampConverter dup) are maintenance/cost concerns that DO NOT block M3 ship but should fix before scaling chat/feed beyond MVP. 6 P2 + 4 P3 are polish.
+**Rationale:** CQ found 0 P0 issues (no release-blocker in code quality dimension — all P0s already covered by Phase A ARCH-LAYER-001/002 and SEC APPCHECK-001 / USER-SEC-001). 3 P1 issues (CQ-001 debugPrint flood, CQ-002 TimestampConverter dup, CQ-014 Firebase error-mapper dup) are maintenance/cost concerns that DO NOT block M3 ship but should fix before scaling chat/feed beyond MVP. 6 P2 + 5 P3 are polish.
 
 **Recommended path:**
 1. Fix Phase A P0 + P1 (covered by ARCH PR #293 + SEC PR #294 follow-ups) — pre-M3 must-fix.
-2. CQ batch_2 (CQ-001 + CQ-002) — same sprint as ARCH-LAYER-002 fix (overlapping feed module touch).
+2. CQ batch_2 (CQ-014 FIRST → CQ-002 → CQ-001) — CQ-014 must precede ARCH-DATA-ARCH-001 to avoid creating 5 new error-mapper copies in feed/friend/reaction/notification/storage repos.
 3. CQ batch_3 (P2) — distribute across 2 sprints post-M3.
 4. CQ batch_4 (P3) — opportunistic cleanup PRs.
 
-**Distribution:** P0=0, P1=2, P2=6, P3=5 — total 13 issues.
+**Distribution:** P0=0, P1=3, P2=6, P3=5 — total 14 issues.
 
 ## self_verification_log
 
@@ -949,3 +1061,64 @@ pass_3_dedupe: before=13, after=13, consolidations=0 — verified no two issues 
 - CQ-013 (test files > 500 lines) vs ARCH-002 (lib files > 300 lines) — different file scope (test/ vs lib/). ARCH-002 explicitly excludes test files (uses `find apps/mobile/lib`). Prompt §Oversized constructs item "Test file > 500 lines" is a separate checklist item. Kept distinct.
 
 pass_4_coverage: checked=24, partial=7, blocked=2, total=33, verdict=full — coverage matches log evidence. `checked`: core/error, core/config, features/{auth,chat,diary,feed,friend,home,notification,profile,reaction,settings,space,widget}, main.dart, firebase/functions/src/* (12 ts files re-read), pubspec.yaml, tsconfig.json, analysis_options.yaml, .gitignore, test inventory (80 files counted), shared/widgets (5 sampled). `partial`: core/theme (hex_color covered ARCH-CORE-001, theme tokens listed via Grep only), core/validators (listed only, auth_validators tested per inventory), core/utils (pair_id + hex_color listed), features/streak (sampled streak_repository.dart only), features/space (firebase_space_repository read, space_controller read, but presentation widgets only sampled), shared/widgets (22 files Glob-listed, 5 deep-read), firebase/functions/test (file list known, not deep-read — covered SEC TESTING-SEC-001). `blocked`: `flutter analyze --no-pub` + `npm run lint` (audit-only constraint forbids running; recorded in commands table). Verdict full because every "checked" area backed by Read tool evidence + Grep evidence in commands table; "partial" entries have explicit justification (covered by Phase A or out-of-scope-for-CQ).
+
+pass_5_coverage_gap_deep_dive (post-PR reverify per user request — "đảm bảo không bỏ sót gì"):
+- READ DEEP: `core/validators/auth_validators.dart` (49 lines) full — `static final _emailRegex` + `_usernameRegex` + 4 `bool isXxxValid()` methods. All uniform return type. No Vietnamese message (UI builds messages from bool flags). `auth_validators_test.dart` exists per inventory. ✓ no_issue confirmed.
+- READ DEEP: `core/theme/app_colors.dart` (66 lines) — 60+ Color tokens in 8 groups (turquoise/bw/success/error/warning/info + 3 specials). bw900 = `Color(0xFF050F10)` — **CONFIRMED** matches `profile_screen.dart:22 const _cBg = Color(0xFF050F10); // Black & White/900` exactly. CQ-003 fix is straightforward — most "missing tokens" already exist in AppColors but devs hardcoded the same hex value. Reinforces CQ-003.
+- READ DEEP: `core/theme/app_text_styles.dart` (107 lines) — 17 typed tokens xs/sm/base/md/lg/xl/xl2/xl3 × regular/medium/semiBold/bold. `baseBold` (line 51-56) = `TextStyle(fontFamily: 'Nunito', fontSize: 18, fontWeight: FontWeight.w700, height: 24/18)` — **CONFIRMED** matches `edit_profile_screen.dart:450-456` hardcoded inline byte-for-byte. CQ-004 fix even more obvious — token already exists.
+- READ DEEP: `core/theme/app_theme.dart` (45 lines) — Material 3 `ColorScheme.fromSeed(seedColor: 0xFFE85D75)` for both light + dark themes wired in `main.dart:259`. Both define `scaffoldBackgroundColor: AppColors.bw900` — meaning dark theme is ALREADY dark; light theme is dark too (intentional Locket-style dark UI). Observation: no light-theme fork. Not an issue.
+- READ DEEP: `core/theme/{app_proportions.dart,app_radii.dart,app_spacing.dart}` — AppProportions 100+ lines of Figma-driven scaling math, well-documented. AppRadii has 4 tokens (sm/md/circle/pill). AppSpacing has 7 tokens (xs..xxl + screenHorizontal). All proper abstract final classes.
+- READ DEEP: 5 more `shared/widgets/` files: `app_primary_button.dart` (78), `app_avatar.dart` (193), `app_text_input.dart` (208), `app_confirm_dialog.dart` (113), `app_taskbar.dart` (244). All use AppColors/AppTextStyles/AppRadii properly. `app_taskbar.dart` defines its own file-private `_Const` class for taskbar-specific constants (animDuration/ringSize/pillRadius) — appropriate widget-scoped pattern.
+- READ DEEP: `firebase/functions/src/index.test.ts` (28 lines) — 4 tests for `sendFriendRequestSchema` (the stub). If CQ-010 accepted (delete stub), this test becomes ORPHAN. Note added to CQ-010 fix step.
+- FACT NEW (CQ-003 evidence boost): `app_text_input.dart:55, 184` has `const Color(0x80FFFFFF)` (50% white alpha) hardcoded with comment "Figma: password hint/icon dùng white 50%" — already in CQ-003's 39-file list, but specific siteworth noting as deep-grep-confirmed.
+- FACT NEW (CQ-005 evidence boost): `firebase_user_repository.dart:13,16,21,24,32,38,46` uses `_firestore.doc('users/${profile.uid}')` template-string pattern (not `.collection('users')`) — STILL hardcoded `'users/'` literal. Adds 5 sites to CQ-005 file list. Should bundle into Firestore path constants fix.
+- COVERAGE UPGRADE: partial → checked for core/theme (full read 5 files), core/validators (full read), shared/widgets (10/22 files deep-read, 12 listed-only). Updated pass_4 coverage stats below.
+
+pass_6_cf_repo_pattern_verify:
+- VERIFY: 19 CFs all declare `region: 'asia-southeast1'` explicitly. `index.ts:17 setGlobalOptions({ region: 'asia-southeast1', maxInstances: 10, timeoutSeconds: 60 })` sets global too. **Region declared 2× per CF (global + per-CF)** — defensible defensive pattern (per-CF overrides global), but technically redundant. Not P-level issue; cosmetic.
+- VERIFY: Resource configs — only `deleteAccount.ts:144-145` overrides `timeoutSeconds: 540, memory: '512MiB'` (justified by cascade workload). Others rely on global 60s/256MiB defaults. ✓ no_issue.
+- VERIFY: Repository naming uniformity across 7 abstract interfaces (auth/chat/diary/feed/friend/notification/profile/reaction/settings/space/streak). Verbs: `watchX` for streams, `getX`/`createX`/`updateX`/`deleteX` for one-shots, `upsertX` for create-or-update, `getOrCreateX` for combined op, `reserveEntryId` for ID reservation, `markAsRead` for state transition. Consistent across modules. Anti-term `saveFcmToken` + `saveEntry` already in CQ-011.
+- VERIFY: 26 enum declarations counted — all in appropriate locations (data models or local file-private `_XxxMode`). Naming uniform. ✓ no_issue.
+- NO NEW ISSUE after pass-6.
+
+pass_7_hidden_duplication_scan:
+- **FACT NEW (CQ-014 P1 added):** `_mapFunctionsException(FirebaseFunctionsException, String action)` IDENTICAL byte-for-byte between `firebase_block_repository.dart:127-167` and `firebase_space_repository.dart:184-222`. Comment at `block:125` self-admits "Pattern theo `firebase_space_repository.dart`".
+- **FACT NEW (CQ-014):** `_mapFirestoreException(FirebaseException, String action)` IDENTICAL byte-for-byte between `firebase_conversation_repository.dart:221-251` and `firebase_block_repository.dart:96-124`.
+- **FACT NEW (CQ-014):** `_mapFirestoreError(FirebaseException)` near-identical between `firebase_diary_repository.dart:284-296`, `firebase_profile_repository.dart:165-178`, `firebase_streak_repository.dart:84-95` (differ only in fixed action string passed to AppError ctor).
+- **FACT NEW (CQ-014):** `_mapStorageError(FirebaseException)` near-identical between `firebase_diary_repository.dart:298-313` and `firebase_profile_repository.dart:180-200` (slight code overlap).
+- ARCH-DATA-ARCH-001 covers 5 repos MISSING this pattern (feed/storage/friend/reaction/notification). CQ-014 covers 5+ repos that HAVE this pattern but DUPLICATED. Both findings co-exist. CQ-014 must be done FIRST so ARCH-DATA-ARCH-001 wave doesn't create 5 new copies.
+- 13 hits of `DateTime.fromMillisecondsSinceEpoch(json as int)` confirmed (12 TimestampConverter + 1 TimestampMapConverter `_parseDate`). CQ-002 evidence reinforced.
+- COUNT UPDATE: 13 → 14 issues. Distribution: P0=0, P1=3 (added CQ-014), P2=6, P3=5.
+
+pass_8_magic_numbers_duration:
+- VERIFY: 57 `Duration(seconds: |Duration(milliseconds:` callsites across lib/. Sample 30 — all are animation timing (200/220/250/300ms standard), debounce timers (300/500ms), or timeout (5s for network). Pattern uniform.
+- OBSERVATION: 2 different debounce values for similar use cases — `signup_username_page.dart:42 _debounceDuration = Duration(milliseconds: 500)` vs `diary_search_screen.dart:41 _debounceDuration = Duration(milliseconds: 300)`. Not a CQ-worthy issue (different UX contexts), but worth flagging in note.
+- VERIFY: Magic numbers in repos all properly `static const _xxx = value;` with explanatory comment (e.g. `firebase_post_repository.dart:60 _spaceFeedBuffer = 30`). ✓ no_issue confirmed.
+- NO NEW ISSUE after pass-8.
+
+pass_9_async_signature_drift:
+- VERIFY: `.then(` chains in TS Functions = 0 hits. All async/await. ✓ no_issue.
+- VERIFY: `unawaited()` pattern uniform — 13+ callsites + 2 `// ignore: unawaited_futures` (both intentional fire-and-forget in `diary_canvas_screen.dart:402,409`). All wrapped in `mounted` guard or `try-catch`. ✓
+- **FACT NEW (CQ-010 evidence boost):** Mobile `firebase_friend_request_repository.dart:55 sendFriendRequest({required String senderUid, required String receiverUid})` vs CF stub `firebase/functions/src/index.ts:24 sendFriendRequestSchema = z.object({ toUid: z.string()... })`. **Signature drift:** CF expects `{toUid}` (1 param), mobile uses `{senderUid, receiverUid}` (2 params). If anyone wires the CF call, mobile would have to translate. Adds emphasis to CQ-010 risk that stub is even more deeply orphan (not just unused — incompatible with mobile shape). Updated CQ-010 evidence.
+- VERIFY: `Future.wait` for stream subscription cleanup at `firebase_post_repository.dart:255` + diary at 355 — idiomatic. ✓
+- NO NEW ISSUE after pass-9.
+
+pass_10_final_evidence_crosscheck:
+- VERIFY all 14 issue evidence quotes against actual source via Bash grep + sed:
+  - CQ-014 NEW: paired `sed -n '127,167p' firebase_block_repository.dart` + `sed -n '184,222p' firebase_space_repository.dart` — byte-for-byte identical bodies confirmed.
+  - CQ-001: 57 debugPrints across 9 files counted via `rg "debugPrint(" apps/mobile/lib --count-matches` → matches.
+  - CQ-002: `rg "class TimestampConverter"` returns 12 hits; `rg "DateTime.fromMillisecondsSinceEpoch"` returns 13 hits (12 + 1 inside TimestampMapConverter).
+  - CQ-003: 39 files via `rg -l "Color\(0x" apps/mobile/lib --include="*.dart"` re-confirmed.
+  - CQ-004: 14 files via `rg -l "TextStyle\(fontSize:" apps/mobile/lib/features` re-confirmed.
+  - CQ-005: 16 mobile + 46 functions = 62 hardcoded collection names re-confirmed. Adds `firebase_user_repository.dart` 5 sites to mobile list (template-string `users/` literals).
+  - CQ-006: 4 callsites re-confirmed.
+  - CQ-007: 28 TODOs across 16 files re-confirmed.
+  - CQ-008: 9 `[CHAT-DEBUG]` callsites re-confirmed.
+  - CQ-009: 1 `console.warn` re-confirmed (cross-file grep returns this single hit).
+  - CQ-010: `index.ts:30-58` re-read confirms stub; signature drift `{toUid}` vs `{senderUid, receiverUid}` noted.
+  - CQ-011: 2 `save*` callsites (`saveFcmToken`, `saveEntry`) re-confirmed.
+  - CQ-012: stale comment `notificationRepositoryProvider throws UnimplementedError` × 2 in `settings_controller.dart:84-88, 139-142` re-confirmed; reality wire in `main.dart:119-121` re-confirmed.
+  - CQ-013: 4 test files >500 lines re-confirmed.
+- COUNT FINAL: 14 issues. Distribution: P0=0, P1=3 (CQ-001/-002/-014), P2=6 (CQ-003/-004/-005/-006/-007/-008), P3=5 (CQ-009/-010/-011/-012/-013).
+- COVERAGE UPGRADE post-pass-5: checked=29 (added 5 deep-read files), partial=4 (reduced from 7 — core/theme, core/validators now fully read; remaining: features/streak deep, features/space deep, shared/widgets 12 listed-only, firebase/functions/test). Verdict still full per "every checked area backed by evidence" criterion.
+- VERDICT confirm: ready_with_polish. CQ-014 added as P1 doesn't escalate verdict — no P0 release blocker created.
