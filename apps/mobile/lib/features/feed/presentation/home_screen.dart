@@ -238,7 +238,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           activeTab: TaskbarTab.home,
           chatBadgeCount: chatBadgeCount,
           onTabSelected: _onTaskbarTab,
-          onGridTap: () => context.go('/grid-view'),
+          onGridTap: () => context.push('/grid-view'),
           onUploadTap: _onShareTap,
           ringColor: ringColor,
         ),

@@ -177,17 +177,30 @@ class WidgetSyncWorker(
      * Synchronous Glide bitmap fetch — safe on [Dispatchers.IO].
      * Glide consults memory + disk cache before going to the network, so an
      * offline run with a populated cache returns the previously cached bitmap.
+     *
+     * `.override(width, height)` caps the decoded bitmap to widget render size.
+     * Without it, Glide decodes at the source resolution (full-resolution
+     * captures from camera = several MB per bitmap) → RemoteViews bundle hits
+     * the 1MB IPC limit and OOM risk grows with each periodic refresh.
+     *
+     * `.get(timeout)` guards the WorkManager IO dispatcher from an indefinite
+     * hang if the network stalls past the connectivity constraint check.
      */
     private fun loadBitmap(url: String, circular: Boolean): Bitmap {
-        val request = Glide.with(applicationContext)
+        val targetSize = if (circular) AVATAR_TARGET_PX else PHOTO_TARGET_PX
+        return Glide.with(applicationContext)
             .asBitmap()
             .load(url)
             .apply(
-                RequestOptions().diskCacheStrategy(DiskCacheStrategy.ALL).let {
-                    if (circular) it.transform(CircleCrop()) else it
-                },
+                RequestOptions()
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .override(targetSize, targetSize)
+                    .let {
+                        if (circular) it.transform(CircleCrop()) else it
+                    },
             )
-        return request.submit().get()
+            .submit(targetSize, targetSize)
+            .get(BITMAP_LOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
     private fun renderPlaceholder() {
@@ -261,6 +274,18 @@ class WidgetSyncWorker(
         private const val PERIODIC_WORK_NAME = "meep.widget.sync.periodic"
         private const val ONE_TIME_WORK_NAME = "meep.widget.sync.oneshot"
         private const val PERIODIC_INTERVAL_MINUTES = 15L
+
+        // Bitmap targets — match max widget render size. Photo cap chosen so a
+        // 4×2 widget at xxxhdpi (~640px wide) renders sharp; avatar at 24dp
+        // ≈ 96px (xxhdpi). Glide downsamples source bitmaps to these bounds
+        // before decoding → memory + bundle stay under RemoteViews 1MB limit.
+        private const val PHOTO_TARGET_PX = 720
+        private const val AVATAR_TARGET_PX = 128
+
+        // Cap on Glide's blocking `.get()` — WorkManager IO dispatcher must not
+        // sit on a hung future when the network constraint passed but the
+        // connection stalled mid-fetch.
+        private const val BITMAP_LOAD_TIMEOUT_SECONDS = 20L
 
         /** Format unread count badge: 1–9 verbatim, ≥10 collapses to "9+". */
         internal fun formatCount(count: Int): String =

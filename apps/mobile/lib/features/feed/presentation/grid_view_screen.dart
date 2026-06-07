@@ -183,7 +183,7 @@ class _GridTopBar extends ConsumerWidget {
             button: true,
             label: 'Quay lại',
             child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
+              onTap: () => context.pop(),
               child: const Icon(Icons.arrow_back, color: AppColors.bw100),
             ),
           ),
