@@ -619,6 +619,13 @@
   Pass-4 update: 18 → 19 (added USERNAME-SEC-002 P3 — namespace squatting gap in /usernames create rule). Consolidations=0 (USERNAME-SEC-001 vs USERNAME-SEC-002 share collection but distinct rule actions — read vs create — and distinct fix paths, kept separate with cross-dep linking).
 - pass_4_coverage: checked=11, partial=1 (client Firebase usage boundary — sampled feed/notification/chat/widget/settings/auth, not every feature module), blocked=0, total=12, verdict=full (every "checked" area backed by grep evidence + file read in commands table)
 
+pass_5_reverify_notes (final cross-check before PR):
+- COUNT CROSS-CHECK: grep `^### ISSUE ` = 19 entries; grep `^- sev: P0` = 2, `P1` = 5, `P2` = 6, `P3` = 6. Sum 2+5+6+6 = 19. Khớp với pass-4 distribution.
+- BATCH SUM CROSS-CHECK: batch_1_p0 (2) + batch_2_p1 (5 incl STORAGE-001+STORAGE-002 bundled line) + batch_3_p2 (6) + batch_4_p3 (6) = 19. Khớp.
+- TEST PLAN CROSS-CHECK: 19 entries trong test_plan_after_fix block, mỗi entry mapping 1-1 với issue ID. Không issue nào thiếu test plan; không test plan entry nào orphan.
+- FINAL VERDICT block có 3 dòng "Final distribution" cho pass-2, pass-3, pass-4 — chuẩn audit trail. Không cần line cho pass-5 vì pass-5 chỉ cross-check không thay đổi distribution.
+- VERDICT confirm: not_ready (P0=2 chưa thay đổi). Recommended path Fix batch_1_p0 + batch_2_p1 (7 issues) trong 1 sprint trước khi ship M3.
+
 pass_4_reverify_notes (expand existing + 1 new):
 - EXPAND USER-SEC-001: fix section mở rộng thành 6-step implementation plan — (1) rule split + public subcollection match block, (2) CF onDocumentWritten denormalize trigger, (3) repository tách watchSelfOrFriendProfile vs watchPublicProfile, (4) liệt kê 5 touch points client, (5) 1-shot migrate CF cho existing /users docs, (6) rollout order CF→migrate→client→rule. Mục đích: leader assign T6 follow-up có thể fork ra 6 sub-task ngay.
 - NEW ISSUE USERNAME-SEC-002 P3: discovered khi re-read /usernames create rule (line 105-106) cho USERNAME-SEC-001 fix design — rule chỉ check `uid == auth.uid` mà KHÔNG check username path param khớp /users/{auth.uid}.username. Squatting vector. Pair với USERNAME-SEC-001 trong fix CF approach. Note: deleteAccount cascade chỉ xóa username trong /users/{uid}.username → squatted usernames mồ côi nếu fix không bundle.
