@@ -82,8 +82,8 @@
   - `Firebase.initializeApp` (no `FirebaseAppCheck.activate` follow-up)
   - `DefaultFirebaseOptions.android.apiKey`
 - evidence: `await Firebase.initializeApp(options:` (main.dart:54) — không có `FirebaseAppCheck.activate` follow-up; grep `App Check|appCheck|PlayIntegrity|activateAppCheck` = 0 hits across apps/mobile, firebase/, android/
-- access_path: unauthenticated bot or modified APK gọi Firestore/Storage/Functions với staging API key `AIzaSyCyuhye-Hm0qnnM4s0f2tNuz4ErWxfr600` (hardcode trong `firebase_options.dart:56`) → server không phân biệt request từ app thật vs request bypass → mọi rule chỉ dựa vào `request.auth` mà quota/abuse path mở
-- risk: data leak (unauthenticated probe /usernames `if true` → user enumeration) + financial (Function spam) + abuse (FCM spam qua callable CF nếu authed bypass) — CLAUDE.md §Security Guardrails đặt App Check làm "Production blocker"
+- access_path: any client (browser/script/repacked APK) gọi Firestore/Storage/Functions với staging API key `AIzaSyCyuhye-Hm0qnnM4s0f2tNuz4ErWxfr600` (hardcode trong `firebase_options.dart:56`) → server không phân biệt request từ app build chính thức vs request từ source khác → mọi rule chỉ dựa vào `request.auth` mà không có app-attestation layer; quota path mở cho automated traffic
+- risk: data leak (unauthenticated probe /usernames `if true` → user enumeration) + financial (Function invocation cost từ automated traffic) + abuse (callable CF invocation rate không có app-binding) — CLAUDE.md §Security Guardrails đặt App Check làm "Production blocker"
 - fix: trong `main.dart` ngay sau `Firebase.initializeApp`, gọi `await FirebaseAppCheck.instance.activate(androidProvider: AndroidProvider.playIntegrity)` (release build) + `AndroidProvider.debug` cho `kDebugMode`. Bật enforce trên Firebase Console cho Firestore/Storage/Functions production project trước khi xóa `if: false` ở `.github/workflows/deploy-production.yml:103,134`
 - authority: CLAUDE.md §Security Guardrails "App Check: Production blocker nếu chưa enable (Play Integrity provider)"; tmp/05_security_firebase_audit_prompt_v2.md §Audit Checklist "App Check" group
 - test: viết integration test trong `apps/mobile/integration_test/app_check_test.dart` verify `FirebaseAppCheck.instance.getToken()` resolve thành non-empty string trong debug build; thêm rules-test deny case trong `firestore.rules.test.ts` cho request thiếu App Check token (sau khi rule enforce)
@@ -100,7 +100,7 @@
 - symbols:
   - `match /users/{uid}` → `allow read: if isAuthed()`
 - evidence: `allow read: if isAuthed();` (firestore.rules:62) cho /users/{uid} — không có check `isOwner(uid) || isFriend(uid)`; doc chứa `email` field (rule `create` line 64 enforce `keys().hasAll(['uid', 'email', 'displayName', 'username', 'createdAt'])`)
-- access_path: bất cứ user nào sau khi signup (email signup không cần verify, hoặc Google login) → đọc `/users/<victim-uid>` → nhận về `email` + `displayName` + `username` + `avatarUrl` + `friendCount` + `postCount`. Kết hợp với USERNAME-SEC-001 (P2) — attacker scan `/usernames/{guess}` (public read) lấy uid, rồi /users/{uid} lấy email
+- access_path: bất cứ user nào sau khi signup (email signup không enforce verify, hoặc Google login) → đọc `/users/<otherUid>` → nhận về `email` + `displayName` + `username` + `avatarUrl` + `friendCount` + `postCount`. Kết hợp với USERNAME-SEC-001 (P2) — bất kỳ client iterate `/usernames/{name}` (public read) lấy uid, rồi `/users/{uid}` lấy email + profile
 - risk: data leak — email là PII; CLAUDE.md §PII handling list "email, phone, displayNames" là PII Meep. Friend graph privacy CLAUDE.md §Domain "Friend graph private" cũng bị compromise (friendCount leak relationship size)
 - fix: tách read rule thành minimal-profile + full-profile. Option A (dễ): `allow read: if isOwner(uid) || isFriend(uid)` cho doc gốc, tạo subcollection `/users/{uid}/public/profile` chứa CHỈ `displayName + avatarUrl` cho lookup stranger. Option B (rule-only): dùng `resource.data` field-mask không khả thi (Firestore rules không filter field) → bắt buộc tách doc. Update `FirebaseUserRepository.watchUser` đọc `/users/{uid}/public/profile` cho stranger; `/users/{uid}` cho self+friend. Đồng bộ với client share_profile_sheet / friend search flow
 - authority: CLAUDE.md §Security Guardrails "Owner check: `isOwner(uid) := isAuthed() && request.auth.uid == uid`. Never just check 'is authenticated' when you really mean 'is owner / is friend'"; tmp prompt §Friend graph privacy checklist item "Read /users/{uid} cho stranger → return profile minimal hay block hoàn toàn"
@@ -118,7 +118,7 @@
 - symbols:
   - `match /posts/{uid}/{allPaths=**}` → `allow read: if request.auth != null`
 - evidence: `allow read: if request.auth != null;` (storage.rules:9) — không enforce friend của uid hoặc post-author check
-- access_path: User A đăng post với image URL `https://firebasestorage.googleapis.com/.../posts/{authorUid}/{postId}/photo.jpg`. URL leak qua: (a) friend chia sẻ link cho non-friend, (b) device cached URL trong shared_preferences widget cache, (c) Firestore /users/{uid}/feed/{postId} fan-out doc rồi bị unfriend nhưng feed entry chưa cleanup race. Bất cứ ai có URL + authed = đọc full-resolution photo
+- access_path: User A đăng post với image URL `https://firebasestorage.googleapis.com/.../posts/{authorUid}/{postId}/photo.jpg`. URL leak qua: (a) friend share link cho non-friend, (b) device cached URL trong shared_preferences widget cache, (c) Firestore /users/{uid}/feed/{postId} fan-out doc còn lại sau unfriend (race với cleanup). Bất cứ authed user nào có URL = đọc full-resolution photo, bypass Firestore friend boundary
 - risk: data leak — photo là PII top priority (CLAUDE.md §PII handling "photos/captions" + §Project Context "personal photos"). Firestore rule layer (/posts) enforce friend boundary nhưng Storage rule không mirror — defense-in-depth fail
 - fix: enforce friend check ở Storage qua `firestore.get()` lookup: `allow read: if request.auth != null && (request.auth.uid == uid || exists(/databases/(default)/documents/friendships/$(pairId)))`. Cần helper compute pairId tương tự firestore.rules. Hoặc đơn giản hơn: enforce author-only read + buộc client luôn fetch URL qua `getDownloadURL()` rồi proxy qua signed URL từ CF (heavy lifting cho MVP — chọn rule-side check)
 - authority: CLAUDE.md §Storage checklist "Read requires authentication" minimal — nhưng §PII handling "PII bar HIGH" require friend boundary mirror ở Storage. Defense-in-depth pattern: Firestore rules là source of truth nhưng Storage rule không được lax hơn
@@ -132,10 +132,10 @@
 - area: rules
 - files:
   - `firebase/storage.rules`
-- loc: 29-35 (/diary/{uid}/{allPaths=**})
+- loc: 28-35 (/diary/{uid}/{allPaths=**})
 - symbols:
   - `match /diary/{uid}/{allPaths=**}` → `allow read: if request.auth != null`
-- evidence: `allow read: if request.auth != null;` (storage.rules:31) cho /diary/{uid} — trong khi `firestore.rules` line 329-331 enforce `authorUid == request.auth.uid || (privacy == 'public' && isFriend(...))`. Storage không mirror.
+- evidence: `allow read: if request.auth != null;` (storage.rules:30) cho /diary/{uid} — trong khi `firestore.rules` line 329-331 enforce `authorUid == request.auth.uid || (privacy == 'public' && isFriend(...))`. Storage không mirror.
 - access_path: User A tạo diary với `privacy='private'`, ảnh upload vào `diary/{aUid}/{entryId}.jpg`. URL leak (Crashlytics, log) → bất kỳ authed user nào đọc được ảnh dù diary marked private
 - risk: data leak — diary explicit `privacy='private'` semantic bị compromise ở Storage layer. Cao hơn STORAGE-001 vì user expressly chọn private
 - fix: enforce author-only read: `allow read: if request.auth != null && request.auth.uid == uid`. Friend "public" diary case: hoặc giữ author-only ở Storage và buộc client luôn check Firestore rule trước; hoặc query Firestore từ Storage rule (heavy — skip). Đề xuất: chốt author-only read cho /diary/ (defense in depth conservative)
@@ -174,8 +174,8 @@
   - `match /conversations/{conversationId}` → `allow create`
   - `FirebaseConversationRepository.getOrCreateConversation`
 - evidence: `participantIds.hasAll([request.auth.uid])` (line 289) — chỉ check caller có trong participantIds, KHÔNG check caller có friendship/space-membership với uid khác
-- access_path: attacker authed → gọi `conversations.doc('attackerUid_victimUid').set({type:'direct', participantIds:[attackerUid, victimUid], ...})` → rule pass. Sau đó `conversations/{id}/messages.set({senderId:attackerUid, text:'spam'})` — message rule line 310-322 check `isParticipant(conversationId)` (đã true vì attacker trong participantIds), `senderId == auth.uid`, `text.size() <= 500` → pass. CF `onMessageCreated` → FCM push victim → victim spam DM từ stranger
-- risk: privacy boundary (Meep "intimate friends only" semantic) + spam/abuse vector. Friend graph privacy CLAUDE.md §Domain "Friend = mutual accepted friendship" — chat phải gate qua friend graph
+- access_path: authed user A (KHÔNG phải friend của B) gọi `conversations.doc(pairIdOf(A,B)).set({type:'direct', participantIds:[A.uid, B.uid], ...})` → rule pass. Sau đó `conversations/{id}/messages.set({senderId:A.uid, text:'...'})` — message rule line 310-322 check `isParticipant(conversationId)` (đã true vì A trong participantIds), `senderId == auth.uid`, `text.size() <= 500` → pass. CF `onMessageCreated` → FCM push B → B nhận unsolicited DM từ non-friend. Locket-parity feature semantic của Meep là chat chỉ giữa friends.
+- risk: privacy boundary (Meep "intimate friends only" semantic) + unsolicited-message vector. Friend graph privacy CLAUDE.md §Domain "Friend = mutual accepted friendship" — chat phải gate qua friend graph
 - fix: enforce friend hoặc space-member ở create. Cho `type='direct'` (2-person): `participantIds.size() == 2 && exists(/databases/(default)/documents/friendships/$(conversationId))` (conversationId là pairId sorted). Cho `type='space'`: `exists(/databases/(default)/documents/spaces/$(conversationId))` + caller is member. `acceptFriendRequest.ts:107-137` + `createSpace.ts:157-169` đã tạo conversation atomically qua CF nên client `getOrCreateConversation` fallback line 122-138 chỉ là idempotent retry, có thể chấp nhận tightening rule
 - authority: tmp prompt §Per-collection ownership "/conversations/{...} + /conversations/{...}/messages/{...}: read by participant only" + CLAUDE.md §Domain "Friend = mutual" — conversation predicated trên friend graph
 - test: `firestore.rules.test.ts describe('/conversations — stranger create denied')` — Alice + Bob KHÔNG friendship, Alice try create `/conversations/{aliceUid}_{bobUid}` → assertFails
@@ -192,8 +192,8 @@
 - symbols:
   - `deleteAccount` onCall handler
 - evidence: `if (!request.auth)` (deleteAccount.ts:148) — chỉ check authed, KHÔNG kiểm `request.auth.token.auth_time` để enforce reauth window. Comment line 135-137 thừa nhận "CF chỉ check `request.auth` exists, không enforce recent-login (Firebase SDK enforce)" — nhưng Firebase Auth SDK reauth-window chỉ enforce cho native SDK calls (`user.delete()`), KHÔNG áp dụng cho callable CF.
-- access_path: attacker steal id_token (XSS, malware, stolen unlocked device) → gọi trực tiếp callable endpoint `https://asia-southeast1-meep-staging.cloudfunctions.net/deleteAccount` với stolen token → cascade-delete victim's full account. Client UI requirement bypassed.
-- risk: account compromise → irreversible data loss; CLAUDE.md §Security Guardrails "Destructive ops (delete account, change email) phải reauth"
+- access_path: id_token long-lived (~1h) còn valid khi user step away từ unlocked device, hoặc khi token được kế thừa qua shared device. Callable endpoint `https://asia-southeast1-meep-staging.cloudfunctions.net/deleteAccount` chấp nhận bất kỳ valid token nào → cascade-delete chạy mà không cần password re-prompt. Client UI gate (DeleteAccountDialog reauth) bị bypass khi gọi CF qua bất kỳ con đường nào khác (CLI test, mistakenly-cached session, etc.).
+- risk: account loss (irreversible cascade) khi token compromise window > 5 phút sau last auth; CLAUDE.md §Security Guardrails "Destructive ops (delete account, change email) phải reauth"
 - fix: enforce reauth window server-side. Trong `deleteAccount` thêm check sau auth gate: `const authTime = request.auth.token.auth_time as number; const now = Math.floor(Date.now() / 1000); if (now - authTime > 5 * 60) { throw new HttpsError('failed-precondition', 'Reauth required'); }`. Apply tương tự cho future destructive CFs (changeEmail).
 - authority: CLAUDE.md §Security Guardrails "Reauth: Destructive ops phải reauth"; Firebase Auth docs "auth_time claim"
 - test: viết `firebase/functions/src/__tests__/deleteAccount.test.ts` (path Vitest mới) với 2 case — token freshly issued (auth_time = now) → ok; token age > 5min → throw `failed-precondition`. Use `firebase-functions-test` v2 với authData override
@@ -210,8 +210,8 @@
 - symbols:
   - `match /usernames/{username}` → `allow read: if true`
 - evidence: `allow read: if true;` (firestore.rules:104) — unauthenticated read pass; comment justify "username availability is public info, checked pre-auth during signup"
-- access_path: unauthenticated bot gọi `firestore.collection('usernames').doc('victim_name').get()` → response `{ uid: '<victimUid>' }`. Bot enumerate dictionary của usernames → mapping username→uid. Khi USER-SEC-001 fix xong (P0), cần authed để read /users/{uid}, nhưng signup free → bot tạo throwaway account.
-- risk: information disclosure — uid không phải secret strictly, nhưng kết hợp USER-SEC-001 fix incomplete (vd attacker dùng signup throwaway) thì username→uid→email pipeline vẫn open. Defense in depth issue.
+- access_path: unauthenticated client gọi `firestore.collection('usernames').doc('<any_name>').get()` → response `{ uid: '<otherUid>' }` mà không cần auth token. Lặp lại với từng username known → mapping username→uid mà không có rate-limit (App Check chưa enable per APPCHECK-001). Sau khi USER-SEC-001 fix, cần authed để read /users/{uid}, nhưng signup không enforce verification → khả năng combine pipeline username → uid → user fields vẫn open.
+- risk: information disclosure — uid không phải secret strictly, nhưng kết hợp với USER-SEC-001 hoặc các collection có owner-by-uid sẽ extend reach của username enumeration. Defense in depth issue.
 - fix: 2 option — (A) restrict read by exact-match query only: rule không hỗ trợ query-shape guard, nên không khả thi. (B) Move availability check vào CF `checkUsernameAvailable` onCall, return `{available: bool}` without exposing uid. Cập nhật `sign_up_controller.dart` gọi CF thay vì direct read. Trade-off: cold-start latency cho signup flow nhưng đáng — chỉ chạy 1 lần/user.
 - authority: tmp prompt §Default-deny posture "Mọi `allow read|write` đều có điều kiện?" + "KHÔNG có `if true` ở bất cứ rule nào?"
 - test: sau khi switch sang CF, viết `__tests__/checkUsernameAvailable.test.ts` verify CF không leak uid trong response; xóa `/usernames` `if true` rule và thêm rules test deny unauth read
@@ -228,7 +228,7 @@
 - symbols:
   - `allow update` whitelist
 - evidence: `hasOnly(['emoji', 'createdAt', 'reactorName', 'reactorAvatarUrl'])` (line 165) — `reactorName` và `reactorAvatarUrl` không có type check + size cap; emoji upper bound chỉ check `emoji.size() > 0` (line 162) — không cap upper.
-- access_path: reactor (1 friend của author) update reaction với `reactorName: '<10000-char string impersonating victim>'` hoặc `reactorAvatarUrl: 'https://malicious.example.com/track.gif'`. Author thấy fake name trong reaction list sheet
+- access_path: reactor (1 friend của author) update reaction với `reactorName: '<10000-char string đặt tên giống user khác>'` hoặc `reactorAvatarUrl: 'https://example.com/<arbitrary>.gif'`. Author thấy display name không khớp profile reactor trong reaction list sheet — tampered UI
 - risk: impersonation in feed UI; defense-in-depth weakness. Không leak data nhưng tampered display
 - fix: thêm type+size validation: `(!affectedKeys().hasAny(['reactorName']) || (request.resource.data.reactorName is string && request.resource.data.reactorName.size() <= 50))` tương tự `senderDisplayName` rule conversation messages line 316-318. Cap emoji upper bound 32 chars (ZWJ emoji family) tương tự /spaces iconEmoji line 252.
 - authority: firestore.rules:316-318 đã model pattern `senderDisplayName.size() <= 50`; createSpace.ts:14-16 chốt 32-char cap cho ZWJ emoji
@@ -237,22 +237,23 @@
 
 ### ISSUE WIDGET-SEC-001
 
-- sev: P2
+- sev: P3
 - blocker: no
 - area: client
 - files:
   - `apps/mobile/lib/features/widget/application/widget_data_service.dart`
   - `apps/mobile/lib/features/settings/application/settings_controller.dart`
-- loc: widget_data_service.dart:112-117 (clearData); settings_controller.dart:74-110 (logout path)
+- loc: widget_data_service.dart:112-117 (clearData); settings_controller.dart:78-115 (logout), 127-158 (deleteAccount)
 - symbols:
   - `WidgetDataService.clearData`
-  - `SettingsController.signOut` (logout flow)
-- evidence: `Future<void> clearData() async` (widget_data_service.dart:112) defined. Grep `clearData` trong `settings_controller.dart` = 0 hits — logout flow line 89-110 gọi `deleteFcmToken` + `resetForLogout` + `auth.signOut`, KHÔNG gọi widget clearData.
-- access_path: User A login → tap photo (cached widget) → logout. Widget caches `imageUrl` (Firebase Storage URL with download token) trong `FlutterSharedPreferences` (`Context.MODE_PRIVATE`, OK scope nhưng cùng app sandbox). User B login same device → widget vẫn render User A's last photo cho đến next WidgetSyncWorker tick (~15min). Worst: device shared (capstone team test device).
-- risk: privacy boundary — User A's photo briefly visible to User B post-logout. Token URL trong SharedPreferences có thể được scrape bởi root-leak / backup extract
-- fix: trong `SettingsController.signOut` (sau line 105 `resetForLogout`, trước `auth.signOut`), gọi `await ref.read(widgetDataServiceProvider).clearData();`. Cùng pattern cho `_doDeleteAccount` (line ~118+). Cũng thêm clear khi auth state emit `uid=null` trong `MeepApp.build` lifecycle listener (defense in depth)
+  - `SettingsController.logout` (has clearData)
+  - `SettingsController.deleteAccount` (missing clearData)
+- evidence: `Future<void> clearData() async` (widget_data_service.dart:112) defined. `settings_controller.dart:94-99` logout DOES call `await ref.read(widgetDataServiceProvider).clearData();` wrapped trong try/catch. `settings_controller.dart:127-158` deleteAccount KHÔNG có clearData call (chỉ deleteFcmToken + resetForLogout + auth.deleteAccountCascade).
+- access_path: deleteAccount flow trên shared device không clear local widget cache trước khi gọi server cascade. CF xóa Firestore + Storage server-side → URL trong cache trở thành 404 → next WidgetSyncWorker tick (~15min) sẽ render placeholder. Trong window ~15min sau deleteAccount, widget vẫn render last-cached image cho user kế tiếp signin same device.
+- risk: privacy polish — cache window ~15min sau deleteAccount; impact thấp vì (a) logout path đã clear, (b) server đã xóa data source nên cache stale → URL invalid → next sync render placeholder. Original pass-1 claim "logout missing clearData" SAI — đã được fix trước pass 1.
+- fix: trong `SettingsController.deleteAccount` (sau line 150 `resetForLogout`, trước `auth.deleteAccountCascade`), thêm `try { await ref.read(widgetDataServiceProvider).clearData(); } catch (_) {}` — mirror logout pattern line 95-99.
 - authority: CLAUDE.md §Security Guardrails "Widget cache cleanup khi sign-out?" checklist item; tmp prompt §Notification/widget cached privacy
-- test: `apps/mobile/test/features/settings/settings_controller_test.dart` thêm case "signOut clears widget cache" — mock WidgetDataService, verify `clearData` called trước `auth.signOut`
+- test: `apps/mobile/test/features/settings/settings_controller_test.dart` thêm case "deleteAccount clears widget cache" — mock WidgetDataService, verify `clearData` called trước `auth.deleteAccountCascade`. Logout test có sẵn pattern.
 - deps: none
 
 ### ISSUE USER-SEC-002
@@ -387,11 +388,11 @@
 - files:
   - `firebase/functions/src/space/onSpaceMemberAdded.ts`
   - `firebase/functions/src/space/onSpaceMemberRemoved.ts`
-- loc: onSpaceMemberAdded.ts:14-19 (idempotent caveat comment)
+- loc: onSpaceMemberAdded.ts:12-17 (idempotent caveat comment)
 - symbols:
   - `onSpaceMemberAdded` trigger
   - `onSpaceMemberRemoved` trigger
-- evidence: `Idempotent caveat: same as Added — at-least-once delivery. MVP accepted.` (onSpaceMemberRemoved.ts:13; same comment block onSpaceMemberAdded.ts:14-17) — acknowledged weakness, not fixed.
+- evidence: `Idempotent caveat: same as Added — at-least-once delivery. MVP accepted.` (onSpaceMemberRemoved.ts:12; same comment block onSpaceMemberAdded.ts:12-17 "Trade-off accepted cho MVP") — acknowledged weakness, not fixed.
 - access_path: Firestore v2 trigger contract đảm bảo at-least-once delivery. Same event fire 2 lần → user spaceCount tăng 2 thay vì 1. Không security risk, là consistency issue
 - risk: data integrity (UI-displayed spaceCount drift). Comment ghi rõ "MVP accepted" — chấp nhận được nhưng audit phải flag
 - fix: triển khai event marker pattern khi dev tới T8 follow-up. Path comment đề xuất: `/users/{uid}/space_count_events/{spaceId}` doc as marker; transaction check exists → skip increment. Hoặc switch sang derived field: compute spaceCount qua client query `space_members where uid == X` collection-group count thay vì denormalized counter.
@@ -414,12 +415,12 @@
 ### batch_3_p2
 - USERNAME-SEC-001 — Move username lookup vào CF (depends USER-SEC-001)
 - REACTION-SEC-001 — Type+size guard trên /reactions update
-- WIDGET-SEC-001 — clearData call trong SettingsController.signOut
 - USER-SEC-002 — Length cap displayName trong /users update
 - DIARY-SEC-001 — Privacy enum + type guard trên /diary update
 - TESTING-SEC-001 — Coverage gap fix cuối cùng (cover toàn bộ collection rule mới fix)
 
 ### batch_4_p3
+- WIDGET-SEC-001 — clearData call trong SettingsController.deleteAccount (logout đã có) — demoted P2→P3 pass-2
 - PERM-001 — RECEIVE_BOOT_COMPLETED + POST_NOTIFICATIONS manifest
 - FRIEND-SEC-001 — pid invariant guard /friendships
 - FUNC-SEC-001 — `.strict()` trên mọi zod schema
@@ -436,7 +437,7 @@
 - `AUTH-SEC-001`: vitest `deleteAccount.test.ts` mock authData with stale `auth_time` → throws `failed-precondition`
 - `USERNAME-SEC-001`: vitest `checkUsernameAvailable.test.ts` verify response only `{available: bool}`; rules test unauth read /usernames → assertFails post-fix
 - `REACTION-SEC-001`: rules test reactor update reactorName with 1000 chars → assertFails
-- `WIDGET-SEC-001`: widget test `settings_controller_test.dart` mock WidgetDataService; verify `clearData()` invoked exactly once before `auth.signOut()`
+- `WIDGET-SEC-001`: widget test `settings_controller_test.dart` mock WidgetDataService; verify `clearData()` invoked trong deleteAccount path trước `auth.deleteAccountCascade()` (logout path đã có test sẵn — chỉ cần mirror)
 - `USER-SEC-002`: rules test owner update displayName 1000 chars → assertFails
 - `TESTING-SEC-001`: thêm describe blocks; verify CI `pr-check.yml firestore-rules` job pass
 - `DIARY-SEC-001`: rules test author update privacy='invalid' → assertFails
@@ -550,15 +551,26 @@
 
 ## self_verification_log
 
+<!-- Pass 2 reverify run as follow-up after first commit; corrections folded into issues in-place and listed in pass_2_reverify_notes below. -->
+
 - pass_1_checklist: N=88 items, M=17 issues, K=88 no_issue_notes mappings (each checklist item mapped to ≥1 issue or note via cross-reference; 6 additional gap items added — imageUrl regex, CAMERA, READ_MEDIA_IMAGES, branch protection, callable unauth test, trigger invalid-input test), gap=0
-- pass_2_schema: total=17, missing_field_fixed=0 (every issue has sev/blocker/area/files/loc/symbols/evidence/access_path/risk/fix/authority/test/deps), severity_demoted=2 (initial draft RULES-004 streaks demoted to no_issue_note after verifying `lib/features/streak/data/firebase_streak_repository.dart:8` comment "không có collection riêng"; initial RULES-008 diary privacy update demoted from P1 to P2 because read rule fail-safe-denies invalid privacy), evidence_failed_grep=0 (all 17 evidence quotes verified grep-able via `grep -Fn` against source files — see `pass_2_grep_verify` bash block above)
+- pass_2_schema: total=17, missing_field_fixed=0 (every issue has sev/blocker/area/files/loc/symbols/evidence/access_path/risk/fix/authority/test/deps), severity_demoted=1 in pass-2 reverify (WIDGET-SEC-001 P2→P3: pass-1 claim "logout missing clearData" SAI — verified `settings_controller.dart:94-99` đã có `clearData()` trong try/catch; chỉ deleteAccount path line 127-158 còn miss → scope hẹp lại, server cascade làm cache stale → URL invalid trong window ~15min nên impact thấp). Pre-pass-2 demotions (in original draft): RULES-004 streaks → no_issue (verified `firebase_streak_repository.dart:8` "không có collection riêng"); RULES-008 diary privacy update P1→P2 (read rule fail-safe denies invalid privacy). evidence_failed_grep=0 — pass-2 re-grep all 17 evidence quotes against source files; 3 line drifts corrected in-place: STORAGE-002 storage.rules:31→30, FUNC-SEC-002 onSpaceMemberAdded.ts:14-19→12-17, WIDGET-SEC-001 settings_controller.dart loc range. Reframed offensive phrasing in 6 issues (APPCHECK-001, USER-SEC-001, STORAGE-001, CHAT-SEC-001, AUTH-SEC-001, USERNAME-SEC-001, REACTION-SEC-001) to defensive language without changing technical content.
 - pass_3_dedupe: before=17, after=17, consolidations=0 (STORAGE-001 vs STORAGE-002 share root cause "Storage read auth-only doesn't mirror Firestore friend boundary" but distinct files+symbols /posts vs /diary — kept separate per "no duplicate cùng file+symbol+root_cause" criterion. USER-SEC-001 vs USERNAME-SEC-001 share story "user enumeration" but distinct rule blocks + fix paths — kept separate with USERNAME-SEC-001.deps linking)
 - pass_4_coverage: checked=11, partial=1 (client Firebase usage boundary — sampled feed/notification/chat/widget/settings/auth, not every feature module), blocked=0, total=12, verdict=full (every "checked" area backed by grep evidence + file read in commands table)
+
+pass_2_reverify_notes (post-commit follow-up after user request):
+- FACT FIX 1 (WIDGET-SEC-001 demote P2→P3 + evidence rewrite): pass-1 claimed `settings_controller.dart:89-110 logout … KHÔNG gọi widget clearData`. Re-read confirms `settings_controller.dart:94-99` đã có `try { await ref.read(widgetDataServiceProvider).clearData(); } catch (_) {}` trong logout path. Real gap thu hẹp về `deleteAccount` path line 127-158 (missing clearData). Demoted P2→P3, fix instruction đổi sang deleteAccount path, test plan đổi sang mirror deleteAccount test case.
+- FACT FIX 2 (STORAGE-002 loc): pass-1 `storage.rules:31`; actual `allow read: if request.auth != null;` ở line 30 (line 31 là `allow write`). loc range updated 29-35 → 28-35 để bao luôn comment.
+- FACT FIX 3 (FUNC-SEC-002 loc): pass-1 `onSpaceMemberAdded.ts:14-19`; actual idempotent comment block ở line 12-17. Updated.
+- REFRAME 1-7 (defensive language): tất cả issue có access_path/risk dùng `attacker steal token`, `bot enumerate dictionary`, `victim`, `spam DM`, `malicious URL` → đổi sang `compromised id_token via shared device`, `unauthenticated client iterates`, `other user`, `unsolicited DM to non-friend`, `arbitrary URL` — giữ nguyên technical content + audit value, chỉ thay phrasing để khớp defensive code-review stance của tmp prompt line 3 "Đây là defensive code review trên repo nội bộ của team, KHÔNG phải penetration testing".
+- COUNT CORRECTION: pass-1 distribution P0=2/P1=5/P2=6/P3=4=17. Pass-2 distribution P0=2/P1=5/P2=5/P3=5=17 (WIDGET-SEC-001 moved buckets). PR commit message từ pass-1 vẫn còn đúng tổng nhưng buckets cần update khi gửi PR.
 
 ## final_verdict
 
 verdict: not_ready
 
-**Rationale:** 2 P0 issues (APPCHECK-001, USER-SEC-001) block MVP launch per CLAUDE.md §Security Guardrails Production blocker + PII bar HIGH. 6 P1 issues (STORAGE-001/002, POST-SEC-001, CHAT-SEC-001, AUTH-SEC-001) cần fix trước Tier 0+ ship (privacy boundary + bypass risks không chấp nhận được cho photo-sharing app intimate friends). P2/P3 issues có thể bundle sau MVP.
+**Rationale:** 2 P0 issues (APPCHECK-001, USER-SEC-001) block MVP launch per CLAUDE.md §Security Guardrails Production blocker + PII bar HIGH. 5 P1 issues (STORAGE-001/002, POST-SEC-001, CHAT-SEC-001, AUTH-SEC-001) cần fix trước Tier 0+ ship (privacy boundary + validation gaps không chấp nhận được cho photo-sharing app intimate friends). P2/P3 issues có thể bundle sau MVP.
 
-**Recommended path:** Fix batch_1_p0 + batch_2_p1 (8 issues) trong 1 sprint (3-5 ngày dev), re-audit, then ship M3.
+**Recommended path:** Fix batch_1_p0 + batch_2_p1 (7 issues) trong 1 sprint (3-5 ngày dev), re-audit, then ship M3.
+
+Final distribution after pass-2 reverify: **P0=2, P1=5, P2=5, P3=5 — total 17 issues** (WIDGET-SEC-001 demoted P2→P3 sau khi verify logout path đã clear cache; chỉ deleteAccount path còn missing — impact thấp vì server cascade làm URL invalid trong 15min).
