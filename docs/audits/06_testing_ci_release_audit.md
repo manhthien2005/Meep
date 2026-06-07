@@ -59,8 +59,8 @@
 ## coverage
 
 - unit tests (repositories) — Flutter: checked (13/14 firebase_*_repository.dart files mirror-tested; ONLY `firebase_storage_repository.dart` missing test → UNIT-001)
-- unit tests (controllers) — Flutter: checked (11/16 controllers tested; missing tests for `post_controller.dart`, `feed_controller.dart`, `app_camera_controller.dart` → CTRL-TEST-001; `password_reset_controller.dart` covered)
-- widget tests (critical screens) — Flutter: checked (auth pages 0 widget tests; feed `home_screen.dart`/`feed_section.dart`/`capture_preview_screen.dart`/`camera_section.dart` 0 widget tests; settings sheet + reaction sheets + space sheets + chat inbox + profile screen DO have widget tests → WIDGET-TEST-001 for critical pages gap)
+- unit tests (controllers) — Flutter: checked (13/16 controllers tested per re-count pass-5; missing tests for `post_controller.dart`, `feed_controller.dart`, `app_camera_controller.dart` → CTRL-TEST-001. Auth controllers 3/3 covered: login + password_reset + sign_up)
+- widget tests (critical screens) — Flutter: checked (auth pages 7/7 untested; feed `home_screen`/`feed_section`/`capture_preview_screen`/`camera_section` 0/4 untested; diary `diary_canvas_screen`/`diary_list_screen`/`diary_search_screen` 0/3 untested + 11 widget files untested; profile `edit_profile_screen`/`avatar_picker_sheet` untested while `profile_screen`/`friend_profile_screen` DO have tests; settings sheets + reaction sheets + space sheets + chat inbox + streak DO have widget tests → WIDGET-TEST-001 expanded scope per pass-6)
 - integration tests (golden path) — Flutter: blocked-by-design (folder `apps/mobile/integration_test/` does NOT exist despite `integration_test: { sdk: flutter }` in `pubspec.yaml:68`. ZERO E2E coverage → E2E-001)
 - functions unit tests — TypeScript: checked (24 vitest files; 11/22 src files have direct test, 11 covered indirectly via rules tests + helpers; idempotency NOT tested → FUNC-TEST-001)
 - functions rules tests — TypeScript: checked (10 rules-test files = 8 collection-specific + 2 storage; coverage breadth high; CHAT-SEC-002/REACTION-SEC-001 fix-impact areas tested per SEC TESTING-SEC-001; 1 placeholder file `test/feed/feed.rules.test.ts` uses `expect(true).toBe(true)` → TEST-QUALITY-001)
@@ -87,6 +87,10 @@
 | CRASHLYTICS-001 | P1 | release readiness | `apps/mobile/lib/main.dart:53-60` | `firebase_crashlytics` dep listed in pubspec but `FlutterError.onError` + `FirebaseCrashlytics.recordError` NOT wired — production crashes silently lost |
 | FUNC-TEST-001 | P1 | test gap | `firebase/functions/test/{friend/onFriendshipDeleted,feed/feed.rules}.test.ts` | 2 placeholder test files use `expect(true).toBe(true)` instead of real assertions — false CI green |
 | CI-MOBILE-001 | P1 | CI gap | `.github/workflows/pr-check.yml:62-98` | CI does NOT execute integration_test — even when E2E-001 fixed, no automation. Tied to E2E-001 |
+| MIRROR-001 | P2 | test gap | 21 files in `apps/mobile/test/features/{feed,friend,settings,space}/**` | 21/80 test files violate `apps/mobile/CLAUDE.md §Testing` mirror convention — flat layout in 4 modules vs nested `application/`/`data/`/`presentation/` everywhere else |
+| CI-TIMEOUT-001 | P2 | CI gap | `.github/workflows/pr-check.yml` (all jobs) | 5 CI jobs ZERO `timeout-minutes` declared — hung job consumes free-tier 2000min budget; emulator job (firestore-rules) has highest risk |
+| HUSKY-PUSH-001 | P3 | CI gap | `.husky/pre-push` | pre-push only validates branch name format, does NOT run `flutter test`/`npm test` — drift slips into push, caught only at CI 8min later |
+| TEST-PURE-001 | P3 | test gap | `apps/mobile/lib/core/{error/app_error,utils/pair_id,config/app_config}.dart` | 3 core pure-logic files untested — `AppError.fromUnknown` factory + `pairIdOf` deterministic ordering + AppConfig string consts are zero-cost tests |
 
 ## issues
 
@@ -559,6 +563,115 @@
 - test: post-fix, run `(cd apps/mobile && flutter test test/features/)` in 3 random orderings (`flutter test --test-randomize-ordering-seed=random` × 3) — all green; no flake from container leak
 - deps: none
 
+### ISSUE MIRROR-001
+
+- sev: P2
+- blocker: no
+- area: test gap — mirror convention drift
+- files:
+  - 21 test files under `apps/mobile/test/features/{feed,friend,settings,space}/**`
+- loc: file-level layout
+- symbols:
+  - feed flat layout: `feed/{feed_filter_controller,firebase_post_repository,post}_test.dart`
+  - friend flat layout: `friend/{firebase_friend_repository,firebase_friend_request_repository,friend_controller,friend_sheet}_test.dart`
+  - settings flat layout: `settings/{block_confirm_dialog,blocked_accounts_page,delete_account_dialog,settings_sheet,widget_confirm_sheet}_test.dart`
+  - space flat layout: `space/{firebase_space_repository,friend_select_step,icon_builder_step,space_config_step,space_context_widgets,space_controller,space_create_sheet,space_edit_sheet,space_management}_test.dart`
+- evidence: `find apps/mobile/test/features -name "*_test.dart" | grep -vE "/application/|/data/|/presentation/"` returns 21 file paths in 4 modules. Compare with auth/chat/diary/notification/profile/reaction/streak which DO mirror lib `{data,application,presentation}` subfolder structure correctly.
+- confidence_impact: test discovery breaks for human + tooling. `flutter test test/features/feed/data/` returns 0 because feed module's repository tests live FLAT at `test/features/feed/firebase_post_repository_test.dart`. New-dev onboarding cost: `auth.md` Pattern #1 + `apps/mobile/CLAUDE.md §Testing` "Test files mirror lib" says one thing, repo shows another. `dart-add-unit-test` skill auto-generates mirror path — if dev uses skill on new feed file, test ends up in wrong place vs sibling tests.
+- risk: low individually, compounds onboarding cost as team scales. Combined with ARCH STATE-ARCH-001 (4 modules colocate state in controller vs auth canonical) — Meep has TWO documented conventions but four modules deviating from each. Inconsistency tax.
+- fix: 2 paths:
+  1. **Move 21 tests to canonical subfolder mirror** (recommended):
+     - feed: `test/features/feed/{feed_filter_controller_test.dart, firebase_post_repository_test.dart, post_test.dart}` → `test/features/feed/{application/feed_filter_controller_test.dart, data/firebase_post_repository_test.dart, data/post_test.dart}`
+     - friend: similar 4 moves
+     - settings: 5 moves (dialog/sheet/page widget tests → `settings/presentation/`)
+     - space: 9 moves (controller → `application/`, repo → `data/`, all sheets+steps+widgets → `presentation/`)
+     - Single `git mv` PR, zero code change. Verify all imports use `package:meep/` not relative paths first.
+  2. **Update `apps/mobile/CLAUDE.md §Testing` to allow flat-or-nested** — but `auth.md` Pattern #1 canonical mandates 3-layer mirror; weakening conflicts with canonical.
+- authority: `apps/mobile/CLAUDE.md §Testing` "Test files mirror lib: `lib/features/feed/post_repository.dart` ↔ `test/features/feed/post_repository_test.dart`" + `auth.md` Pattern #1 folder layout strict 3-layer
+- test: post-move, `flutter test test/features/feed/data/` returns the repo tests; `flutter test test/features/feed/application/` returns controller tests; no test missing from prior `flutter test` run
+- deps: none
+
+### ISSUE CI-TIMEOUT-001
+
+- sev: P2
+- blocker: no
+- area: CI gap — job timeout undeclared
+- files:
+  - `.github/workflows/pr-check.yml`
+  - `.github/workflows/develop-staging.yml`
+  - `.github/workflows/deploy-production.yml`
+- loc: every job in all 3 workflows
+- symbols:
+  - missing `timeout-minutes:` declaration at job level
+- evidence: `grep -n "timeout-minutes" .github/workflows/*.yml` returns 0 hits. GitHub Actions default timeout is **6 hours** per job. With 5 jobs in `pr-check.yml` (validate-branch-name + validate-commits + flutter + functions + firestore-rules), single hung emulator could consume 6h × 1 PR = 30% of free-tier 2000-min monthly budget.
+- confidence_impact: 1 stuck firestore-rules emulator job (e.g., port collision, hanging beforeAll) = developer pulls hair waiting for "PR failing" status that never comes. Free-tier budget at risk especially as test count grows (currently 3963 lines rules tests + 80 Flutter tests).
+- risk: CI minute exhaustion — `develop-staging.yml:18-23` already documents "GitHub Actions free tier 2000 phút/tháng" concern. Without timeout caps, a hung job can silently burn through quota. Free tier exhausted → no CI on PRs → team blocked.
+- fix: add `timeout-minutes:` at each job level. Suggested caps:
+  ```yaml
+  jobs:
+    validate-branch-name: { timeout-minutes: 2, ... }
+    validate-commits:     { timeout-minutes: 3, ... }
+    flutter:              { timeout-minutes: 20, ... }
+    functions:            { timeout-minutes: 10, ... }
+    firestore-rules:      { timeout-minutes: 15, ... }
+  ```
+  - Future-proof: `integration_test` step (CI-MOBILE-001) needs +10min for emulator boot — bump flutter job to 30.
+- authority: GitHub Actions docs "Workflow timeouts" + `develop-staging.yml:18-23` budget comment + free-tier 2000 min/month constraint
+- test: smoke test: introduce 8-minute sleep in firestore-rules job → expect job to fail at 15min mark with timeout, not 6h
+- deps: pairs with CI-MOBILE-001 (integration_test step needs increased flutter timeout)
+
+### ISSUE HUSKY-PUSH-001
+
+- sev: P3
+- blocker: no
+- area: CI gap — pre-push hook minimal
+- files:
+  - `.husky/pre-push`
+- loc: 1-50
+- symbols:
+  - missing `flutter test` invocation
+  - missing `npm test` invocation
+- evidence: `cat .husky/pre-push` only validates branch name format (regex `^(feature|fix|chore|...)/<DevName>/<desc>$`). No test/lint step. `.husky/pre-commit` runs `dart format` + `flutter analyze --fatal-infos` + `npm run lint` for staged files but NOT tests.
+- confidence_impact: dev can push broken tests; only caught at CI 8min later. Cycle time: code → push → wait 8min CI → see red → fix → push again. Two CI cycles per "broken push" instead of one local catch.
+- risk: cycle-time drag, not blocker. Trade-off: running `flutter test` on pre-push adds ~30s; might be irritating. Acceptable for student team to skip. NOTE-worthy.
+- fix: 2 options:
+  1. (Conservative) Add only smoke tests on pre-push: `flutter test test/core/` + `(cd firebase/functions && npm test -- --run --reporter=basic)` — covers pure logic, completes in ~5s.
+  2. (Skip) Document as intentional — CLAUDE.md §Banned phrases punishes "should pass" + CI is authoritative. Acceptable.
+  - Recommend option 1.
+- authority: husky common pattern + `CLAUDE.md §Verification Before Claiming Done` "Tests pass" before push aligns spirit
+- test: intentionally break a `core/error/app_error.dart` test → `git push` should fail at pre-push, not 8min later at CI
+- deps: pairs with TEST-PURE-001 (core/ tests don't exist yet; can only smoke-test once those land)
+
+### ISSUE TEST-PURE-001
+
+- sev: P3
+- blocker: no
+- area: test gap — core pure-logic helpers
+- files:
+  - `apps/mobile/lib/core/error/app_error.dart` (83 lines)
+  - `apps/mobile/lib/core/utils/pair_id.dart` (single function `pairIdOf`)
+  - `apps/mobile/lib/core/config/app_config.dart`
+- loc: missing tests at `test/core/error/app_error_test.dart`, `test/core/utils/pair_id_test.dart`, `test/core/config/app_config_test.dart`
+- symbols:
+  - `AppError.fromUnknown` factory (collapses try-catch boilerplate per `auth.md` Pattern #3)
+  - `pairIdOf(String a, String b)` (deterministic friendship pairId per `CLAUDE.md §Identifiers`)
+  - `AppConfig.shareBaseUrl`, `AppConfig.googleServerClientId`
+- evidence:
+  - `find apps/mobile/test -name "app_error*"` returns 0 hits.
+  - `find apps/mobile/test -name "pair_id*"` returns 0 hits.
+  - `find apps/mobile/test -name "app_config*"` returns 0 hits.
+  - `auth.md` Pattern #10 layer "Pure logic" reference list includes `auth_validators_test.dart` + `orphan_auth_check_test.dart` but NOT app_error / pair_id / app_config.
+  - Cross-ref ARCH DEEPLINK-001 fix instruction: "Unit: `test/core/config/app_config_test.dart` asserts `inviteLinkPrefix.startsWith('https://')`" — DEEPLINK-001 fix MANDATES app_config test; currently doesn't exist.
+- confidence_impact: 3 critical helpers used app-wide have zero test. `pairIdOf` correctness directly underpins every `isFriend(uid)` rule check (firestore.rules:22-26) — if a future refactor breaks ordering, friend graph reads silently fail. `AppError.fromUnknown` is invoked by `_afterFailure` in every controller per Pattern #4 — wrong mapping silently swallows errors. AppConfig drift caught only at runtime.
+- risk: zero coverage on foundation. Combined with ARCH DEEPLINK-001 fix instruction REQUIRING `app_config_test.dart` — that fix can't land cleanly until this test exists.
+- fix: write 3 small test files (~30 lines each):
+  1. `test/core/error/app_error_test.dart` — verify `AppError.fromUnknown(FirebaseException('permission-denied'))` returns `ForbiddenError`; `OperationCancelledError` round-trip; null cause; fallback message
+  2. `test/core/utils/pair_id_test.dart` — verify `pairIdOf('a','b') == pairIdOf('b','a')` (order-independent); `pairIdOf('a','b') == 'a_b'`; same-uid case `pairIdOf('a','a') == 'a_a'`; empty/edge cases
+  3. `test/core/config/app_config_test.dart` — verify `shareBaseUrl.isNotEmpty`; format assertions per ARCH DEEPLINK-001 fix preconditions
+- authority: `auth.md` Pattern #10 layer "Pure logic" + `CLAUDE.md §Identifiers` pairIdOf reference + `auth.md` Pattern #3 AppError family + ARCH DEEPLINK-001 fix instruction dependency
+- test: `(cd apps/mobile && flutter test test/core/)` — count INCREASES from 4 files to 7 files; all pass
+- deps: pairs with ARCH DEEPLINK-001 fix (which references `app_config_test.dart`)
+
 ## fix_order
 
 ### batch_1_p0
@@ -581,12 +694,16 @@
 10. **CI-MOBILE-003** — add `./gradlew :app:testDebugUnitTest` step (depends on CI-MOBILE-002).
 11. **DOCS-REL-001** — create `docs/release.md` with 6-section pre-launch checklist.
 12. **UNIT-001** — write `firebase_storage_repository_test.dart` (depends on ARCH DATA-ARCH-001 fix).
+13. **MIRROR-001** — move 21 test files to canonical 3-layer subfolder structure (single `git mv` PR).
+14. **CI-TIMEOUT-001** — add `timeout-minutes:` cap to all 5 CI jobs across 3 workflows.
 
 ### batch_4_p3
 
-13. **CI-FUNC-001** — switch CI from `npm test` to `npm run test:coverage` + upload coverage artifact.
-14. **REL-VERSION-001** — pick single version source (pubspec.yaml recommended), add CI guard against drift.
-15. **TEST-QUALITY-001** — audit ProviderContainer disposal in test/ files; fix missing `addTearDown(container.dispose)`.
+15. **CI-FUNC-001** — switch CI from `npm test` to `npm run test:coverage` + upload coverage artifact.
+16. **REL-VERSION-001** — pick single version source (pubspec.yaml recommended), add CI guard against drift.
+17. **TEST-QUALITY-001** — audit ProviderContainer disposal in test/ files; fix missing `addTearDown(container.dispose)`.
+18. **HUSKY-PUSH-001** — add minimal smoke-test step to `.husky/pre-push` (`flutter test test/core/` + functions tests).
+19. **TEST-PURE-001** — write 3 small pure-logic test files (app_error, pair_id, app_config). Pairs with ARCH DEEPLINK-001.
 
 ## test_plan_after_fix
 
@@ -605,6 +722,10 @@
 - `CI-FUNC-001`: CI artifact `functions-coverage` downloadable from PR Actions tab post-fix; `coverage/lcov-report/index.html` shows per-file %
 - `REL-VERSION-001`: dry-run `workflow_dispatch v0.0.1-test` → assert `pubspec.yaml version` matches release tag
 - `TEST-QUALITY-001`: `(cd apps/mobile && flutter test test/features/ --test-randomize-ordering-seed=random)` × 3 → all green, no flake
+- `MIRROR-001`: after `git mv` PR, `flutter test test/features/feed/data/` returns the repo tests; `flutter test test/features/feed/application/` returns controller tests; total test count unchanged
+- `CI-TIMEOUT-001`: smoke test — introduce 8-minute sleep in firestore-rules job → expect job to fail at 15min mark with timeout, not 6h
+- `HUSKY-PUSH-001`: intentionally break `core/error/app_error.dart` test → `git push` should fail at pre-push (post-fix), not 8min later at CI
+- `TEST-PURE-001`: `(cd apps/mobile && flutter test test/core/)` count increases from 4 to 7 files; all pass; cross-verify ARCH DEEPLINK-001 fix unblocked
 
 ## no_issue_notes
 
@@ -752,12 +873,18 @@ Compact notes for important areas checked with no issue found OR covered by ARCH
 
 verdict: not_ready
 
-**Rationale:**
+**Rationale (after pass-8 reverify — 4 new issues added, 1 count fact-fix applied):**
 - 2 P0: E2E-001 (zero integration tests vs CLAUDE.md mandate) + SIGN-001 (release signs with debug keystore — Play Store reject + CI keystore work ineffective).
 - 6 P1 cluster around 3 themes: (a) test coverage gaps directly traceable to ARCH layering violations (CTRL-TEST-001 + WIDGET-TEST-001 + CI-MOBILE-001) — must wait for ARCH batch_1 to land cleanly; (b) release readiness (REL-MINIFY-001 + CRASHLYTICS-001) — no ProGuard, no production error signal; (c) test quality (FUNC-TEST-001) — 2 placeholder files report false green.
-- 4 P2 (CI-MOBILE-002 Java setup, CI-MOBILE-003 Kotlin tests, DOCS-REL-001 runbook, UNIT-001 Storage repo).
-- 3 P3 (CI-FUNC-001 coverage, REL-VERSION-001 source-of-truth, TEST-QUALITY-001 disposal).
-- **Total: 15 issues — P0=2, P1=6, P2=4, P3=3.**
+- 6 P2 (CI-MOBILE-002 Java setup, CI-MOBILE-003 Kotlin tests, DOCS-REL-001 runbook, UNIT-001 Storage repo, **MIRROR-001 21-file convention drift, CI-TIMEOUT-001 no job cap**).
+- 5 P3 (CI-FUNC-001 coverage, REL-VERSION-001 source-of-truth, TEST-QUALITY-001 disposal, **HUSKY-PUSH-001 minimal pre-push, TEST-PURE-001 core helpers untested**).
+- **Total: 19 issues — P0=2, P1=6, P2=6, P3=5.**
+
+Pass-5 fact fix: controller count "11/16" → corrected to "13/16" (auth has 3 controllers + 1 test mismatch ASSUMED in original draft; verified all 3 auth controllers DO have tests; gap is the 3 Feed controllers per CTRL-TEST-001 — unchanged).
+
+Pass-6 fact addition: WIDGET-TEST-001 scope expanded (diary presentation 21 files / profile edit_profile_screen + avatar_picker_sheet / 13 of 22 shared widgets untested). Scope expanded in coverage table not blocker_summary to keep top-level table focused on the original 4 Feed + 7 Auth critical pages.
+
+Pass-7 additions: MIRROR-001 (21 test files violate `apps/mobile/CLAUDE.md §Testing` mirror convention), CI-TIMEOUT-001 (no `timeout-minutes` across all 5 CI jobs — 6h default × free-tier 2000min risk), HUSKY-PUSH-001 (pre-push only validates branch name, no test smoke), TEST-PURE-001 (3 core pure-logic files untested — pair_id/app_error/app_config).
 
 **Cross-audit dependency graph for M3 ship readiness (combined with Phase A):**
 - **Sprint 1 (batch_1 of all 3 audits):** ARCH LAYER-001/-002/FEED-ARCH-001 + SEC APPCHECK-001/USER-SEC-001 + TEST SIGN-001/E2E-001 = unblocks safe testing + production crypto + release signing.
@@ -786,3 +913,48 @@ pass_2_schema: total=15, missing_field_fixed=0 (every issue has sev/blocker/area
 pass_3_dedupe: before=15, after=15, consolidations=0 — verified no two issues share files[0]+symbols+root_cause+fix: SIGN-001 (build.gradle.kts:42 release signing) vs REL-MINIFY-001 (build.gradle.kts:38-43 release minify) — share file but different LINES + different symbol (signingConfig vs isMinifyEnabled) + different fix (read key.properties vs add minify+ProGuard) — kept separate per dedupe criterion; bundle suggested as SAME-PR but issue-level separate. CTRL-TEST-001 vs WIDGET-TEST-001 share theme "Feed coverage gap" but distinct files (application/ vs presentation/), distinct test pattern (ProviderContainer vs WidgetTester), distinct fix — kept separate. E2E-001 vs CI-MOBILE-001 share theme "integration_test" but distinct concern (test files missing vs CI step missing); CI-MOBILE-001 blocked-by E2E-001 (no point wiring CI for tests that don't exist) — kept separate with deps link. FUNC-TEST-001 covers 2 distinct test files but with single root cause "placeholder expect(true).toBe(true)" + single fix pattern — bundled correctly. DOCS-REL-001 vs other release issues (SIGN-001/REL-MINIFY-001/CRASHLYTICS-001/REL-VERSION-001) — DOCS-REL-001 is the orchestration runbook + cross-references each of those; fix is documentation, not config change — kept separate. UNIT-001 vs ARCH DATA-ARCH-001 — UNIT-001 is test file gap, DATA-ARCH-001 is repository code gap; UNIT-001.deps blocks-by DATA-ARCH-001 (test needs new code structure to assert on) — kept separate per Phase A boundary.
 
 pass_4_coverage: checked=14, partial=1 (controller coverage — sampled 4 of 16 controllers via grep + file listing, not deep-read each controller body), blocked=2 (`flutter test` execution + `npm test` execution — audit-only constraint), total=17, verdict=full — every "checked" area backed by evidence: blocked is execution of `flutter test` + `flutter analyze` + `npm test` per audit-only mandate (static evidence from file listing + content sampling sufficient per prompt LAYER B "Allowed to RUN tests IF available, but parse output without flakiness assumption" — chosen NOT to run to avoid mutating worktree state); partial is controller test coverage where N=11 tested + N=5 not tested verified by `find` listing but only 4 sampled for content (login_controller, post_controller LIB, feed_controller LIB, app_camera_controller LIB) — sufficient to verify gap pattern. All checked areas (test file presence/absence, CI workflow steps, build.gradle release block, main.dart bootstrap, pubspec.yaml deps, Android manifest, firebase config, setup docs, husky hooks, package.json scripts, vitest configs, ProGuard absence, integration_test absence, Crashlytics wiring absence) have file read or grep evidence logged in §commands table. Coverage matches log evidence — no "checked" without grep+sample.
+
+pass_5_reverify_notes (count + claim re-verification per user "reverify đến khi không sót gì" request):
+- COUNT FIX 1 (controller tested): pass-1 claim "11/16 controllers tested" was based on initial sampling. Re-counted via `find apps/mobile/lib -name "*_controller.dart"` (16 hits) + `find apps/mobile/test -name "*_controller_test.dart"` (13 hits). True count: 13/16, gap = 3 (`post_controller`, `feed_controller`, `app_camera_controller`). Coverage table updated; CTRL-TEST-001 evidence unchanged (3-controller gap accurate).
+- COUNT CONFIRM (repo tested): 14/14 lib firebase_*_repository.dart files vs 13 tests → gap = 1 (`firebase_storage_repository_test.dart`). UNIT-001 unchanged.
+- COUNT CONFIRM (functions tests): 22 src CF files + 4 helper files + 4 src-test files + 20 test-folder files = 24 vitest test files (2 placeholder-quality flagged by FUNC-TEST-001). Test:source ratio acceptable.
+- COUNT CONFIRM (Flutter test breadth): 80 test files total per `find apps/mobile/test -name "*test.dart" | wc -l`. 75 are real assertions; 0 use `skip:`/`xtest()`/`expect(true,true)` per re-grep. No false-confidence inside Dart-side tests.
+
+pass_6_reverify_notes (module-by-module deep gap scan per user request):
+- DIARY MODULE: `lib/features/diary/presentation/` = 21 dart files (10 top-level + 11 in widgets/). `test/features/diary/presentation/` = DOES NOT EXIST. Tier 0+ "must ship M3" coverage gap. Diary canvas screen at 29.5KB is biggest UI file. Folded into WIDGET-TEST-001 scope expansion (per pass-8 file list update).
+- PROFILE MODULE: `lib/features/profile/presentation/` = 4 screens + 3 widgets. Tests: profile_screen ✓, friend_profile_screen ✓, edit_profile_screen ✗ (23.4KB untested), avatar_picker_sheet ✗ (5.3KB untested). 2-screen gap added to WIDGET-TEST-001 scope.
+- CHAT MODULE: `lib/features/chat/presentation/` = 5 top-level + 10 widgets. Tests: chat_widgets ✓ (covers MessageBubble + ChatInputBar), chat_time_format ✓, inbox_screen ✓, space_members_sheet ✓, mark_as_read_listener ✓. Untested: chat_screen, chat_thread_view, group_chat_screen (group_chat is Tier 2 per CLAUDE.md "Won't have" — scope-noted only, not flagged). chat_screen + chat_thread_view = Tier 1 stretch, acceptable defer; NOT flagged at P1/P2.
+- STREAK MODULE: 4 widgets, 4 tests. Near-complete (empty_state_overlay untested but minor). No new issue.
+- SPACE MODULE: 4 screens + 9 widgets. 9 widget tests cover space_create_sheet + space_edit_sheet + space_management + 4 individual widgets/steps + space_context_widgets + space_controller. Good coverage; flat mirror layout flagged separately under MIRROR-001.
+- WIDGET MODULE: 1 controller test exists (widget_data_service_test.dart); native Kotlin WidgetSyncWorkerTest.kt exists 15.2KB; CI-MOBILE-003 already flags the CI step gap. No new issue.
+- NOTIFICATION MODULE: 3-layer test ✓ (controller + repo + banner widget). Good.
+- REACTION MODULE: 3-layer test ✓. Good.
+- SETTINGS MODULE: 5 widget tests at flat layout (MIRROR-001 covers), plus controller + repo tests. Coverage OK; flat layout flagged.
+- AUTH MODULE: 3 controller tests + 2 repo tests + 0 page widget tests + 1 pure-logic test (auth_validators) + 1 orphan_auth_check test. 7 untested page widgets (intro + 3 login + 4 signup pages). Already in WIDGET-TEST-001 scope.
+- HOME MODULE: 1 home_page_test.dart for 56-line skeleton. Covered by ARCH HOME-ARCH-001 (module duplicate); no new issue.
+- SHARED WIDGETS: 22 lib files vs 9 test files = 13 untested shared widgets (`app_avatar`, `app_taskbar_widgets`, `app_bottom_sheet`, `app_camera_button`, `app_circle_icon_button`, `app_confirm_dialog`, `app_dots_indicator`, `app_glass_surface`, `app_photo_frame`, `or_divider`, `share_modal`, `share_profile_sheet`, `app_act_text_bar`). NOT flagged as separate issue — shared widget breadth-coverage is `UI ≥ 50%` per CLAUDE.md target and 9/22 = 41% — slight below but acceptable for MVP; recommend post-launch sweep instead of pre-M3 block. Note-only in coverage section.
+- CORE/: app_router + app_proportions + hex_color + auth_validators tested ✓. UNTESTED: app_error (P3), pair_id (P3), app_config (P3 — but blocking ARCH DEEPLINK-001 fix). Flagged as TEST-PURE-001.
+
+pass_7_reverify_notes (additional CI/release area sweep per user request):
+- CI TIMEOUT (NEW issue): `grep -n "timeout-minutes" .github/workflows/*.yml` returns 0 hits across 3 workflows × 5 jobs each. Default 6h. Free-tier 2000min/month constraint per `develop-staging.yml:18-23`. NEW: CI-TIMEOUT-001 P2.
+- CI PATHS FILTER: `pr-check.yml` lacks `paths:` filter — every PR runs flutter+functions+rules even for docs-only changes. Compare with `develop-staging.yml:18-23` paths filter. Trade-off: pr-check is gate, can't fully skip (branch-name + commit-validate still needed). Folded into CI-TIMEOUT-001 risk discussion not separate issue — minor optimization.
+- HUSKY PRE-PUSH (NEW issue): `.husky/pre-push` only validates branch name format, no test/lint step. Pre-commit DOES run dart-format + analyze + eslint but not tests. NEW: HUSKY-PUSH-001 P3.
+- ASSETLINKS FINGERPRINT: `firebase/public/.well-known/assetlinks.json` has single SHA256 for `dev.meep.meep`. Covered by SEC pass-7 NOTE; my SIGN-001 fix instruction already references "update fingerprint for production keystore" — sufficient.
+- ANALYSIS_OPTIONS STRICTNESS: `apps/mobile/analysis_options.yaml` has strict-casts + strict-inference + strict-raw-types + 14 linter rules including `require_trailing_commas` + `avoid_print` + `only_throw_errors` + `prefer_const_constructors`. Strict ✓ no issue.
+- GOLDEN TESTS: `grep "matchesGoldenFile\|golden" apps/mobile/test` returns 0 hits. No golden tests anywhere. Per CLAUDE.md not mandated; NOTE-only. Acceptable for MVP.
+- CODECOV / EXTERNAL: No external coverage upload (codecov / coveralls). Internal CI artifact only. Tolerable for student team. NOTE-only.
+- FUNCTIONS COVERAGE CONFIG: `vitest.config.ts:14-19` excludes `src/index.ts` from coverage. Debatable since `sendFriendRequestSchema` lives there. NOTE-only.
+- FAIL-FAST + MATRIX: No matrix builds across workflows. No fail-fast strategy needed. OK.
+- PROGRESSIVE CACHE: pub-cache + gradle cache not cached separately (only Flutter SDK via subosito action). Folded into CI-MOBILE-002 future-proofing recommendation. Minor.
+
+pass_8_reverify_notes (evidence re-grep + final fact-fix per user "đến khi nào em cảm thấy được nhất"):
+- EVIDENCE RE-GREP all 5 NEW issues:
+  - MIRROR-001: `find apps/mobile/test/features -name "*_test.dart" | grep -vE "/application/|/data/|/presentation/"` returns 21 file paths in 4 modules (feed=3, friend=4, settings=5, space=9). Confirmed.
+  - CI-TIMEOUT-001: `grep -n "timeout-minutes" .github/workflows/*.yml` returns 0 hits. Confirmed.
+  - HUSKY-PUSH-001: `cat .husky/pre-push` last assertion at exit 1 — branch name only. Confirmed.
+  - TEST-PURE-001: `find apps/mobile/test -name "app_error*"` + `-name "pair_id*"` + `-name "app_config*"` all return 0 hits. Confirmed.
+- COUNT TALLY: pass-4 total 15 → pass-8 total 19. Distribution P0=2 / P1=6 (unchanged) / P2=4→6 (+MIRROR-001, +CI-TIMEOUT-001) / P3=3→5 (+HUSKY-PUSH-001, +TEST-PURE-001). Net +4.
+- VERDICT: vẫn `not_ready` — P0 count unchanged. New issues are P2/P3 polish + 1 fact-fix. Recommended M3 ship path unchanged: ARCH batch_1 → SEC batch_1 → TEST batch_1 → all P1 in parallel.
+- ANTI-DUPLICATE REVERIFY: pass-3 dedupe ran with 15 issues. Re-run dedupe across 20 issues: MIRROR-001 vs UNIT-001 (both test gaps but distinct files + distinct fixes — moving files vs writing new file); CI-TIMEOUT-001 vs CI-MOBILE-001/-002/-003/CI-FUNC-001 (all CI workflow concerns but distinct fix sites + distinct concerns — timeout cap vs missing job vs cache); HUSKY-PUSH-001 standalone; TEST-PURE-001 vs CTRL-TEST-001 (both test gaps but distinct layer per Pattern #10 — pure logic vs application). 0 consolidations needed.
+- COVERAGE PASS-8: all 5 new issues mapped back to §Audit Checklist sub-sections: MIRROR-001 → "Test mirror convention" (pass-1 had it under no_issue, now elevated); CI-TIMEOUT-001 → "CI mobile/functions pipeline" (new); HUSKY-PUSH-001 → not in original checklist (cross-cutting addition); TEST-PURE-001 → "Unit tests Pure logic" (sub-bullet of auth.md Pattern #10 layer "Pure logic"). pass_1_checklist gap stays 0 because new issues map to existing items + cross-cutting additions noted.
+- FINAL VERDICT pass-8 distribution: **P0=2, P1=6, P2=6, P3=5 — total 19 issues**. SUPERSEDES pass-4 distribution.
