@@ -68,6 +68,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.4'
@@ -88,6 +93,19 @@ jobs:
 
       - name: Test with coverage
         run: flutter test --coverage --reporter=expanded
+
+      - name: Run Kotlin unit tests (widget native)
+        run: |
+          # google-services.json gitignored (secret) -> tao dummy ephemeral cho
+          # google-services plugin parse. Robolectric unit test khong connect
+          # Firebase that nen gia tri dummy du; file KHONG commit.
+          cat > android/app/google-services.json <<'JSON'
+          {"project_info":{"project_number":"000000000000","project_id":"meep-ci-dummy","storage_bucket":"meep-ci-dummy.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000000000","android_client_info":{"package_name":"dev.meep.meep"}},"oauth_client":[],"api_key":[{"current_key":"AIzaSyDUMMYKEYFORCIROBOLECTRICUNITTEST0"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}
+          JSON
+          # gradlew khong commit (android/.gitignore) -> Flutter inject wrapper
+          # qua --config-only truoc khi goi gradle.
+          flutter build apk --config-only --release
+          (cd android && ./gradlew :app:testDebugUnitTest --no-daemon)
 
       - name: Upload coverage artifact
         if: always()
@@ -121,8 +139,16 @@ jobs:
       - name: Type check
         run: npm run typecheck || npx tsc --noEmit
 
-      - name: Test
-        run: npm test
+      - name: Test with coverage
+        run: npm run test:coverage
+
+      - name: Upload functions coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: functions-coverage
+          path: firebase/functions/coverage/
+          retention-days: 7
 
   firestore-rules:
     name: Firestore security rules tests
