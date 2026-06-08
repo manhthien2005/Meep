@@ -8,6 +8,7 @@ name: Deploy to Staging
 # CHƯA KÍCH HOẠT: cần anh fill GitHub Secrets:
 #   - FIREBASE_PROJECT_STAGING (vd "meep-dev-abc123")
 #   - FIREBASE_SERVICE_ACCOUNT_STAGING (JSON key)
+#   - GOOGLE_SERVICES_JSON_STAGING_BASE64 (base64 của apps/mobile/android/app/google-services.json)
 # Sau khi fill secrets, comment-out dòng `if: false` ở job `deploy-functions` để kích hoạt.
 
 on:
@@ -52,6 +53,18 @@ jobs:
 
       - name: Code generation
         run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Prepare Android Firebase config
+        run: |
+          if [ -n "${{ secrets.GOOGLE_SERVICES_JSON_STAGING_BASE64 }}" ]; then
+            echo "${{ secrets.GOOGLE_SERVICES_JSON_STAGING_BASE64 }}" | base64 -d > android/app/google-services.json
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON_STAGING_BASE64 chưa được cấu hình; dùng dummy google-services.json chỉ để CI build APK."
+            cat > android/app/google-services.json <<'JSON'
+          {"project_info":{"project_number":"000000000000","project_id":"meep-ci-dummy","storage_bucket":"meep-ci-dummy.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000000000","android_client_info":{"package_name":"dev.meep.meep"}},"oauth_client":[],"api_key":[{"current_key":"AIzaSyDUMMYKEYFORCIROBOLECTRICUNITTEST0"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}
+          JSON
+          fi
+          test -s android/app/google-services.json
 
       - name: Build APK
         run: flutter build apk --debug
