@@ -135,3 +135,31 @@ Empty state must have a Vietnamese CTA.
 - Adding a new UI dependency (`flutter_animate`, `gap`, `flutter_svg`...).
 - Overriding `MaterialApp` global theme.
 - Changing `core/theme/` shared tokens.
+
+---
+
+## Firebase App Check — debug token workflow
+
+App Check active trong `main.dart` với `AndroidProvider.debug` (debug build) và `AndroidProvider.playIntegrity` (release). Khi anh chạy debug build, mỗi installation cần 1 debug token được allowlist trên Firebase Console — nếu không, mọi call Firestore/Storage/Functions sẽ fail sau khi enforce bật.
+
+### Lấy debug token lần đầu chạy
+
+1. `flutter run` debug build lên emulator/device.
+2. Mở Logcat (Android Studio hoặc `adb logcat`), filter tag `DebugAppCheckProvider`.
+3. Dòng cần copy:
+
+   ```
+   Enter this debug secret into the allow list in the Firebase Console for your project:
+   <UUID-token>
+   ```
+
+### Allowlist token
+
+Firebase Console → project → **App Check** → tab **Apps** → app Android → menu ⋮ → **Manage debug tokens** → **Add debug token** → paste UUID + đặt tên (vd `ThienPDM dev emulator`).
+
+Token này persist per-installation. Reinstall app = sinh token mới = phải allowlist lại.
+
+### Khi nào KHÔNG cần debug token
+
+- Enforcement chưa bật trên Firebase Console cho service đó (status hiện tại pre-PR-merge).
+- Sau khi anh enable enforce ở Console, mọi unallowlisted debug token sẽ bị block.

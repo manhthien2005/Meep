@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -52,6 +54,17 @@ const _emulatorHost = '10.0.2.2';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // App Check chặn automated abuse traffic tới Firestore/Storage/Functions.
+  // Phải activate sau Firebase.initializeApp và TRƯỚC mọi Firebase service call
+  // (Auth/Firestore/Storage bên dưới) để token đính kèm ngay request đầu tiên.
+  // Debug build dùng AndroidProvider.debug — Logcat sẽ in token cần allowlist
+  // qua Firebase Console > App Check > Debug tokens. Release build dùng
+  // Play Integrity attestation từ Google Play.
+  await FirebaseAppCheck.instance.activate(
+    androidProvider:
+        kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+  );
 
   if (_useEmulator) {
     await FirebaseAuth.instance.useAuthEmulator(_emulatorHost, 9099);
