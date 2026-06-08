@@ -4,13 +4,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 
 import 'package:meep/features/notification/data/app_notification.dart';
+import 'package:meep/features/notification/data/notification_preferences.dart';
 import 'package:meep/features/notification/data/notification_repository.dart';
 
 class FirebaseNotificationRepository implements NotificationRepository {
-  FirebaseNotificationRepository({required FirebaseFirestore firestore})
-      : _firestore = firestore;
+  FirebaseNotificationRepository({
+    required FirebaseFirestore firestore,
+    required NotificationPreferences prefs,
+  })  : _firestore = firestore,
+        _prefs = prefs;
 
   final FirebaseFirestore _firestore;
+  final NotificationPreferences _prefs;
 
   CollectionReference<Map<String, dynamic>> _fcmTokensRef(String uid) =>
       _firestore.collection('users').doc(uid).collection('fcmTokens');
@@ -26,6 +31,11 @@ class FirebaseNotificationRepository implements NotificationRepository {
   /// and one fewer write).
   @override
   Future<void> saveFcmToken(String uid, String token) async {
+    // NOTIF-PERF-001: skip get + batch write Firestore nếu token cho uid này
+    // không đổi so với lần ghi gần nhất (local cache). FCM token ổn định giữa
+    // các lần login cùng device → tránh 1 read + 1 batch write mỗi initFcm.
+    if (_prefs.cachedFcmToken(uid) == token) return;
+
     final tokenId = sha256.convert(utf8.encode(token)).toString();
     final existing = await _fcmTokensRef(uid).get();
     final batch = _firestore.batch();
@@ -39,11 +49,15 @@ class FirebaseNotificationRepository implements NotificationRepository {
       'updatedAt': FieldValue.serverTimestamp(),
     });
     await batch.commit();
+    await _prefs.setCachedFcmToken(uid, token);
   }
 
   /// Logout cleanup — remove every fcmTokens doc for this uid.
   @override
   Future<void> deleteFcmToken(String uid) async {
+    // Clear cache trước để lần login kế tiếp (cùng device, có thể khác user)
+    // luôn ghi lại token vào Firestore thay vì skip nhầm theo cache cũ.
+    await _prefs.clearCachedFcmToken(uid);
     final snap = await _fcmTokensRef(uid).get();
     if (snap.docs.isEmpty) return;
     final batch = _firestore.batch();

@@ -69,6 +69,32 @@ abstract class AuthRepository {
   /// Gọi 1 lần khi app khởi động trước `runApp`.
   Future<void> revalidateSession();
 
+  /// True nếu email user hiện tại đã xác minh.
+  ///
+  /// Đọc giá trị CACHED trên `User` — KHÔNG tự cập nhật khi user click link
+  /// xác minh trong inbox (external). Caller phải gọi [reloadUser] trước để
+  /// lấy giá trị mới nhất từ server. Google/social providers luôn trả true
+  /// (email pre-verified). Trả false nếu chưa đăng nhập.
+  bool get isEmailVerified;
+
+  /// Force-reload user state từ server để refresh [isEmailVerified] sau khi
+  /// user click link xác minh trong inbox.
+  ///
+  /// No-op nếu chưa đăng nhập. Network/timeout → swallow (offline-friendly,
+  /// giống [revalidateSession]); session-permanently-invalid codes → [signOut].
+  /// Caller re-đọc [isEmailVerified] sau khi method này trả về.
+  Future<void> reloadUser();
+
+  /// Gửi email xác minh tới địa chỉ của user hiện tại.
+  ///
+  /// Gọi sau signup email/password và khi user bấm "Gửi lại" trên màn xác minh.
+  ///
+  /// Throws:
+  /// - [UnauthenticatedError] khi chưa đăng nhập
+  /// - [UnauthenticatedError] code 'too-many-requests' khi gửi quá nhiều
+  /// - [NetworkError] khi mất mạng
+  Future<void> sendEmailVerification();
+
   /// Delete the current user's Firebase Auth account.
   /// Used for rollback when Firestore batch write fails after createUser.
   Future<void> deleteCurrentUser();

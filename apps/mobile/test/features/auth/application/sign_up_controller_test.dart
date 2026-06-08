@@ -6,9 +6,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/application/sign_up_controller.dart';
 import 'package:meep/features/auth/application/sign_up_state.dart';
+import 'package:meep/features/auth/data/auth_repository.dart';
 import 'package:meep/features/auth/data/firebase_auth_repository.dart';
 import 'package:meep/features/auth/data/firebase_user_repository.dart';
+import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/user_repository.dart';
 import 'package:mock_exceptions/mock_exceptions.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _MockAuthRepository extends Mock implements AuthRepository {}
+
+class _MockUserRepository extends Mock implements UserRepository {}
+
+class _FakeUserProfile extends Fake implements UserProfile {}
 
 ProviderContainer makeContainer({
   MockFirebaseAuth? auth,
@@ -244,6 +254,96 @@ void main() {
         container.read(signUpControllerProvider).errorMessage,
         isNotNull,
       );
+    });
+  });
+
+  group('SignUpController — email verification (AUTH-SEC-002)', () {
+    late _MockAuthRepository authRepo;
+    late _MockUserRepository userRepo;
+
+    setUpAll(() => registerFallbackValue(_FakeUserProfile()));
+
+    setUp(() {
+      authRepo = _MockAuthRepository();
+      userRepo = _MockUserRepository();
+      when(() => authRepo.currentUid).thenReturn('uid-new');
+      when(() => authRepo.currentEmail).thenReturn('new@example.com');
+      when(
+        () => authRepo.signUpWithEmail(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async {});
+      when(() => authRepo.signInWithGoogle()).thenAnswer((_) async {});
+      when(() => authRepo.sendEmailVerification()).thenAnswer((_) async {});
+      when(() => userRepo.createProfile(any())).thenAnswer((_) async {});
+    });
+
+    ProviderContainer mockContainer() {
+      final c = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(authRepo),
+          userRepositoryProvider.overrideWithValue(userRepo),
+        ],
+      );
+      addTearDown(c.dispose);
+      return c;
+    }
+
+    test('email signup → sendEmailVerification được gọi', () async {
+      final c = mockContainer();
+      final ctrl = c.read(signUpControllerProvider.notifier);
+      ctrl.setEmail('new@example.com');
+      ctrl.setPassword('pass1234');
+      ctrl.setDisplayName('New User');
+      ctrl.state = c.read(signUpControllerProvider).copyWith(
+            username: 'newuser',
+            isUsernameAvailable: true,
+          );
+
+      await ctrl.createAccount();
+
+      expect(c.read(signUpControllerProvider).errorMessage, isNull);
+      verify(() => authRepo.sendEmailVerification()).called(1);
+    });
+
+    test('Google signup → KHÔNG gọi sendEmailVerification', () async {
+      final c = mockContainer();
+      final ctrl = c.read(signUpControllerProvider.notifier);
+      ctrl.prefillFromGoogle('Google User');
+      ctrl.setDisplayName('Google User');
+      ctrl.state = c.read(signUpControllerProvider).copyWith(
+            username: 'googleuser',
+            isUsernameAvailable: true,
+          );
+
+      await ctrl.createAccount();
+
+      expect(c.read(signUpControllerProvider).errorMessage, isNull);
+      verifyNever(() => authRepo.sendEmailVerification());
+    });
+
+    test('sendEmailVerification fail → KHÔNG rollback, account vẫn tạo',
+        () async {
+      when(() => authRepo.sendEmailVerification())
+          .thenThrow(Exception('too-many-requests'));
+      final c = mockContainer();
+      final ctrl = c.read(signUpControllerProvider.notifier);
+      ctrl.setEmail('new@example.com');
+      ctrl.setPassword('pass1234');
+      ctrl.setDisplayName('New User');
+      ctrl.state = c.read(signUpControllerProvider).copyWith(
+            username: 'newuser',
+            isUsernameAvailable: true,
+          );
+
+      await ctrl.createAccount();
+
+      // Profile created, no fatal error, no Auth-user rollback.
+      verify(() => userRepo.createProfile(any())).called(1);
+      expect(c.read(signUpControllerProvider).errorMessage, isNull);
+      expect(c.read(signUpControllerProvider).isLoading, isFalse);
+      verifyNever(() => authRepo.deleteCurrentUser());
     });
   });
 }

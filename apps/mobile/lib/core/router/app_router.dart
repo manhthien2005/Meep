@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/auth/application/email_verification_gate.dart';
 import 'package:meep/features/auth/application/login_controller.dart';
 import 'package:meep/features/auth/application/sign_up_controller.dart';
 import 'package:meep/features/auth/presentation/intro_page.dart';
+import 'package:meep/features/auth/presentation/verify_email_page.dart';
 import 'package:meep/features/auth/presentation/login/login_email_page.dart';
 import 'package:meep/features/auth/presentation/login/login_password_page.dart';
 import 'package:meep/features/auth/presentation/login/reset_password_page.dart';
@@ -42,6 +44,10 @@ import 'package:meep/features/streak/presentation/streak_screen.dart';
 
 part 'app_router.g.dart';
 
+/// Root navigator key — cho phép show dialog/overlay từ ngoài cây widget của
+/// route (vd rationale dialog quyền thông báo trong [MeepApp] khi FCM init).
+final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'rootNav');
+
 /// Pure redirect logic — testable không cần GoRouter.
 ///
 /// 5-state machine:
@@ -51,7 +57,12 @@ part 'app_router.g.dart';
 ///     (đang ở /signup/name hoặc /signup/username → giữ nguyên)
 ///   uid != null, profileExists = false, !needsProfile  → /intro (orphaned)
 ///     (đang trong /signup/* → giữ nguyên cho email signup)
+///   uid != null, profileExists = true, requiresEmailVerification → /verify-email
 ///   uid != null, profileExists = true                  → /home
+///
+/// Email-verification hard gate: email/password user chưa verify (profile đã
+/// tồn tại) bị giữ ở /verify-email cho tới khi verify xong. Google user
+/// (email pre-verified) không bị gate.
 ///
 /// Special case: /login/reset-password và /__/auth/* luôn được phép truy cập
 /// bất kể auth state — user có thể có bất kỳ session nào khi reset mật khẩu.
@@ -60,6 +71,7 @@ String? authRedirect({
   required String? uid,
   required bool? profileExists,
   required bool needsProfile,
+  required bool requiresEmailVerification,
   required String location,
 }) {
   if (isLoading) return null;
@@ -103,6 +115,16 @@ String? authRedirect({
 
   // uid != null, profile exists — không redirect user khỏi reset page
   if (location == '/login/reset-password') return null;
+
+  // Email-verification hard gate — sau profileExists==true, trước /home.
+  // Email/password user chưa verify bị giữ ở /verify-email.
+  if (requiresEmailVerification) {
+    if (location == '/verify-email') return null;
+    return '/verify-email';
+  }
+  // Đã verify (hoặc Google) → không để kẹt trên /verify-email.
+  if (location == '/verify-email') return '/home';
+
   return onAuthRoute ? '/home' : null;
 }
 
@@ -167,6 +189,8 @@ class _RouterNotifier extends ChangeNotifier {
       loginControllerProvider.select((s) => s.needsProfile),
       (_, __) => notifyListeners(),
     );
+    // Email-verify gate: redirect re-eval khi verify status đổi (poll/reload).
+    ref.listen(emailVerificationGateProvider, (_, __) => notifyListeners());
     // No-op listen — chỉ để keepAlive, không trigger redirect re-eval.
     ref.listen(signUpControllerProvider, (_, __) {});
   }
@@ -200,6 +224,7 @@ GoRouter appRouter(Ref ref) {
 
   final router = GoRouter(
     initialLocation: initialLocation,
+    navigatorKey: rootNavigatorKey,
     refreshListenable: notifier,
     onException: (context, state, router) {
       final uri = state.uri;
@@ -227,6 +252,7 @@ GoRouter appRouter(Ref ref) {
       final uidState = ref.read(currentUidProvider);
       final profileState = ref.read(currentUserProfileProvider);
       final needsProfile = ref.read(loginControllerProvider).needsProfile;
+      final requiresEmailVerification = ref.read(emailVerificationGateProvider);
       final uid = uidState.valueOrNull;
       final isLoading =
           uidState.isLoading || (uid != null && profileState.isLoading);
@@ -249,6 +275,7 @@ GoRouter appRouter(Ref ref) {
         uid: uid,
         profileExists: profileExists,
         needsProfile: needsProfile,
+        requiresEmailVerification: requiresEmailVerification,
         location: state.matchedLocation,
       );
     },
@@ -277,6 +304,10 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/signup/username',
         builder: (_, __) => const SignUpUsernamePage(),
+      ),
+      GoRoute(
+        path: '/verify-email',
+        builder: (_, __) => const VerifyEmailPage(),
       ),
       GoRoute(
         path: '/login/email',

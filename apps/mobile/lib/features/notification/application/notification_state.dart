@@ -2,6 +2,20 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'notification_state.freezed.dart';
 
+/// Trạng thái quyền thông báo (Android 13+ POST_NOTIFICATIONS).
+///
+/// - [unknown]: chưa kiểm tra / chưa hỏi.
+/// - [granted]: đã cấp → FCM hoạt động.
+/// - [denied]: từ chối nhưng còn hỏi lại được → show rationale dialog.
+/// - [permanentlyDenied]: từ chối vĩnh viễn (chọn "Don't allow") → chỉ bật
+///   được trong Cài đặt hệ thống → show fallback banner + "Mở Cài đặt".
+enum NotificationPermissionStatus {
+  unknown,
+  granted,
+  denied,
+  permanentlyDenied
+}
+
 @freezed
 class BannerPayload with _$BannerPayload {
   const factory BannerPayload({
@@ -30,7 +44,8 @@ class OpenedAppPayload with _$OpenedAppPayload {
 @freezed
 class NotificationState with _$NotificationState {
   const factory NotificationState({
-    @Default(false) bool fcmPermissionDenied,
+    @Default(NotificationPermissionStatus.unknown)
+    NotificationPermissionStatus permissionStatus,
     @Default(false) bool bannerSuppressed,
     BannerPayload? currentBanner,
     OpenedAppPayload? lastOpenedApp,

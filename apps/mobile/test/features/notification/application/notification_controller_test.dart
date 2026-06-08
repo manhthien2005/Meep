@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:meep/features/notification/application/notification_controller.dart';
+import 'package:meep/features/notification/application/notification_state.dart';
 import 'package:meep/features/notification/data/notification_preferences.dart';
 import 'package:meep/features/notification/data/notification_repository.dart';
 
@@ -41,7 +42,7 @@ void main() {
     test('bannerSuppressed = false by default (no pref set)', () {
       final state = container.read(notificationControllerProvider);
       expect(state.bannerSuppressed, isFalse);
-      expect(state.fcmPermissionDenied, isFalse);
+      expect(state.permissionStatus, NotificationPermissionStatus.unknown);
       expect(state.currentBanner, isNull);
     });
 
@@ -341,12 +342,12 @@ void main() {
     // return at `if (_fcmInitialized) return;` skips token save for user B
     // and they get no push until cold restart.
 
-    test('clears currentBanner + lastOpenedApp + fcmPermissionDenied',
+    test('clears currentBanner + lastOpenedApp + resets permissionStatus',
         () async {
       final controller =
           container.read(notificationControllerProvider.notifier);
 
-      // Seed state with a banner + opened-app + denied flag.
+      // Seed state with a banner + opened-app.
       controller.handleForeground(
         const RemoteMessage(
           messageId: 'fg-1',
@@ -371,7 +372,7 @@ void main() {
       final state = container.read(notificationControllerProvider);
       expect(state.currentBanner, isNull);
       expect(state.lastOpenedApp, isNull);
-      expect(state.fcmPermissionDenied, isFalse);
+      expect(state.permissionStatus, NotificationPermissionStatus.unknown);
     });
 
     test('is idempotent — calling twice is safe', () async {

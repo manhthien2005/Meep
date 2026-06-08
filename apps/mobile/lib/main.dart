@@ -40,6 +40,7 @@ import 'package:meep/features/notification/application/notification_state.dart';
 import 'package:meep/features/notification/data/firebase_notification_repository.dart';
 import 'package:meep/features/notification/data/notification_preferences.dart';
 import 'package:meep/features/notification/presentation/widgets/notification_banner.dart';
+import 'package:meep/features/notification/presentation/widgets/notification_permission_dialog.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/firebase_space_repository.dart';
 import 'package:meep/features/streak/application/streak_controller.dart';
@@ -82,6 +83,7 @@ void main() async {
   };
 
   final prefs = await SharedPreferences.getInstance();
+  final notifPrefs = NotificationPreferences(prefs: prefs);
 
   final authRepo = FirebaseAuthRepository(
     auth: FirebaseAuth.instance,
@@ -139,11 +141,12 @@ void main() async {
           FirebaseReactionRepository(FirebaseFirestore.instance),
         ),
         notificationRepositoryProvider.overrideWithValue(
-          FirebaseNotificationRepository(firestore: FirebaseFirestore.instance),
+          FirebaseNotificationRepository(
+            firestore: FirebaseFirestore.instance,
+            prefs: notifPrefs,
+          ),
         ),
-        notificationPreferencesProvider.overrideWithValue(
-          NotificationPreferences(prefs: prefs),
-        ),
+        notificationPreferencesProvider.overrideWithValue(notifPrefs),
         diaryRepositoryProvider.overrideWithValue(
           FirebaseDiaryRepository.firebase(
             firestore: FirebaseFirestore.instance,
@@ -174,6 +177,8 @@ class MeepApp extends ConsumerStatefulWidget {
 
 class _MeepAppState extends ConsumerState<MeepApp> with WidgetsBindingObserver {
   OverlayEntry? _bannerOverlay;
+  OverlayEntry? _permissionOverlay;
+  bool _rationaleAsked = false;
 
   @override
   void initState() {
@@ -184,6 +189,7 @@ class _MeepAppState extends ConsumerState<MeepApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     _bannerOverlay?.remove();
+    _permissionOverlay?.remove();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -193,6 +199,60 @@ class _MeepAppState extends ConsumerState<MeepApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       ref.read(widgetDataServiceProvider).recordLastViewedAt();
     }
+  }
+
+  /// NOTIF-UX-PERM-001 — phản ứng theo trạng thái quyền thông báo:
+  /// - denied (lần đầu) → rationale dialog; user đồng ý → request quyền.
+  /// - permanentlyDenied → fallback banner + "Mở Cài đặt".
+  /// - granted → gỡ banner nếu đang hiện.
+  void _handlePermissionStatus(NotificationPermissionStatus status) {
+    switch (status) {
+      case NotificationPermissionStatus.denied:
+        if (_rationaleAsked) return;
+        _rationaleAsked = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          final ctx = rootNavigatorKey.currentContext;
+          if (ctx == null) return;
+          final allow = await NotificationPermissionDialog.show(ctx);
+          if (!mounted || !allow) return;
+          await ref
+              .read(notificationControllerProvider.notifier)
+              .requestPermission();
+        });
+      case NotificationPermissionStatus.permanentlyDenied:
+        _showPermissionBanner();
+      case NotificationPermissionStatus.granted:
+      case NotificationPermissionStatus.unknown:
+        _removePermissionBanner();
+    }
+  }
+
+  void _showPermissionBanner() {
+    _removePermissionBanner();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final overlay = Overlay.maybeOf(context, rootOverlay: true);
+      if (overlay == null) return;
+      final entry = OverlayEntry(
+        builder: (_) => Positioned(
+          top: MediaQuery.of(context).padding.top + 10,
+          left: (MediaQuery.of(context).size.width - 364) / 2,
+          child: NotificationPermissionBanner(
+            onOpenSettings: () => ref
+                .read(notificationControllerProvider.notifier)
+                .openNotificationSettings(),
+            onDismiss: _removePermissionBanner,
+          ),
+        ),
+      );
+      overlay.insert(entry);
+      _permissionOverlay = entry;
+    });
+  }
+
+  void _removePermissionBanner() {
+    _permissionOverlay?.remove();
+    _permissionOverlay = null;
   }
 
   @override
@@ -226,6 +286,12 @@ class _MeepAppState extends ConsumerState<MeepApp> with WidgetsBindingObserver {
         ref.read(notificationControllerProvider.notifier).initFcm();
       }
     });
+
+    // ── Notification: react to permission status (NOTIF-UX-PERM-001) ────
+    ref.listen(
+      notificationControllerProvider.select((s) => s.permissionStatus),
+      (_, status) => _handlePermissionStatus(status),
+    );
 
     // ── Notification: foreground banner overlay ─────────────────────────
     // The first `ref.listen` fire can happen before `MaterialApp.router`
