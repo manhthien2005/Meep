@@ -2,7 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_proportions.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/shared/widgets/app_note_pill.dart';
 import 'package:meep/shared/widgets/app_photo_frame.dart';
 

@@ -1,4 +1,4 @@
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 
 /// Resolves a caption preset for [type].
 /// Each implementation returns localised, contextual text

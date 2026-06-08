@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/feed/presentation/feed_section.dart';
 import 'package:meep/features/reaction/application/reaction_controller.dart';
 import 'package:meep/features/reaction/data/reaction_repository.dart';

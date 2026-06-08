@@ -4,7 +4,7 @@ import 'package:gal/gal.dart';
 import 'package:http/http.dart' as http;
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/features/feed/application/post_controller.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/shared/widgets/app_circle_icon_button.dart';
 import 'package:share_plus/share_plus.dart';
 

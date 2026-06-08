@@ -4,7 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:meep/core/utils/pair_id.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 
 part 'friend_posts_provider.g.dart';

@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/streak/application/streak_controller.dart';
 import 'package:meep/features/streak/data/streak_repository.dart';
 import 'package:meep/features/streak/presentation/streak_screen.dart';

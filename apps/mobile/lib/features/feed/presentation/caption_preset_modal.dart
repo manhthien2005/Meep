@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:meep/core/theme/app_colors.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 
 class CaptionPresetModal extends StatelessWidget {
   const CaptionPresetModal({super.key, required this.onSelect});

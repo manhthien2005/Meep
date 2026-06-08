@@ -1,7 +1,7 @@
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/chat/data/conversation.dart';
 import 'package:meep/features/chat/data/message.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/space/data/space.dart';
 import 'package:meep/features/space/data/space_member.dart';
 

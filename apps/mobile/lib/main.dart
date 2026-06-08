@@ -28,6 +28,9 @@ import 'package:meep/features/chat/data/firebase_conversation_repository.dart';
 import 'package:meep/features/diary/application/diary_controller.dart';
 import 'package:meep/features/diary/data/firebase_diary_repository.dart';
 import 'package:meep/features/diary/data/image_picker_service.dart';
+import 'package:meep/features/feed/application/feed_controller.dart';
+import 'package:meep/features/feed/data/firebase_post_repository.dart';
+import 'package:meep/features/feed/data/firebase_storage_repository.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/data/firebase_friend_repository.dart';
 import 'package:meep/features/friend/data/firebase_friend_request_repository.dart';
@@ -106,6 +109,12 @@ void main() async {
         ),
         friendRepositoryProvider.overrideWithValue(
           FirebaseFriendRepository(FirebaseFirestore.instance),
+        ),
+        postRepositoryProvider.overrideWithValue(
+          FirebasePostRepository(FirebaseFirestore.instance),
+        ),
+        storageRepositoryProvider.overrideWithValue(
+          FirebaseStorageRepository(FirebaseStorage.instance),
         ),
         friendRequestRepositoryProvider.overrideWithValue(
           FirebaseFriendRequestRepository(

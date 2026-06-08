@@ -1,19 +1,15 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/feed/application/feed_state.dart';
-import 'package:meep/features/feed/data/firebase_post_repository.dart';
-import 'package:meep/features/feed/data/firebase_storage_repository.dart';
-import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/feed/data/post_repository.dart';
 import 'package:meep/features/feed/data/storage_repository.dart';
 import 'package:meep/features/widget/application/widget_data_service.dart';
+import 'package:meep/shared/models/post.dart';
 
 part 'feed_controller.g.dart';
 
@@ -29,12 +25,14 @@ enum FeedFilter {
 }
 
 @Riverpod(keepAlive: true)
-PostRepository postRepository(Ref ref) =>
-    FirebasePostRepository(FirebaseFirestore.instance);
+PostRepository postRepository(Ref ref) => throw UnimplementedError(
+      'wire FirebasePostRepository in main.dart after Firebase.initializeApp',
+    );
 
 @Riverpod(keepAlive: true)
-StorageRepository storageRepository(Ref ref) =>
-    FirebaseStorageRepository(FirebaseStorage.instance);
+StorageRepository storageRepository(Ref ref) => throw UnimplementedError(
+      'wire FirebaseStorageRepository in main.dart after Firebase.initializeApp',
+    );
 
 /// Async notifier — build() returns `Future<FeedState>` so `AsyncValue.when()` works in UI.
 ///
@@ -53,7 +51,12 @@ class FeedController extends _$FeedController {
     // filterSpaceId: used with FeedFilter.space — query feed WHERE spaceId == filterSpaceId
     String? filterSpaceId,
   }) async {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    // uid từ auth abstraction (currentUidProvider) thay vì Firebase Auth
+    // singleton — giữ layering controller → repository, test override được.
+    // Signed-out → feed rỗng; khi uid emit lại (sign-in), provider rebuild →
+    // feed thật.
+    final uid = ref.watch(currentUidProvider).valueOrNull;
+    if (uid == null) return const FeedState();
     final repo = ref.read(postRepositoryProvider);
 
     // [DEBUG/Space Feed] Log lúc build provider — anh đối chiếu với

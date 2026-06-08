@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/feed/data/post_repository.dart';
 
 class FirebasePostRepository implements PostRepository {
@@ -11,6 +11,9 @@ class FirebasePostRepository implements PostRepository {
   final FirebaseFirestore _db;
 
   static const _posts = 'posts';
+
+  @override
+  String newPostId() => _db.collection(_posts).doc().id;
 
   @override
   Future<Post> createPost(Post post) async {

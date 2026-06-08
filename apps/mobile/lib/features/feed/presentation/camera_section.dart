@@ -15,6 +15,7 @@ import 'package:meep/features/feed/application/camera_state.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/presentation/capture_action_bar.dart';
 import 'package:meep/features/feed/presentation/capture_preview_args.dart';
+import 'package:meep/features/feed/presentation/widgets/camera_permission_fallback.dart';
 import 'package:meep/shared/widgets/app_dots_indicator.dart';
 import 'package:meep/shared/widgets/app_photo_frame.dart';
 
@@ -364,12 +365,7 @@ class _DualViewfinderContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (error != null) {
-      return Container(
-        color: AppColors.bw800,
-        alignment: Alignment.center,
-        child:
-            const Icon(Icons.no_photography, color: AppColors.bw500, size: 48),
-      );
+      return const CameraPermissionFallback();
     }
 
     final primaryIsFront = activeLens == CameraLens.front;
@@ -511,12 +507,7 @@ class _ViewfinderContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (error != null) {
-      return Container(
-        color: AppColors.bw800,
-        alignment: Alignment.center,
-        child:
-            const Icon(Icons.no_photography, color: AppColors.bw500, size: 48),
-      );
+      return const CameraPermissionFallback();
     }
     if (!isInitialized || controller == null) {
       return const ColoredBox(color: AppColors.bw900);
@@ -560,6 +551,11 @@ class _HistoryButton extends ConsumerWidget {
             : CachedNetworkImage(
                 imageUrl: thumbUrl,
                 fit: BoxFit.cover,
+                // Thumb render ở 26px — decode bitmap đúng kích thước hiển thị
+                // thay vì full 1080px (IMG-PERF-001).
+                memCacheWidth:
+                    (_thumbSize * MediaQuery.devicePixelRatioOf(context))
+                        .round(),
                 placeholder: (_, __) =>
                     const ColoredBox(color: AppColors.bw700),
                 errorWidget: (_, __, ___) =>

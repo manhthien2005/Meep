@@ -1,5 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,8 +9,8 @@ import 'package:meep/features/feed/application/caption_service.dart';
 import 'package:meep/features/feed/application/caption_service_impl.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/application/post_state.dart';
-import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/space/application/space_controller.dart';
+import 'package:meep/shared/models/post.dart';
 
 part 'post_controller.g.dart';
 
@@ -82,7 +81,7 @@ class PostController extends _$PostController {
   }
 
   Future<bool> submit() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final uid = ref.read(currentUidProvider).valueOrNull;
     if (uid == null) return false;
 
     if (state.isDualMode) {
@@ -104,7 +103,9 @@ class PostController extends _$PostController {
     }
 
     state = state.copyWith(isUploading: true, errorMessage: null);
-    final postId = FirebaseFirestore.instance.collection('posts').doc().id;
+    // postId minted bởi repository (data layer own Firestore id-gen) — cần
+    // trước upload vì Storage path nhúng postId.
+    final postId = ref.read(postRepositoryProvider).newPostId();
     final storageRepo = ref.read(storageRepositoryProvider);
 
     String? imageUrl;
@@ -170,7 +171,6 @@ class PostController extends _$PostController {
     // ── Step 3: create Firestore post doc ────────────────────────────────────
     try {
       final postRepo = ref.read(postRepositoryProvider);
-      final user = FirebaseAuth.instance.currentUser!;
 
       // Empty / whitespace caption → store null so it never renders downstream.
       final trimmedCaption = state.caption?.trim();
@@ -196,23 +196,17 @@ class PostController extends _$PostController {
         }
       }
 
-      // authorName: lưu full displayName. UI tự handle ellipsis (xem
-      // `feed_section.dart` _AuthorLabel: maxLines 1 + ellipsis + Flexible).
-      // Ưu tiên Firestore profile (source of truth, luôn sync với
-      // /users/{uid}.displayName) — FirebaseAuth currentUser.displayName có
-      // thể null/empty với user đăng ký bằng email/phone trước khi sync về
-      // Auth.
+      // authorName: lưu full displayName từ Firestore profile (source of truth,
+      // luôn sync với /users/{uid}.displayName). UI tự handle ellipsis (xem
+      // `feed_section.dart` PostHeaderRow: maxLines 1 + ellipsis + Flexible).
       final profile = ref.read(currentUserProfileProvider).valueOrNull;
-      final profileName = profile?.displayName.trim() ?? '';
-      final authorName = profileName.isNotEmpty
-          ? profileName
-          : (user.displayName?.trim() ?? '');
+      final authorName = profile?.displayName.trim() ?? '';
 
       final post = Post(
         postId: postId,
         authorId: uid,
         authorName: authorName,
-        authorAvatarUrl: user.photoURL ?? profile?.avatarUrl,
+        authorAvatarUrl: profile?.avatarUrl,
         imageUrl: imageUrl,
         backImageUrl: backImageUrl,
         frontImageUrl: frontImageUrl,

@@ -6,6 +6,11 @@ enum CameraMode { single, dual }
 
 enum CameraLens { back, front }
 
+/// Camera permission/init outcome — drives the viewfinder fallback UX.
+/// `unknown` = chưa init xong; `granted` = camera chạy; `denied` = user từ
+/// chối quyền (cần CTA "Mở Cài đặt").
+enum CameraPermissionState { unknown, granted, denied }
+
 @freezed
 class CameraState with _$CameraState {
   const factory CameraState({
@@ -24,6 +29,8 @@ class CameraState with _$CameraState {
     @Default(CameraLens.back) CameraLens activeLens,
     String? backPhotoPath,
     String? frontPhotoPath,
+    @Default(CameraPermissionState.unknown)
+    CameraPermissionState permissionState,
     String? error,
   }) = _CameraState;
 }

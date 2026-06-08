@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:meep/features/feed/application/caption_service.dart';
 import 'package:meep/features/feed/application/weather_code_mapper.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 
 class CaptionServiceImpl implements CaptionService {
   // Session-level geocode cache: last (lat, lng) → address string

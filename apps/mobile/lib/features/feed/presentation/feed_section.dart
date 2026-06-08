@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,11 +9,12 @@ import 'package:meep/core/theme/hex_color.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/reaction/application/reaction_controller.dart';
 import 'package:meep/features/reaction/data/reaction.dart';
 import 'package:meep/features/reaction/presentation/emoji_picker_sheet.dart';
 import 'package:meep/features/reaction/presentation/reaction_list_sheet.dart';
+import 'package:meep/features/feed/presentation/widgets/feed_error_view.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/post_card.dart';
@@ -41,14 +41,12 @@ class FeedSection extends ConsumerWidget {
           ),
         ),
       ),
-      error: (_, __) => const SliverToBoxAdapter(
+      error: (_, __) => SliverToBoxAdapter(
         child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Center(
-            child: Text(
-              'Không tải được feed. Kiểm tra kết nối.',
-              style: TextStyle(color: AppColors.bw500),
-              textAlign: TextAlign.center,
+          padding: const EdgeInsets.all(24),
+          child: FeedErrorView(
+            onRetry: () => ref.invalidate(
+              feedControllerProvider(filter: filter, filterUid: filterUid),
             ),
           ),
         ),
@@ -58,26 +56,17 @@ class FeedSection extends ConsumerWidget {
           return const SliverToBoxAdapter(child: _EmptyState());
         }
 
+        // uid resolve một lần qua auth abstraction (currentUidProvider) thay vì
+        // Firebase Auth singleton trong itemBuilder — giữ layering + tránh
+        // re-read mỗi tile.
+        final currentUid = ref.watch(currentUidProvider).valueOrNull;
+
         return SliverList(
           delegate: SliverChildBuilderDelegate(
             (context, index) {
               if (index >= state.posts.length) return const _FeedFooter();
 
               final post = state.posts[index];
-
-              // Trigger prefetch after frame — never call state mutation during build
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                ref
-                    .read(
-                      feedControllerProvider(
-                        filter: filter,
-                        filterUid: filterUid,
-                      ).notifier,
-                    )
-                    .onItemVisible(index);
-              });
-
-              final currentUid = FirebaseAuth.instance.currentUser?.uid;
               final isOwn = post.authorId == currentUid;
 
               return Padding(
@@ -447,7 +436,7 @@ class _FriendMessageBarState extends ConsumerState<FriendMessageBar> {
   /// displayName + avatarUrl lấy từ UserProfile (Firestore /users/{uid}) thay
   /// vì chỉ FirebaseAuth.currentUser — đảm bảo có data đúng cho mọi auth method
   /// (Google / email signup). uid lấy từ currentUidProvider (auth abstraction)
-  /// thay vì FirebaseAuth.instance trực tiếp — giữ layering UI → repository.
+  /// thay vì Firebase Auth singleton trực tiếp — giữ layering UI → repository.
   void _toggleReaction(String emoji, [GlobalKey? sourceKey]) {
     if (sourceKey != null) _spawnBubbles(emoji, sourceKey);
     try {

@@ -7,9 +7,10 @@ import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/application/feed_filter_controller.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/feed/presentation/feed_filter_dropdown.dart';
 import 'package:meep/features/feed/presentation/grid_photo_tile.dart';
+import 'package:meep/features/feed/presentation/widgets/feed_error_view.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 
 /// Grid view 3-cột tất cả ảnh đã post của filter hiện tại. Mở từ nút
@@ -64,10 +65,14 @@ class GridViewScreen extends ConsumerWidget {
                     'mode=$mode, spaceId=${selection.spaceId}, error=$e',
                   );
                   debugPrint('[Space Feed] Stacktrace UI Grid: $st');
-                  return const Center(
-                    child: Text(
-                      'Không tải được ảnh',
-                      style: TextStyle(color: AppColors.bw500),
+                  return FeedErrorView(
+                    message: 'Không tải được ảnh',
+                    onRetry: () => ref.invalidate(
+                      feedControllerProvider(
+                        filter: mode,
+                        filterUid: selection.authorUid,
+                        filterSpaceId: selection.spaceId,
+                      ),
                     ),
                   );
                 },

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 
 Post _single({String imageUrl = 'https://example.com/photo.jpg'}) => Post(
       postId: 'p1',

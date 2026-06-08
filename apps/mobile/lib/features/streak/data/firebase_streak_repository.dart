@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:meep/core/error/app_error.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/streak/data/streak_repository.dart';
 
 /// Firestore implementation of [StreakRepository].

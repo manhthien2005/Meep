@@ -1,7 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/streak/presentation/widgets/calendar_day_cell.dart';
 import 'package:meep/features/streak/presentation/widgets/streak_calendar.dart';
 
