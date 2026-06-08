@@ -402,4 +402,112 @@ void main() {
       );
     });
   });
+
+  group('isEmailVerified', () {
+    test('false khi chưa đăng nhập', () {
+      expect(repo.isEmailVerified, isFalse);
+    });
+
+    test('true khi user đã verify', () {
+      final auth = MockFirebaseAuth(
+        mockUser: MockUser(uid: 'u1', isEmailVerified: true),
+        signedIn: true,
+      );
+      expect(FirebaseAuthRepository(auth: auth).isEmailVerified, isTrue);
+    });
+
+    test('false khi user chưa verify', () {
+      final auth = MockFirebaseAuth(
+        mockUser: MockUser(uid: 'u1', isEmailVerified: false),
+        signedIn: true,
+      );
+      expect(FirebaseAuthRepository(auth: auth).isEmailVerified, isFalse);
+    });
+  });
+
+  group('sendEmailVerification', () {
+    test('UnauthenticatedError khi chưa đăng nhập', () async {
+      await expectLater(
+        repo.sendEmailVerification(),
+        throwsA(isA<UnauthenticatedError>()),
+      );
+    });
+
+    test('completes khi user signed in', () async {
+      final auth = MockFirebaseAuth(
+        mockUser: MockUser(uid: 'u1', email: 'a@b.com'),
+        signedIn: true,
+      );
+      await expectLater(
+        FirebaseAuthRepository(auth: auth).sendEmailVerification(),
+        completes,
+      );
+    });
+
+    test('UnauthenticatedError "too-many-requests" map tiếng Việt', () async {
+      final user = MockUser(uid: 'u-spam', email: 'a@b.com');
+      final auth = MockFirebaseAuth(mockUser: user, signedIn: true);
+      whenCalling(Invocation.method(#sendEmailVerification, null))
+          .on(user)
+          .thenThrow(FirebaseAuthException(code: 'too-many-requests'));
+      Object? caught;
+      try {
+        await FirebaseAuthRepository(auth: auth).sendEmailVerification();
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught, isA<UnauthenticatedError>());
+      expect((caught! as UnauthenticatedError).message, contains('Quá nhiều'));
+    });
+
+    test('NetworkError khi mất mạng', () async {
+      final user = MockUser(uid: 'u-net', email: 'a@b.com');
+      final auth = MockFirebaseAuth(mockUser: user, signedIn: true);
+      whenCalling(Invocation.method(#sendEmailVerification, null))
+          .on(user)
+          .thenThrow(FirebaseAuthException(code: 'network-request-failed'));
+      await expectLater(
+        FirebaseAuthRepository(auth: auth).sendEmailVerification(),
+        throwsA(isA<NetworkError>()),
+      );
+    });
+  });
+
+  group('reloadUser', () {
+    test('no-op khi chưa đăng nhập', () async {
+      await expectLater(repo.reloadUser(), completes);
+    });
+
+    test('reload thành công → giữ session', () async {
+      final auth = MockFirebaseAuth(
+        mockUser: MockUser(uid: 'u1'),
+        signedIn: true,
+      );
+      final r = FirebaseAuthRepository(auth: auth);
+      await r.reloadUser();
+      expect(r.currentUid, 'u1');
+    });
+
+    test('reload throws user-not-found → signOut', () async {
+      final user = MockUser(uid: 'u-deleted');
+      final auth = MockFirebaseAuth(mockUser: user, signedIn: true);
+      whenCalling(Invocation.method(#reload, null))
+          .on(user)
+          .thenThrow(FirebaseAuthException(code: 'user-not-found'));
+      final r = FirebaseAuthRepository(auth: auth);
+      await r.reloadUser();
+      expect(r.currentUid, isNull);
+    });
+
+    test('reload throws network-request-failed → giữ session', () async {
+      final user = MockUser(uid: 'u-offline');
+      final auth = MockFirebaseAuth(mockUser: user, signedIn: true);
+      whenCalling(Invocation.method(#reload, null))
+          .on(user)
+          .thenThrow(FirebaseAuthException(code: 'network-request-failed'));
+      final r = FirebaseAuthRepository(auth: auth);
+      await r.reloadUser();
+      expect(r.currentUid, 'u-offline');
+    });
+  });
 }

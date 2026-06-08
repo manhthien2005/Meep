@@ -4,20 +4,28 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:meep/features/notification/data/app_notification.dart';
 import 'package:meep/features/notification/data/firebase_notification_repository.dart';
+import 'package:meep/features/notification/data/notification_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late FakeFirebaseFirestore db;
+  late NotificationPreferences prefs;
   late FirebaseNotificationRepository repo;
 
   const uid = 'uid-alice';
   const otherUid = 'uid-bob';
 
-  setUp(() {
+  setUp(() async {
     db = FakeFirebaseFirestore();
-    repo = FirebaseNotificationRepository(firestore: db);
+    SharedPreferences.setMockInitialValues({});
+    prefs =
+        NotificationPreferences(prefs: await SharedPreferences.getInstance());
+    repo = FirebaseNotificationRepository(firestore: db, prefs: prefs);
   });
 
   CollectionReference<Map<String, dynamic>> fcmTokensRef(String forUid) =>
@@ -87,6 +95,46 @@ void main() {
       expect(all.docs.first.id, tokenIdOf(token));
     });
 
+    test('NOTIF-PERF-001: skips Firestore write when cached token unchanged',
+        () async {
+      // First save writes + caches the token.
+      await repo.saveFcmToken(uid, token);
+      expect(prefs.cachedFcmToken(uid), token);
+
+      // Delete the doc out-of-band; a cached-skip save must NOT recreate it.
+      await fcmTokensRef(uid).doc(tokenIdOf(token)).delete();
+      await repo.saveFcmToken(uid, token);
+
+      final snap = await fcmTokensRef(uid).get();
+      expect(
+        snap.docs,
+        isEmpty,
+        reason: 'cached token unchanged → no get + no batch write',
+      );
+    });
+
+    test('NOTIF-PERF-001: writes again when token changes', () async {
+      await repo.saveFcmToken(uid, token);
+      const newToken = 'fcm-token-rotated-xyz';
+      await repo.saveFcmToken(uid, newToken);
+
+      final all = await fcmTokensRef(uid).get();
+      expect(all.docs.length, 1);
+      expect(all.docs.first.id, tokenIdOf(newToken));
+      expect(prefs.cachedFcmToken(uid), newToken);
+    });
+
+    test('NOTIF-PERF-001: per-uid cache — user B not skipped by user A token',
+        () async {
+      await repo.saveFcmToken(uid, token);
+      // Same token, different uid (user B on same device) → must still write.
+      await repo.saveFcmToken(otherUid, token);
+
+      final bSnap = await fcmTokensRef(otherUid).get();
+      expect(bSnap.docs.length, 1);
+      expect(bSnap.docs.first.id, tokenIdOf(token));
+    });
+
     test('does not touch other users fcmTokens', () async {
       await fcmTokensRef(otherUid).doc('other-token-id').set({
         'token': 'other-token',
@@ -128,6 +176,21 @@ void main() {
 
     test('no-op when uid has no tokens — does not throw', () async {
       await expectLater(repo.deleteFcmToken(uid), completes);
+    });
+
+    test('NOTIF-PERF-001: clears token cache so next save re-writes', () async {
+      const token = 'fcm-token-abc123';
+      await repo.saveFcmToken(uid, token);
+      expect(prefs.cachedFcmToken(uid), token);
+
+      await repo.deleteFcmToken(uid);
+      expect(prefs.cachedFcmToken(uid), isNull);
+
+      // Same token after delete must write again (cache cleared).
+      await repo.saveFcmToken(uid, token);
+      final snap = await fcmTokensRef(uid).get();
+      expect(snap.docs.length, 1);
+      expect(snap.docs.first.id, tokenIdOf(token));
     });
 
     test('does not touch other users fcmTokens', () async {

@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:meep/features/auth/application/auth_providers.dart';
@@ -55,27 +56,65 @@ class NotificationController extends _$NotificationController {
     return NotificationState(bannerSuppressed: suppressed);
   }
 
-  /// Idempotent — re-entry on uid stream re-emit (vd refresh token flip
-  /// AsyncLoading→AsyncData) must NOT chain extra `onMessage` listeners,
-  /// else `_handleForeground` fires N times per push.
+  /// Kiểm tra quyền thông báo (Android 13+ POST_NOTIFICATIONS) khi user login.
+  ///
+  /// Nếu đã granted → wire FCM ngay. Nếu chưa → KHÔNG tự request ở đây; chỉ set
+  /// [NotificationState.permissionStatus] để UI (MeepApp) hiển thị rationale
+  /// dialog (denied/chưa hỏi) hoặc fallback banner (permanentlyDenied). User
+  /// bấm "Cho phép" → [requestPermission]. Android < 13 luôn granted.
   Future<void> initFcm() async {
+    if (_fcmInitialized) return;
+
+    final status = await Permission.notification.status;
+    if (status.isGranted) {
+      await _setupFcm();
+      state = state.copyWith(
+        permissionStatus: NotificationPermissionStatus.granted,
+      );
+      return;
+    }
+    state = state.copyWith(permissionStatus: _mapStatus(status));
+  }
+
+  /// Request POST_NOTIFICATIONS qua hệ thống — gọi từ rationale dialog khi user
+  /// bấm "Cho phép". Granted → wire FCM; denied/permanent → set state cho UI.
+  Future<void> requestPermission() async {
+    final result = await Permission.notification.request();
+    if (result.isGranted) {
+      await _setupFcm();
+      state = state.copyWith(
+        permissionStatus: NotificationPermissionStatus.granted,
+      );
+      return;
+    }
+    state = state.copyWith(permissionStatus: _mapStatus(result));
+  }
+
+  /// Mở màn Cài đặt ứng dụng để user bật thông báo thủ công khi
+  /// permanentlyDenied (hệ thống không cho hỏi lại trong app).
+  Future<bool> openNotificationSettings() => openAppSettings();
+
+  static NotificationPermissionStatus _mapStatus(PermissionStatus s) {
+    if (s.isGranted || s.isLimited || s.isProvisional) {
+      return NotificationPermissionStatus.granted;
+    }
+    if (s.isPermanentlyDenied || s.isRestricted) {
+      return NotificationPermissionStatus.permanentlyDenied;
+    }
+    return NotificationPermissionStatus.denied;
+  }
+
+  /// Wire FCM: local notifications + token save + onTokenRefresh + cold-start
+  /// deep link + foreground/opened listeners.
+  ///
+  /// Idempotent qua [_fcmInitialized] — re-entry on uid stream re-emit (vd
+  /// refresh token flip AsyncLoading→AsyncData) must NOT chain extra
+  /// `onMessage` listeners, else `_handleForeground` fires N times per push.
+  Future<void> _setupFcm() async {
     if (_fcmInitialized) return;
     _fcmInitialized = true;
 
     final messaging = FirebaseMessaging.instance;
-
-    final settings = await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    if (settings.authorizationStatus == AuthorizationStatus.denied) {
-      state = state.copyWith(fcmPermissionDenied: true);
-      // Reset so retry after user grants in Settings re-runs the full flow.
-      _fcmInitialized = false;
-      return;
-    }
 
     await _initLocalNotifications();
 
@@ -273,7 +312,7 @@ class NotificationController extends _$NotificationController {
     state = state.copyWith(
       currentBanner: null,
       lastOpenedApp: null,
-      fcmPermissionDenied: false,
+      permissionStatus: NotificationPermissionStatus.unknown,
     );
   }
 }

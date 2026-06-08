@@ -83,12 +83,15 @@ class _SignUpUsernamePageState extends ConsumerState<SignUpUsernamePage> {
       if (!ref.read(signUpControllerProvider).isUsernameAvailable) return;
     }
 
+    final isGoogle = ref.read(signUpControllerProvider).isGoogleSignIn;
     await ref.read(signUpControllerProvider.notifier).createAccount();
     if (!mounted) return;
     if (ref.read(signUpControllerProvider).errorMessage == null) {
       // Delay 800ms để user thấy "Hoàn tất" trước khi redirect
       await Future<void>.delayed(const Duration(milliseconds: 800));
-      if (mounted) context.go('/home');
+      // Email/password signup chưa verify → màn xác minh; Google đã verified
+      // → thẳng /home. Router redirect cũng backstop, đây chỉ tránh flash.
+      if (mounted) context.go(isGoogle ? '/home' : '/verify-email');
     }
   }
 

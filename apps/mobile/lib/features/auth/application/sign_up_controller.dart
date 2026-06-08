@@ -186,6 +186,16 @@ class SignUpController extends _$SignUpController {
           updatedAt: DateTime.now(),
         ),
       );
+
+      // Email/password signup: gửi email xác minh ngay. Swallow lỗi gửi —
+      // tài khoản đã tạo hợp lệ, user resend được từ /verify-email; không
+      // rollback chỉ vì gửi mail fail (vd too-many-requests).
+      if (!state.isGoogleSignIn) {
+        try {
+          await authRepo.sendEmailVerification();
+        } catch (_) {/* resend available on /verify-email */}
+      }
+
       state = state.copyWith(isLoading: false);
     } catch (e) {
       // Rollback: nếu Firebase Auth user đã tạo nhưng Firestore batch fail →

@@ -11,6 +11,7 @@ void main() {
           uid: null,
           profileExists: null,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/home',
         ),
         isNull,
@@ -21,6 +22,7 @@ void main() {
           uid: 'u1',
           profileExists: true,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/intro',
         ),
         isNull,
@@ -35,6 +37,7 @@ void main() {
           uid: null,
           profileExists: null,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/intro',
         ),
         isNull,
@@ -48,6 +51,7 @@ void main() {
           uid: null,
           profileExists: null,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/login/email',
         ),
         isNull,
@@ -61,6 +65,7 @@ void main() {
           uid: null,
           profileExists: null,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/signup/email',
         ),
         isNull,
@@ -74,6 +79,7 @@ void main() {
           uid: null,
           profileExists: null,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/home',
         ),
         '/intro',
@@ -87,6 +93,7 @@ void main() {
           uid: null,
           profileExists: null,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/profile',
         ),
         '/intro',
@@ -101,6 +108,7 @@ void main() {
           uid: 'u1',
           profileExists: null,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/home',
         ),
         isNull,
@@ -111,6 +119,7 @@ void main() {
           uid: 'u1',
           profileExists: null,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/intro',
         ),
         isNull,
@@ -125,6 +134,7 @@ void main() {
           uid: 'u1',
           profileExists: false,
           needsProfile: true,
+          requiresEmailVerification: false,
           location: '/signup/name',
         ),
         isNull,
@@ -139,6 +149,7 @@ void main() {
           uid: 'u1',
           profileExists: false,
           needsProfile: true,
+          requiresEmailVerification: false,
           location: '/signup/username',
         ),
         isNull,
@@ -152,6 +163,7 @@ void main() {
           uid: 'u1',
           profileExists: false,
           needsProfile: true,
+          requiresEmailVerification: false,
           location: '/home',
         ),
         '/signup/name',
@@ -165,6 +177,7 @@ void main() {
           uid: 'u1',
           profileExists: false,
           needsProfile: true,
+          requiresEmailVerification: false,
           location: '/signup/email',
         ),
         '/signup/name',
@@ -179,6 +192,7 @@ void main() {
           uid: 'u1',
           profileExists: false,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/intro',
         ),
         '/intro',
@@ -192,6 +206,7 @@ void main() {
           uid: 'u1',
           profileExists: false,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/home',
         ),
         '/intro',
@@ -207,6 +222,7 @@ void main() {
           uid: 'u1',
           profileExists: false,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/signup/email',
         ),
         isNull,
@@ -221,6 +237,7 @@ void main() {
           uid: 'u1',
           profileExists: true,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/home',
         ),
         isNull,
@@ -234,6 +251,7 @@ void main() {
           uid: 'u1',
           profileExists: true,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/profile',
         ),
         isNull,
@@ -247,6 +265,7 @@ void main() {
           uid: 'u1',
           profileExists: true,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/intro',
         ),
         '/home',
@@ -260,6 +279,7 @@ void main() {
           uid: 'u1',
           profileExists: true,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/signup/email',
         ),
         '/home',
@@ -273,6 +293,7 @@ void main() {
           uid: 'u1',
           profileExists: true,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/login/email',
         ),
         '/home',
@@ -286,6 +307,7 @@ void main() {
           uid: 'u1',
           profileExists: true,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/dev/widgets',
         ),
         '/home',
@@ -300,6 +322,7 @@ void main() {
           uid: null,
           profileExists: null,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/inbox',
         ),
         isNull,
@@ -313,6 +336,7 @@ void main() {
           uid: 'u1',
           profileExists: true,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/chat/conv-1',
         ),
         isNull,
@@ -326,9 +350,196 @@ void main() {
           uid: null,
           profileExists: null,
           needsProfile: false,
+          requiresEmailVerification: false,
           location: '/group-chat/conv-1',
         ),
         isNull,
+      );
+    });
+  });
+
+  group('authRedirect — email verification hard gate (AUTH-SEC-002)', () {
+    test('unverified + profile + /home → /verify-email', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: true,
+          needsProfile: false,
+          requiresEmailVerification: true,
+          location: '/home',
+        ),
+        '/verify-email',
+      );
+    });
+
+    test('unverified + /intro → /verify-email', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: true,
+          needsProfile: false,
+          requiresEmailVerification: true,
+          location: '/intro',
+        ),
+        '/verify-email',
+      );
+    });
+
+    test('unverified + already on /verify-email → null (stay)', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: true,
+          needsProfile: false,
+          requiresEmailVerification: true,
+          location: '/verify-email',
+        ),
+        isNull,
+      );
+    });
+
+    test('unverified + deep link /profile → /verify-email (gate catches all)',
+        () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: true,
+          needsProfile: false,
+          requiresEmailVerification: true,
+          location: '/profile',
+        ),
+        '/verify-email',
+      );
+    });
+
+    test('verified + on /verify-email → /home (evict)', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: true,
+          needsProfile: false,
+          requiresEmailVerification: false,
+          location: '/verify-email',
+        ),
+        '/home',
+      );
+    });
+
+    test('verified + /home → null (stay, no gate)', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: true,
+          needsProfile: false,
+          requiresEmailVerification: false,
+          location: '/home',
+        ),
+        isNull,
+      );
+    });
+
+    test('unverified BUT reset-password deep link → null (bypass gate)', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: true,
+          needsProfile: false,
+          requiresEmailVerification: true,
+          location: '/login/reset-password',
+        ),
+        isNull,
+      );
+    });
+
+    test('unverified BUT /__/auth/action → null (bypass gate)', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: true,
+          needsProfile: false,
+          requiresEmailVerification: true,
+          location: '/__/auth/action',
+        ),
+        isNull,
+      );
+    });
+
+    test('unverified BUT /chat dev bypass → null', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: true,
+          needsProfile: false,
+          requiresEmailVerification: true,
+          location: '/chat/c1',
+        ),
+        isNull,
+      );
+    });
+
+    test('unverified + profile==null (orphan) → /intro (gate not reached)', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: false,
+          needsProfile: false,
+          requiresEmailVerification: true,
+          location: '/home',
+        ),
+        '/intro',
+      );
+    });
+
+    test('unverified + profileExists==null → null (wait, gate not reached)',
+        () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: 'u1',
+          profileExists: null,
+          needsProfile: false,
+          requiresEmailVerification: true,
+          location: '/home',
+        ),
+        isNull,
+      );
+    });
+
+    test('isLoading wins over gate', () {
+      expect(
+        authRedirect(
+          isLoading: true,
+          uid: 'u1',
+          profileExists: true,
+          needsProfile: false,
+          requiresEmailVerification: true,
+          location: '/home',
+        ),
+        isNull,
+      );
+    });
+
+    test('uid null + gate true (impossible but safe) → /intro', () {
+      expect(
+        authRedirect(
+          isLoading: false,
+          uid: null,
+          profileExists: null,
+          needsProfile: false,
+          requiresEmailVerification: true,
+          location: '/home',
+        ),
+        '/intro',
       );
     });
   });

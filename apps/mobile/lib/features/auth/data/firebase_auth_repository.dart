@@ -181,6 +181,42 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
+  bool get isEmailVerified => _auth.currentUser?.emailVerified ?? false;
+
+  @override
+  Future<void> reloadUser() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    try {
+      await user.reload().timeout(const Duration(seconds: 5));
+    } on FirebaseAuthException catch (e) {
+      if (_isSessionPermanentlyInvalid(e.code)) {
+        await signOut();
+      }
+      // else: transient → giữ session, poll sẽ retry.
+    } on TimeoutException {
+      // Mạng chậm → giữ session.
+    } catch (_) {
+      // Unknown — conservative, không signOut.
+    }
+  }
+
+  @override
+  Future<void> sendEmailVerification() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw const UnauthenticatedError(
+        message: 'Bạn cần đăng nhập để xác minh email',
+      );
+    }
+    try {
+      await user.sendEmailVerification();
+    } on FirebaseAuthException catch (e) {
+      throw _mapSendVerificationError(e);
+    }
+  }
+
+  @override
   Future<void> deleteCurrentUser() async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -317,6 +353,16 @@ class FirebaseAuthRepository implements AuthRepository {
       };
 
   AppError _mapGenericError(FirebaseAuthException e) => switch (e.code) {
+        'network-request-failed' =>
+          const NetworkError(message: 'Không có kết nối mạng'),
+        _ => UnexpectedError(message: e.message ?? e.code, cause: e),
+      };
+
+  AppError _mapSendVerificationError(FirebaseAuthException e) =>
+      switch (e.code) {
+        'too-many-requests' => const UnauthenticatedError(
+            message: 'Quá nhiều lần gửi. Vui lòng thử lại sau',
+          ),
         'network-request-failed' =>
           const NetworkError(message: 'Không có kết nối mạng'),
         _ => UnexpectedError(message: e.message ?? e.code, cause: e),
