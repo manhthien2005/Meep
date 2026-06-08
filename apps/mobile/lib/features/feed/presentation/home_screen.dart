@@ -263,14 +263,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final filterSelection = ref.watch(feedFilterControllerProvider);
     final filterMode = _filterModeFor(filterSelection);
 
-    // [DEBUG/Space Feed] Log mỗi lần HomeScreen rebuild với filter mới.
-    // Anh đối chiếu thứ tự: FilterController log → HomeScreen log → FeedController log → Repo log.
-    debugPrint(
-      '[Space Feed] HomeScreen build — mode=$filterMode, '
-      'authorUid=${filterSelection.authorUid}, '
-      'spaceId=${filterSelection.spaceId}, label="${filterSelection.label}"',
-    );
-
     final feedAsync = ref.watch(
       feedControllerProvider(
         filter: filterMode,
@@ -335,22 +327,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Expanded(
               child: feedAsync.when(
                 loading: () => _buildPageView(null, isLoading: true),
-                error: (e, st) {
-                  // [DEBUG/Space Feed] Đây là chỗ UI hiển thị "Không tải
-                  // được feed". Log error cuối cùng + stacktrace để anh
-                  // thấy rõ trong terminal.
-                  debugPrint(
-                    '[Space Feed] HomeScreen render ERROR state — '
-                    'mode=$filterMode, spaceId=${filterSelection.spaceId}, error=$e',
-                  );
-                  debugPrint('[Space Feed] Stacktrace UI: $st');
-                  return _buildPageView(null, isError: true);
-                },
+                error: (e, st) => _buildPageView(null, isError: true),
                 data: (state) {
-                  debugPrint(
-                    '[Space Feed] HomeScreen render DATA state — '
-                    'mode=$filterMode, posts=${state.posts.length}',
-                  );
                   _posts = state.posts;
                   return _buildPageView(state.posts);
                 },

@@ -1,21 +1,22 @@
-import { setGlobalOptions } from 'firebase-functions/v2';
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { initializeApp } from 'firebase-admin/app';
-import { z } from 'zod';
+import { setGlobalOptions } from "firebase-functions/v2";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { initializeApp } from "firebase-admin/app";
+import { z } from "zod";
 
 // Feed module
-export { onPostCreated } from './feed/onPostCreated.js';
-export { onPostDeleted } from './feed/onPostDeleted.js';
+export { onPostCreated } from "./feed/onPostCreated.js";
+export { onPostDeleted } from "./feed/onPostDeleted.js";
 
 // Settings module
-export { blockUser } from './settings/blockUser.js';
-export { deleteAccount } from './settings/deleteAccount.js';
+export { blockUser } from "./settings/blockUser.js";
+export { deleteAccount } from "./settings/deleteAccount.js";
 
 initializeApp();
 
 setGlobalOptions({
-  region: 'asia-southeast1',
+  region: "asia-southeast1",
   maxInstances: 10,
+  memory: "256MiB",
   timeoutSeconds: 60,
 });
 
@@ -40,19 +41,19 @@ const sendFriendRequestSchema = z
  */
 export const sendFriendRequest = onCall((request) => {
   if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Login required');
+    throw new HttpsError("unauthenticated", "Login required");
   }
 
   const parsed = sendFriendRequestSchema.safeParse(request.data);
   if (!parsed.success) {
-    throw new HttpsError('invalid-argument', parsed.error.message);
+    throw new HttpsError("invalid-argument", parsed.error.message);
   }
 
   const { toUid } = parsed.data;
   const fromUid = request.auth.uid;
 
   if (fromUid === toUid) {
-    throw new HttpsError('failed-precondition', 'Cannot friend yourself');
+    throw new HttpsError("failed-precondition", "Cannot friend yourself");
   }
 
   // TODO(impl): see comment above.
@@ -65,8 +66,8 @@ export const sendFriendRequest = onCall((request) => {
 
 // ===== Friend module =====
 
-export { acceptFriendRequest } from './friend/acceptFriendRequest.js';
-export { onFriendshipDeleted } from './friend/onFriendshipDeleted.js';
+export { acceptFriendRequest } from "./friend/acceptFriendRequest.js";
+export { onFriendshipDeleted } from "./friend/onFriendshipDeleted.js";
 
 // ===== Settings module stubs =====
 
@@ -79,23 +80,23 @@ export { onFriendshipDeleted } from './friend/onFriendshipDeleted.js';
 
 // ===== Notification module =====
 
-export { onFriendRequestCreated } from './notification/onFriendRequestCreated.js';
-export { onFriendRequestAccepted } from './notification/onFriendRequestAccepted.js';
-export { onReactionCreated } from './notification/onReactionCreated.js';
+export { onFriendRequestCreated } from "./notification/onFriendRequestCreated.js";
+export { onFriendRequestAccepted } from "./notification/onFriendRequestAccepted.js";
+export { onReactionCreated } from "./notification/onReactionCreated.js";
 
 // ===== Chat module =====
 
-export { onMessageCreated } from './chat/onMessageCreated.js';
+export { onMessageCreated } from "./chat/onMessageCreated.js";
 
 // ===== Space module =====
 
-export { createSpace } from './space/createSpace.js';
-export { updateSpace } from './space/updateSpace.js';
-export { leaveSpace } from './space/leaveSpace.js';
-export { kickMember } from './space/kickMember.js';
-export { transferOwnership } from './space/transferOwnership.js';
-export { onSpaceMemberAdded } from './space/onSpaceMemberAdded.js';
-export { onSpaceMemberRemoved } from './space/onSpaceMemberRemoved.js';
-export { onSpaceDeleted } from './space/onSpaceDeleted.js';
+export { createSpace } from "./space/createSpace.js";
+export { updateSpace } from "./space/updateSpace.js";
+export { leaveSpace } from "./space/leaveSpace.js";
+export { kickMember } from "./space/kickMember.js";
+export { transferOwnership } from "./space/transferOwnership.js";
+export { onSpaceMemberAdded } from "./space/onSpaceMemberAdded.js";
+export { onSpaceMemberRemoved } from "./space/onSpaceMemberRemoved.js";
+export { onSpaceDeleted } from "./space/onSpaceDeleted.js";
 // onSpacePostCreated — KHÔNG export per Option A: spacePostFanOut là
 // helper gọi từ feed/onPostCreated khi post.spaceId != null (đã wire).

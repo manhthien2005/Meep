@@ -17,6 +17,7 @@ class FirebaseNotificationRepository implements NotificationRepository {
 
   final FirebaseFirestore _firestore;
   final NotificationPreferences _prefs;
+  static const _notificationLimit = 50;
 
   CollectionReference<Map<String, dynamic>> _fcmTokensRef(String uid) =>
       _firestore.collection('users').doc(uid).collection('fcmTokens');
@@ -88,6 +89,7 @@ class FirebaseNotificationRepository implements NotificationRepository {
     try {
       final snap = await _notificationsRef(uid)
           .orderBy('createdAt', descending: true)
+          .limit(_notificationLimit)
           .get();
       return snap.docs
           .map(

@@ -51,7 +51,7 @@ import java.util.concurrent.TimeUnit
  *   - Unread count() fails          → treat as 0, continue
  *   - Avatar download fails         → default avatar drawable
  *
- * Doze / battery save can defer execution beyond the 15-minute cadence —
+ * Doze / battery save can defer execution beyond the periodic cadence —
  * known limitation; foreground re-trigger lives in T5.
  */
 class WidgetSyncWorker(
@@ -273,7 +273,7 @@ class WidgetSyncWorker(
         private const val TAG = "WidgetSyncWorker"
         private const val PERIODIC_WORK_NAME = "meep.widget.sync.periodic"
         private const val ONE_TIME_WORK_NAME = "meep.widget.sync.oneshot"
-        private const val PERIODIC_INTERVAL_MINUTES = 15L
+        private const val PERIODIC_INTERVAL_MINUTES = 60L
 
         // Bitmap targets — match max widget render size. Photo cap chosen so a
         // 4×2 widget at xxxhdpi (~640px wide) renders sharp; avatar at 24dp
@@ -292,14 +292,15 @@ class WidgetSyncWorker(
             if (count >= 10) "9+" else count.toString()
 
         /**
-         * Schedule the 15-minute periodic refresh. Safe to call repeatedly —
+         * Schedule the periodic refresh. Safe to call repeatedly —
          * [ExistingPeriodicWorkPolicy.KEEP] preserves the existing schedule.
-         * WorkManager enforces a 15-minute floor so the interval cannot go
-         * lower regardless of caller intent.
+         * Periodic work is intentionally conservative; immediate refreshes
+         * still happen through [enqueueOneTime] when the widget is added.
          */
         fun schedulePeriodic(context: Context) {
             val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .setRequiredNetworkType(NetworkType.UNMETERED)
+                .setRequiresBatteryNotLow(true)
                 .build()
             val request = PeriodicWorkRequestBuilder<WidgetSyncWorker>(
                 PERIODIC_INTERVAL_MINUTES,

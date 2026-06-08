@@ -31,12 +31,6 @@ class GridViewScreen extends ConsumerWidget {
       mode = FeedFilter.all;
     }
 
-    // [DEBUG/Space Feed] Log mỗi lần Grid rebuild để đối chiếu với Home.
-    debugPrint(
-      '[Space Feed] GridViewScreen build — mode=$mode, '
-      'authorUid=${selection.authorUid}, spaceId=${selection.spaceId}',
-    );
-
     final feedAsync = ref.watch(
       feedControllerProvider(
         filter: mode,
@@ -57,39 +51,24 @@ class GridViewScreen extends ConsumerWidget {
                   child:
                       CircularProgressIndicator(color: AppColors.turquoise500),
                 ),
-                error: (e, st) {
-                  // [DEBUG/Space Feed] Grid render error — log để biết
-                  // user thấy "Không tải được ảnh" do nguyên nhân nào.
-                  debugPrint(
-                    '[Space Feed] GridViewScreen render ERROR — '
-                    'mode=$mode, spaceId=${selection.spaceId}, error=$e',
-                  );
-                  debugPrint('[Space Feed] Stacktrace UI Grid: $st');
-                  return FeedErrorView(
-                    message: 'Không tải được ảnh',
-                    onRetry: () => ref.invalidate(
-                      feedControllerProvider(
-                        filter: mode,
-                        filterUid: selection.authorUid,
-                        filterSpaceId: selection.spaceId,
-                      ),
+                error: (e, st) => FeedErrorView(
+                  message: 'Không tải được ảnh',
+                  onRetry: () => ref.invalidate(
+                    feedControllerProvider(
+                      filter: mode,
+                      filterUid: selection.authorUid,
+                      filterSpaceId: selection.spaceId,
                     ),
-                  );
-                },
-                data: (state) {
-                  debugPrint(
-                    '[Space Feed] GridViewScreen render DATA — '
-                    'mode=$mode, posts=${state.posts.length}',
-                  );
-                  return state.posts.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Chưa có ảnh',
-                            style: TextStyle(color: AppColors.bw500),
-                          ),
-                        )
-                      : _Grid(posts: state.posts);
-                },
+                  ),
+                ),
+                data: (state) => state.posts.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Chưa có ảnh',
+                          style: TextStyle(color: AppColors.bw500),
+                        ),
+                      )
+                    : _Grid(posts: state.posts),
               ),
             ),
           ],

@@ -11,8 +11,8 @@ abstract class PostRepository {
 
   /// Stream of paginated feed for [uid], newest first.
   ///
-  /// Khi [spaceId] null (default): feed chung — posts của user + friends,
-  /// loại bỏ posts đăng vào Space (post.spaceIds không rỗng).
+  /// Khi [spaceId] null (default): feed chung — own posts + friend posts +
+  /// Space posts mà caller là member.
   ///
   /// Khi [spaceId] != null: chỉ posts đăng vào Space đó (post.spaceIds
   /// chứa [spaceId]). Implementation query `memberIds arrayContains uid`
