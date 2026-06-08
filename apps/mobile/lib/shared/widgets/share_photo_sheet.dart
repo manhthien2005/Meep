@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/feed/application/post_controller.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
 import 'package:share_plus/share_plus.dart';
 

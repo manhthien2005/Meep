@@ -1,6 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 
 part 'post_state.freezed.dart';
 

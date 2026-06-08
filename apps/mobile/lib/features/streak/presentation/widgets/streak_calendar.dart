@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/streak/presentation/widgets/calendar_day_cell.dart';
 
 /// Custom calendar grid 7 cols × 6 rows. Match Figma `269:1990`.

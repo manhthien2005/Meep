@@ -10,7 +10,7 @@ import 'package:meep/core/theme/hex_color.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/feed/application/post_controller.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/feed/presentation/capture_action_bar.dart';
 import 'package:meep/features/feed/presentation/capture_preview_args.dart';
 import 'package:meep/features/feed/presentation/caption_preset_modal.dart';
@@ -226,10 +226,29 @@ class _CapturePreviewScreenState extends ConsumerState<CapturePreviewScreen> {
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                child: Text(
-                  postState.errorMessage!,
-                  style: const TextStyle(color: Colors.redAccent, fontSize: 13),
-                  textAlign: TextAlign.center,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      postState.errorMessage!,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 13,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    // submit() idempotent (giữ pendingImagePath/bytes) → retry
+                    // không bắt user chụp lại (UPLOAD-UX-001).
+                    TextButton.icon(
+                      onPressed: postState.isUploading ? null : _send,
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Thử lại'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.turquoise500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             _AudienceRow(

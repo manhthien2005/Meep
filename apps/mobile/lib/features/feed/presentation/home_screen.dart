@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -11,15 +10,16 @@ import 'package:meep/features/chat/application/chat_providers.dart';
 import 'package:meep/features/feed/application/app_camera_controller.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/application/feed_filter_controller.dart';
-import 'package:meep/features/feed/data/post.dart';
 import 'package:meep/features/feed/presentation/camera_section.dart';
 import 'package:meep/features/feed/presentation/feed_filter_dropdown.dart';
 import 'package:meep/features/feed/presentation/feed_section.dart';
+import 'package:meep/features/feed/presentation/widgets/feed_error_view.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/presentation/friend_sheet.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/space.dart';
 import 'package:meep/features/space/presentation/space_management_sheet.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 
@@ -385,15 +385,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           );
         }
         if (isError) {
-          return const Center(
-            child: Text(
-              'Không tải được feed. Kiểm tra kết nối.',
-              style: TextStyle(color: AppColors.bw500),
-              textAlign: TextAlign.center,
-            ),
+          return FeedErrorView(
+            onRetry: () {
+              final sel = ref.read(feedFilterControllerProvider);
+              ref.invalidate(
+                feedControllerProvider(
+                  filter: _filterModeFor(sel),
+                  filterUid: sel.authorUid,
+                  filterSpaceId: sel.spaceId,
+                ),
+              );
+            },
           );
         }
-        if (posts == null || posts.isEmpty) return const _EmptyFeedPage();
+        if (posts == null || posts.isEmpty) {
+          return _EmptyFeedPage(
+            onCapture: () => _pageController.jumpToPage(0),
+          );
+        }
         return _PostPage(post: posts[index - 1]);
       },
     );
@@ -465,7 +474,10 @@ class _HomeTopBar extends ConsumerWidget {
     final currentUid = ref.watch(currentUidProvider).valueOrNull;
     final friendCount = currentUid == null
         ? 0
-        : ref.watch(friendControllerProvider(currentUid)).friends.length;
+        : ref.watch(
+            friendControllerProvider(currentUid)
+                .select((s) => s.friends.length),
+          );
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -579,14 +591,14 @@ class _HomeTopBar extends ConsumerWidget {
 /// `post.spaceId.colorHex` — paint ở LEVEL Scaffold (_scaffoldBgColor) thay
 /// vì ColoredBox riêng cho từng page, để header pill + footer taskbar
 /// (transparent bg) phủ cùng màu space xuyên qua.
-class _PostPage extends StatelessWidget {
+class _PostPage extends ConsumerWidget {
   const _PostPage({required this.post});
 
   final Post post;
 
   @override
-  Widget build(BuildContext context) {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentUid = ref.watch(currentUidProvider).valueOrNull;
     return post.authorId == currentUid
         ? OwnPostPage(post: post)
         : FriendPostPage(post: post);
@@ -594,17 +606,24 @@ class _PostPage extends StatelessWidget {
 }
 
 class _EmptyFeedPage extends StatelessWidget {
-  const _EmptyFeedPage();
+  const _EmptyFeedPage({required this.onCapture});
+
+  /// Đưa user về trang camera (page 0) để chụp ảnh đầu tiên.
+  final VoidCallback onCapture;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.photo_camera_outlined, color: AppColors.bw600, size: 48),
-          SizedBox(height: 16),
-          Text(
+          const Icon(
+            Icons.photo_camera_outlined,
+            color: AppColors.bw600,
+            size: 48,
+          ),
+          const SizedBox(height: 16),
+          const Text(
             'Chưa có ảnh nào',
             style: TextStyle(
               color: AppColors.bw400,
@@ -613,8 +632,8 @@ class _EmptyFeedPage extends StatelessWidget {
               fontFamily: 'Nunito',
             ),
           ),
-          SizedBox(height: 8),
-          Text(
+          const SizedBox(height: 8),
+          const Text(
             'Chụp ảnh đầu tiên và gửi cho bạn bè!',
             style: TextStyle(
               color: AppColors.bw600,
@@ -622,6 +641,15 @@ class _EmptyFeedPage extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
             textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          TextButton.icon(
+            onPressed: onCapture,
+            icon: const Icon(Icons.photo_camera, size: 18),
+            label: const Text('Chụp ảnh đầu tiên'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.turquoise500,
+            ),
           ),
         ],
       ),

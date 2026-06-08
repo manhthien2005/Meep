@@ -1,7 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:meep/core/theme/app_colors.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/core/theme/app_proportions.dart';
+import 'package:meep/shared/models/post.dart';
 
 /// Single tile in feed grid view (`580:2883`). 1:1 aspect, light corner radius.
 /// Tap → caller opens detail sheet.
@@ -19,6 +20,12 @@ class GridPhotoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Decode bitmap ~ kích thước tile (screenW / số cột) thay vì full 1080px —
+    // grid 3-cột render ảnh ~120px, tránh giữ 4.6MB/bitmap (IMG-PERF-001).
+    final cacheW = (MediaQuery.sizeOf(context).width /
+            AppProportions.gridColumns *
+            MediaQuery.devicePixelRatioOf(context))
+        .round();
     return GestureDetector(
       onTap: onTap,
       child: AspectRatio(
@@ -28,6 +35,8 @@ class GridPhotoTile extends StatelessWidget {
           child: CachedNetworkImage(
             imageUrl: post.coverImageUrl,
             fit: BoxFit.cover,
+            memCacheWidth: cacheW,
+            memCacheHeight: cacheW,
             placeholder: (_, __) => const ColoredBox(color: AppColors.bw800),
             errorWidget: (_, __, ___) =>
                 const ColoredBox(color: AppColors.bw800),

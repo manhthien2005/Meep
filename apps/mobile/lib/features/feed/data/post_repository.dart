@@ -1,6 +1,11 @@
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 
 abstract class PostRepository {
+  /// Mint a new unique post id. The data layer owns Firestore id-generation so
+  /// callers (controllers) never touch the Firestore singleton directly.
+  /// Needed before upload because the Storage path embeds the postId.
+  String newPostId();
+
   /// Upload photo + create Firestore post doc. Returns created post.
   Future<Post> createPost(Post post);
 

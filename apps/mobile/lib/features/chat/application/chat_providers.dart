@@ -7,7 +7,7 @@ import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/data/conversation.dart';
 import 'package:meep/features/chat/data/message.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/space.dart';
 import 'package:meep/features/space/data/space_member.dart';

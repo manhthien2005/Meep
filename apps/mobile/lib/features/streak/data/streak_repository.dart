@@ -1,4 +1,4 @@
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 
 /// Read-only queries for Streak/Kỷ niệm Module.
 ///

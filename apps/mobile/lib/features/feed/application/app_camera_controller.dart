@@ -26,7 +26,10 @@ class AppCameraController extends _$AppCameraController {
     try {
       _cameras = await availableCameras();
       if (_cameras.isEmpty) {
-        state = state.copyWith(error: 'No camera found');
+        state = state.copyWith(
+          error: 'Không tìm thấy máy ảnh trên thiết bị',
+          permissionState: CameraPermissionState.unknown,
+        );
         return;
       }
 
@@ -39,9 +42,38 @@ class AppCameraController extends _$AppCameraController {
                 ? CameraLensDirection.back
                 : CameraLensDirection.front),
       );
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
+      state = state.copyWith(permissionState: CameraPermissionState.granted);
+    } on CameraException catch (e) {
+      // Phân biệt permission-denied (cần CTA "Mở Cài đặt") với lỗi init khác.
+      // Message tiếng Việt tại boundary (auth.md Pattern #10) — UI render
+      // trực tiếp state.error.
+      final isDenied = e.code == 'CameraAccessDenied' ||
+          e.code == 'CameraAccessRestricted' ||
+          e.code == 'cameraPermission';
+      state = state.copyWith(
+        permissionState: isDenied
+            ? CameraPermissionState.denied
+            : CameraPermissionState.unknown,
+        error: isDenied
+            ? 'Meep cần quyền truy cập máy ảnh để chụp ảnh'
+            : 'Không thể khởi động máy ảnh',
+      );
+    } catch (_) {
+      state = state.copyWith(
+        error: 'Không thể khởi động máy ảnh',
+        permissionState: CameraPermissionState.unknown,
+      );
     }
+  }
+
+  /// Retry init sau khi user cấp quyền từ Settings (hoặc lỗi tạm thời). Clear
+  /// error + permissionState rồi gọi lại [initialize].
+  Future<void> retry() async {
+    state = state.copyWith(
+      error: null,
+      permissionState: CameraPermissionState.unknown,
+    );
+    await initialize();
   }
 
   Future<void> setMode(CameraMode mode) async {

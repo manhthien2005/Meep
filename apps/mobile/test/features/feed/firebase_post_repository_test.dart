@@ -1,7 +1,7 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meep/features/feed/data/firebase_post_repository.dart';
-import 'package:meep/features/feed/data/post.dart';
+import 'package:meep/shared/models/post.dart';
 
 Post _makePost({
   String postId = 'p1',
@@ -26,6 +26,15 @@ void main() {
   setUp(() {
     db = FakeFirebaseFirestore();
     repo = FirebasePostRepository(db);
+  });
+
+  group('newPostId', () {
+    test('returns a non-empty unique id each call', () {
+      final id1 = repo.newPostId();
+      final id2 = repo.newPostId();
+      expect(id1, isNotEmpty);
+      expect(id1, isNot(id2));
+    });
   });
 
   group('createPost', () {
