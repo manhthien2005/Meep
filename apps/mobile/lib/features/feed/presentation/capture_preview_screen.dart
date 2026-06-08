@@ -8,6 +8,7 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_proportions.dart';
 import 'package:meep/core/theme/hex_color.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/feed/application/post_controller.dart';
 import 'package:meep/shared/models/post.dart';

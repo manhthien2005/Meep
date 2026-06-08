@@ -22,7 +22,7 @@ Future<({Map<String, String> names, Map<String, String?> avatars})>
     _loadMemberProfiles(WidgetRef ref, List<SpaceMember> members) async {
   final userRepo = ref.read(userRepositoryProvider);
   final profiles = await Future.wait(
-    members.map((m) => userRepo.getProfile(m.uid)),
+    members.map((m) => userRepo.getPublicProfile(m.uid)),
   );
   final names = <String, String>{};
   final avatars = <String, String?>{};

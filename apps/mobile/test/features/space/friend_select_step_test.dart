@@ -2,23 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/data/friend_repository.dart';
 import 'package:meep/features/space/presentation/space_create_sheet.dart';
 
 class FakeFriendRepository implements FriendRepository {
-  final List<UserProfile> _friends;
+  final List<PublicProfile> _friends;
 
   FakeFriendRepository(this._friends);
 
   @override
-  Stream<List<UserProfile>> watchFriends(String uid) {
+  Stream<List<PublicProfile>> watchFriends(String uid) {
     return Stream.value(_friends);
   }
 
   @override
-  Future<UserProfile?> searchUser(String username) async {
+  Future<PublicProfile?> searchUser(String username) async {
     return _friends
         .where((f) => f.username.toLowerCase() == username.toLowerCase())
         .firstOrNull;
@@ -35,17 +35,15 @@ class FakeFriendRepository implements FriendRepository {
 
 void main() {
   group('FriendSelectStep', () {
-    late List<UserProfile> mockFriends;
+    late List<PublicProfile> mockFriends;
 
     setUp(() {
       mockFriends = List.generate(
         12,
-        (i) => UserProfile(
+        (i) => PublicProfile(
           uid: 'uid-$i',
-          email: 'user$i@test.com',
           displayName: 'User $i',
           username: 'user$i',
-          createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
       );

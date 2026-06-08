@@ -57,23 +57,108 @@ service cloud.firestore {
           .data.participantIds.hasAny([request.auth.uid]);
     }
 
-    // ===== /users/{uid} =====
-    match /users/{uid} {
-      allow read: if isAuthed();
-      allow create: if isOwner(uid)
-        && request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'username', 'createdAt'])
+    function isNullableString(data, field, max) {
+      return !(field in data) ||
+        data[field] == null ||
+        (data[field] is string && data[field].size() <= max);
+    }
+
+    function isValidGender(data) {
+      return !('gender' in data) ||
+        data.gender == null ||
+        data.gender in ['male', 'female', 'other'];
+    }
+
+    function isZeroCounter(data, field) {
+      return !(field in data) ||
+        (data[field] is number && data[field] == 0);
+    }
+
+    function isValidUserCreate(uid) {
+      return request.resource.data.keys().hasAll(
+          ['uid', 'email', 'displayName', 'username', 'createdAt'])
+        && request.resource.data.keys().hasOnly([
+          'uid', 'email', 'displayName', 'username', 'avatarUrl', 'bio',
+          'dateOfBirth', 'phoneNumber', 'gender', 'postCount', 'friendCount',
+          'spaceCount', 'isSearchable', 'createdAt', 'updatedAt',
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 254
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 1
+        && request.resource.data.displayName.size() <= 50
         && request.resource.data.username is string
         && request.resource.data.username.size() >= 3
         && request.resource.data.username.size() <= 20
-        && request.resource.data.username.matches('^[a-z0-9_]+$');
-      allow update: if isOwner(uid)
-        && !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['uid', 'createdAt', 'email', 'username',
-                     'postCount', 'friendCount', 'spaceCount']);
+        && request.resource.data.username.matches('^[a-z0-9_]+$')
+        && request.resource.data.createdAt is timestamp
+        && (!('updatedAt' in request.resource.data) ||
+            request.resource.data.updatedAt is timestamp)
+        && isNullableString(request.resource.data, 'avatarUrl', 500)
+        && isNullableString(request.resource.data, 'bio', 300)
+        && isNullableString(request.resource.data, 'dateOfBirth', 20)
+        && isNullableString(request.resource.data, 'phoneNumber', 30)
+        && isValidGender(request.resource.data)
+        && (!('isSearchable' in request.resource.data) ||
+            request.resource.data.isSearchable is bool)
+        && isZeroCounter(request.resource.data, 'postCount')
+        && isZeroCounter(request.resource.data, 'friendCount')
+        && isZeroCounter(request.resource.data, 'spaceCount');
+    }
+
+    function changedUserKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function isValidUserUpdate() {
+      return changedUserKeys().hasOnly([
+          'displayName', 'avatarUrl', 'bio', 'dateOfBirth', 'phoneNumber',
+          'gender', 'isSearchable', 'updatedAt',
+        ])
+        && (!changedUserKeys().hasAny(['displayName']) ||
+          (request.resource.data.displayName is string
+            && request.resource.data.displayName.size() >= 1
+            && request.resource.data.displayName.size() <= 50))
+        && (!changedUserKeys().hasAny(['avatarUrl']) ||
+            isNullableString(request.resource.data, 'avatarUrl', 500))
+        && (!changedUserKeys().hasAny(['bio']) ||
+            isNullableString(request.resource.data, 'bio', 300))
+        && (!changedUserKeys().hasAny(['dateOfBirth']) ||
+            isNullableString(request.resource.data, 'dateOfBirth', 20))
+        && (!changedUserKeys().hasAny(['phoneNumber']) ||
+            isNullableString(request.resource.data, 'phoneNumber', 30))
+        && (!changedUserKeys().hasAny(['gender']) ||
+            isValidGender(request.resource.data))
+        && (!changedUserKeys().hasAny(['isSearchable']) ||
+            request.resource.data.isSearchable is bool)
+        && (!changedUserKeys().hasAny(['updatedAt']) ||
+            request.resource.data.updatedAt is timestamp);
+    }
+
+    function isValidFriendshipResource(pid) {
+      return resource.data.members is list
+        && resource.data.members.size() == 2
+        && resource.data.members[0] is string
+        && resource.data.members[1] is string
+        && pid == pairId(resource.data.members[0], resource.data.members[1]);
+    }
+
+    // ===== /users/{uid} =====
+    match /users/{uid} {
+      allow get: if isOwner(uid) || isFriend(uid);
+      allow list: if false;
+      allow create: if isOwner(uid) && isValidUserCreate(uid);
+      allow update: if isOwner(uid) && isValidUserUpdate();
       allow delete: if false; // use deleteAccount CF
 
       match /private/{docId} {
         allow read, write: if isOwner(uid);
+      }
+
+      match /public/{docId} {
+        allow read: if isAuthed();
+        allow write: if false; // onUserProfileChanged + migratePublicProfiles
       }
 
       match /notifications/{notifId} {
@@ -96,6 +181,13 @@ service cloud.firestore {
       match /fcmTokens/{tokenId} {
         allow read, write: if isOwner(uid);
       }
+    }
+
+    // Collection-group rule for public profile reads.
+    // Required for client queries using collectionGroup('public').
+    match /{path=**}/public/{docId} {
+      allow read: if isAuthed();
+      allow write: if false; // onUserProfileChanged + migratePublicProfiles
     }
 
     // ===== /usernames/{username} =====
@@ -212,10 +304,14 @@ service cloud.firestore {
 
     // ===== /friendships/{pairId} =====
     match /friendships/{pid} {
-      allow read: if isAuthed() &&
+      allow get: if isAuthed() &&
+        isValidFriendshipResource(pid) &&
+        request.auth.uid in resource.data.members;
+      allow list: if isAuthed() &&
         request.auth.uid in resource.data.members;
       allow create, update: if false; // CF acceptFriendRequest only
       allow delete: if isAuthed() &&
+        isValidFriendshipResource(pid) &&
         request.auth.uid in resource.data.members;
     }
 

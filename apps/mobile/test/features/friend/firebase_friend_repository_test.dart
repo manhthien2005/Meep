@@ -3,7 +3,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:meep/core/utils/pair_id.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/friend/data/firebase_friend_repository.dart';
 
 void main() {
@@ -18,14 +18,12 @@ void main() {
   group('searchUser', () {
     test('returns user when exact username match (case-insensitive)', () async {
       // Arrange
-      await firestore.collection('users').doc('uid1').set({
-        'uid': 'uid1',
-        'email': 'thien@meep.app',
-        'displayName': 'Thien PDM',
-        'username': 'thienpdm',
-        'createdAt': Timestamp.now(),
-        'updatedAt': Timestamp.now(),
-      });
+      await _seedPublicProfile(
+        firestore,
+        uid: 'uid1',
+        displayName: 'Thien PDM',
+        username: 'thienpdm',
+      );
 
       // Act
       final result = await repository.searchUser('ThienPDM');
@@ -54,14 +52,12 @@ void main() {
 
     test('trims whitespace before search', () async {
       // Arrange
-      await firestore.collection('users').doc('uid1').set({
-        'uid': 'uid1',
-        'email': 'thien@meep.app',
-        'displayName': 'Thien PDM',
-        'username': 'thienpdm',
-        'createdAt': Timestamp.now(),
-        'updatedAt': Timestamp.now(),
-      });
+      await _seedPublicProfile(
+        firestore,
+        uid: 'uid1',
+        displayName: 'Thien PDM',
+        username: 'thienpdm',
+      );
 
       // Act
       final result = await repository.searchUser('  ThienPDM  ');
@@ -163,14 +159,12 @@ void main() {
         'createdAt': Timestamp.now(),
       });
 
-      await firestore.collection('users').doc('friend1').set({
-        'uid': 'friend1',
-        'email': 'friend@meep.app',
-        'displayName': 'Friend One',
-        'username': 'friend1',
-        'createdAt': Timestamp.now(),
-        'updatedAt': Timestamp.now(),
-      });
+      await _seedPublicProfile(
+        firestore,
+        uid: 'friend1',
+        displayName: 'Friend One',
+        username: 'friend1',
+      );
 
       // Act
       final stream = repository.watchFriends(uid);
@@ -179,7 +173,7 @@ void main() {
       await expectLater(
         stream,
         emits(
-          predicate<List<UserProfile>>((list) {
+          predicate<List<PublicProfile>>((list) {
             return list.length == 1 && list.first.uid == 'friend1';
           }),
         ),
@@ -193,5 +187,22 @@ void main() {
       // Assert
       await expectLater(stream, emits(isEmpty));
     });
+  });
+}
+
+Future<void> _seedPublicProfile(
+  FakeFirebaseFirestore firestore, {
+  required String uid,
+  required String displayName,
+  required String username,
+}) {
+  return firestore.doc('users/$uid/public/profile').set({
+    'uid': uid,
+    'displayName': displayName,
+    'username': username,
+    'avatarUrl': null,
+    'bio': null,
+    'isSearchable': true,
+    'updatedAt': Timestamp.now(),
   });
 }

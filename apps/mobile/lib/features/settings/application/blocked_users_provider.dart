@@ -8,7 +8,7 @@ import 'package:meep/features/settings/application/settings_controller.dart';
 part 'blocked_users_provider.g.dart';
 
 /// Stream danh sách `BlockedUserView` cho BlockedAccountsPage.
-/// Join `BlockRepository.watchBlockedUsers` với `UserRepository.getProfile`
+/// Join `BlockRepository.watchBlockedUsers` với `UserRepository.getPublicProfile`
 /// để có username + avatar (Block chỉ chứa UIDs).
 ///
 /// N+1 reads chấp nhận được vì blocked list thường < 10. Nếu list lớn lên,
@@ -24,7 +24,7 @@ Stream<List<BlockedUserView>> blockedUsers(Ref ref) {
   return blockRepo.watchBlockedUsers(uid).asyncMap((blocks) async {
     if (blocks.isEmpty) return <BlockedUserView>[];
     final profiles = await Future.wait(
-      blocks.map((b) => userRepo.getProfile(b.blockedUid)),
+      blocks.map((b) => userRepo.getPublicProfile(b.blockedUid)),
     );
     return [
       for (var i = 0; i < blocks.length; i++)

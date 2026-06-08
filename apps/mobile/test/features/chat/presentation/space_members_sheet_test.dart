@@ -32,9 +32,9 @@ class _FakeSpaceRepository implements SpaceRepository {
 void main() {
   Future<FakeFirebaseFirestore> seededFirestore() async {
     final firestore = FakeFirebaseFirestore();
-    // Seed user profiles so chatUserProfileProvider resolves names + avatars.
+    // Seed public profiles so chatUserProfileProvider resolves names + avatars.
     for (final entry in ChatSeed.usersByUid.entries) {
-      await firestore.collection('users').doc(entry.key).set(
+      await firestore.doc('users/${entry.key}/public/profile').set(
             entry.value.toJson(),
           );
     }

@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:meep/core/error/app_error.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/friend/data/friend_repository.dart';
 import 'package:meep/features/friend/data/friendship.dart';
 
@@ -9,17 +9,19 @@ class FirebaseFriendRepository implements FriendRepository {
   FirebaseFriendRepository(this._firestore);
 
   final FirebaseFirestore _firestore;
+  static const int _whereInLimit = 10;
 
   @override
-  Future<UserProfile?> searchUser(String username) async {
+  Future<PublicProfile?> searchUser(String username) async {
     final query = username.toLowerCase().trim();
     if (query.isEmpty) return null;
 
     final QuerySnapshot<Map<String, dynamic>> snapshot;
     try {
       snapshot = await _firestore
-          .collection('users')
+          .collectionGroup('public')
           .where('username', isEqualTo: query)
+          .where('isSearchable', isEqualTo: true)
           .limit(1)
           .get();
     } on FirebaseException catch (e) {
@@ -28,20 +30,19 @@ class FirebaseFriendRepository implements FriendRepository {
 
     if (snapshot.docs.isEmpty) return null;
 
-    return UserProfile.fromJson(snapshot.docs.first.data());
+    return PublicProfile.fromFirestore(snapshot.docs.first);
   }
 
   @override
-  Stream<List<UserProfile>> watchFriends(String uid) {
+  Stream<List<PublicProfile>> watchFriends(String uid) {
     return _firestore
         .collection('friendships')
         .where('members', arrayContains: uid)
         .snapshots()
         .asyncMap((snapshot) async {
       try {
-        if (snapshot.docs.isEmpty) return <UserProfile>[];
+        if (snapshot.docs.isEmpty) return <PublicProfile>[];
 
-        // Extract friend UIDs
         final friendUids = <String>[];
         for (final doc in snapshot.docs) {
           final friendship = Friendship.fromJson(doc.data());
@@ -50,18 +51,9 @@ class FirebaseFriendRepository implements FriendRepository {
           friendUids.add(friendUid);
         }
 
-        // Batch fetch user profiles
-        if (friendUids.isEmpty) return <UserProfile>[];
+        if (friendUids.isEmpty) return <PublicProfile>[];
 
-        final userDocs = await Future.wait(
-          friendUids
-              .map((fuid) => _firestore.collection('users').doc(fuid).get()),
-        );
-
-        return userDocs
-            .where((doc) => doc.exists)
-            .map((doc) => UserProfile.fromJson(doc.data()!))
-            .toList();
+        return _fetchPublicProfiles(friendUids);
       } on FirebaseException catch (e) {
         throw _mapFirestoreError(e, 'tải danh sách bạn bè');
       }
@@ -71,6 +63,33 @@ class FirebaseFriendRepository implements FriendRepository {
       }
       Error.throwWithStackTrace(e, s);
     });
+  }
+
+  Future<List<PublicProfile>> _fetchPublicProfiles(
+    List<String> friendUids,
+  ) async {
+    final profilesByUid = <String, PublicProfile>{};
+
+    for (var i = 0; i < friendUids.length; i += _whereInLimit) {
+      final end = (i + _whereInLimit > friendUids.length)
+          ? friendUids.length
+          : i + _whereInLimit;
+      final chunk = friendUids.sublist(i, end);
+      final snapshot = await _firestore
+          .collectionGroup('public')
+          .where('uid', whereIn: chunk)
+          .get();
+
+      for (final doc in snapshot.docs) {
+        final profile = PublicProfile.fromFirestore(doc);
+        profilesByUid[profile.uid] = profile;
+      }
+    }
+
+    return friendUids
+        .map((friendUid) => profilesByUid[friendUid])
+        .whereType<PublicProfile>()
+        .toList();
   }
 
   @override

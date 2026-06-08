@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/data/friend_repository.dart';
 import 'package:meep/features/space/presentation/space_create_sheet.dart';
 
 class _FakeFriendRepository implements FriendRepository {
-  final List<UserProfile> _friends;
+  final List<PublicProfile> _friends;
 
   _FakeFriendRepository(this._friends);
 
   @override
-  Stream<List<UserProfile>> watchFriends(String uid) => Stream.value(_friends);
+  Stream<List<PublicProfile>> watchFriends(String uid) =>
+      Stream.value(_friends);
 
   @override
-  Future<UserProfile?> searchUser(String username) async =>
+  Future<PublicProfile?> searchUser(String username) async =>
       _friends.where((f) => f.username == username).firstOrNull;
 
   @override
@@ -30,12 +31,10 @@ void main() {
   group('SpaceCreateSheet scaffold', () {
     final mockFriends = List.generate(
       3,
-      (i) => UserProfile(
+      (i) => PublicProfile(
         uid: 'uid-$i',
-        email: 'user$i@test.com',
         displayName: 'User $i',
         username: 'user$i',
-        createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       ),
     );

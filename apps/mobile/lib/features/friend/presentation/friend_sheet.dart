@@ -9,7 +9,7 @@ import 'package:meep/core/config/app_config.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/application/friend_state.dart';
 import 'package:meep/features/friend/data/friend_request.dart';
@@ -19,10 +19,10 @@ import 'package:meep/shared/widgets/app_confirm_dialog.dart';
 
 /// Fetches the sender's profile for a pending friend request row.
 /// [FriendRequest] only carries [FriendRequest.senderId]; the UI needs the
-/// display name + avatar, so we look it up via the existing UserRepository.
+/// display name + avatar, so we look up the public profile only.
 final _senderProfileProvider =
-    FutureProvider.family<UserProfile?, String>((ref, senderId) {
-  return ref.read(userRepositoryProvider).getProfile(senderId);
+    FutureProvider.family<PublicProfile?, String>((ref, senderId) {
+  return ref.read(userRepositoryProvider).getPublicProfile(senderId);
 });
 
 /// Friend management bottom sheet.
@@ -436,7 +436,7 @@ class _FriendSheetState extends ConsumerState<FriendSheet> {
   }
 
   Widget _buildSearchResultItem({
-    required UserProfile user,
+    required PublicProfile user,
     required String currentUid,
     required bool isSelf,
     required bool isFriend,
@@ -485,7 +485,7 @@ class _FriendSheetState extends ConsumerState<FriendSheet> {
   }
 
   Widget _buildSearchActionButton({
-    required UserProfile user,
+    required PublicProfile user,
     required String currentUid,
     required bool isSelf,
     required bool isFriend,
@@ -584,7 +584,7 @@ class _FriendSheetState extends ConsumerState<FriendSheet> {
     );
   }
 
-  Widget _buildFriendItem(UserProfile friend, String currentUid) {
+  Widget _buildFriendItem(PublicProfile friend, String currentUid) {
     return SizedBox(
       height: 50,
       child: Row(
@@ -637,7 +637,10 @@ class _FriendSheetState extends ConsumerState<FriendSheet> {
   /// Confirm + remove an accepted friend. Shows the shared destructive dialog;
   /// the actual delete + friendCount/feed cleanup runs in the controller and
   /// the onFriendshipDeleted Cloud Function.
-  Future<void> _confirmUnfriend(UserProfile friend, String currentUid) async {
+  Future<void> _confirmUnfriend(
+    PublicProfile friend,
+    String currentUid,
+  ) async {
     final confirmed = await showAppConfirmDialog(
       context,
       title: 'Xóa ${friend.displayName} khỏi Meep của bạn?',

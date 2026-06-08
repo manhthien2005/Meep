@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/shared/widgets/app_avatar.dart';
 import 'package:meep/shared/widgets/app_primary_button.dart';
@@ -35,14 +35,14 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
   // emit AsyncLoading lúc mount. `.valueOrNull` ở initState sẽ trả null
   // dù user đã signin → empty stream. Đợi `build` chạy lại khi stream
   // emit value lần đầu rồi mới cache.
-  Stream<List<UserProfile>>? _friendsStream;
+  Stream<List<PublicProfile>>? _friendsStream;
   String? _cachedUid;
 
-  Stream<List<UserProfile>> _ensureStream(String? uid) {
+  Stream<List<PublicProfile>> _ensureStream(String? uid) {
     if (uid == _cachedUid && _friendsStream != null) return _friendsStream!;
     _cachedUid = uid;
     if (uid == null) {
-      _friendsStream = Stream.value(const <UserProfile>[]);
+      _friendsStream = Stream.value(const <PublicProfile>[]);
     } else {
       _friendsStream = ref.read(friendRepositoryProvider).watchFriends(uid);
     }
@@ -55,7 +55,7 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
     super.dispose();
   }
 
-  List<UserProfile> _filterFriends(List<UserProfile> friends) {
+  List<PublicProfile> _filterFriends(List<PublicProfile> friends) {
     if (_searchQuery.isEmpty) return friends;
     final query = _searchQuery.toLowerCase();
     return friends
@@ -170,7 +170,7 @@ class _FriendSelectStepState extends ConsumerState<FriendSelectStep> {
           const SizedBox(height: 20),
           // Friend list
           Expanded(
-            child: StreamBuilder<List<UserProfile>>(
+            child: StreamBuilder<List<PublicProfile>>(
               stream: friendsStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -255,7 +255,7 @@ class _FriendListItem extends StatelessWidget {
     required this.onTap,
   });
 
-  final UserProfile friend;
+  final PublicProfile friend;
   final bool isSelected;
   final bool canSelect;
   final VoidCallback onTap;

@@ -95,7 +95,7 @@ class _AudienceRow extends ConsumerWidget {
 
     final currentUid = ref.watch(currentUidProvider).valueOrNull ?? '';
     final friends = currentUid.isEmpty
-        ? const <UserProfile>[]
+        ? const <PublicProfile>[]
         : ref.watch(
             friendControllerProvider(currentUid).select((s) => s.friends),
           );
@@ -352,7 +352,7 @@ class _FriendAudienceTile extends StatelessWidget {
     required this.onTap,
   });
 
-  final UserProfile friend;
+  final PublicProfile friend;
   final bool isSelected;
   final double avatarSize;
   final double labelSize;

@@ -5,7 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:meep/core/utils/pair_id.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/friend/application/friend_state.dart';
 import 'package:meep/features/friend/data/friend_repository.dart';
 import 'package:meep/features/friend/data/friend_request.dart';
@@ -29,7 +29,7 @@ FriendRequestRepository friendRequestRepository(Ref ref) =>
 @riverpod
 class FriendController extends _$FriendController {
   Timer? _searchDebounce;
-  StreamSubscription<List<UserProfile>>? _friendsSub;
+  StreamSubscription<List<PublicProfile>>? _friendsSub;
   StreamSubscription<List<FriendRequest>>? _requestsSub;
   StreamSubscription<List<FriendRequest>>? _sentSub;
 

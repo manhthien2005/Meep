@@ -51,6 +51,10 @@ function unauthed() {
   return testEnv.unauthenticatedContext();
 }
 
+function pairId(a: string, b: string): string {
+  return a < b ? `${a}_${b}` : `${b}_${a}`;
+}
+
 // ===== /users/{uid} =====
 
 describe('/users/{uid}', () => {
@@ -62,13 +66,27 @@ describe('/users/{uid}', () => {
     await assertSucceeds(authed(alice).firestore().doc(`users/${alice}`).get());
   });
 
-  test('other authed user can read', async () => {
+  test('friend can read full user doc', async () => {
+    const alice = uid('alice');
+    const bob = uid('bob');
+    const pid = pairId(alice, bob);
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set({ displayName: 'Alice' });
+      await ctx.firestore().doc(`friendships/${pid}`).set({
+        members: [alice, bob],
+        createdAt: new Date(),
+      });
+    });
+    await assertSucceeds(authed(bob).firestore().doc(`users/${alice}`).get());
+  });
+
+  test('stranger cannot read full user doc', async () => {
     const alice = uid('alice');
     const bob = uid('bob');
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc(`users/${alice}`).set({ displayName: 'Alice' });
     });
-    await assertSucceeds(authed(bob).firestore().doc(`users/${alice}`).get());
+    await assertFails(authed(bob).firestore().doc(`users/${alice}`).get());
   });
 
   test('unauthenticated cannot read', async () => {
@@ -112,6 +130,123 @@ describe('/users/{uid}', () => {
     const alice = uid('alice');
     await assertFails(
       authed(alice).firestore().doc(`users/${alice}/feed/post1`).set({ postId: 'post1' }),
+    );
+  });
+
+  test('/users/{uid}/public/profile — authed stranger can read', async () => {
+    const alice = uid('alice');
+    const bob = uid('bob');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}/public/profile`).set({
+        uid: alice,
+        displayName: 'Alice',
+        username: 'alice',
+        avatarUrl: null,
+        bio: null,
+        isSearchable: true,
+        updatedAt: new Date(),
+      });
+    });
+    await assertSucceeds(
+      authed(bob).firestore().doc(`users/${alice}/public/profile`).get(),
+    );
+  });
+
+  test('/users/{uid}/public/profile — unauthenticated cannot read', async () => {
+    const alice = uid('alice');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}/public/profile`).set({
+        uid: alice,
+        displayName: 'Alice',
+        username: 'alice',
+        isSearchable: true,
+        updatedAt: new Date(),
+      });
+    });
+    await assertFails(
+      unauthed().firestore().doc(`users/${alice}/public/profile`).get(),
+    );
+  });
+
+  test('/users/{uid}/public/profile — client cannot write', async () => {
+    const alice = uid('alice');
+    await assertFails(
+      authed(alice).firestore().doc(`users/${alice}/public/profile`).set({
+        uid: alice,
+        displayName: 'Alice',
+        username: 'alice',
+        isSearchable: true,
+        updatedAt: new Date(),
+      }),
+    );
+  });
+});
+
+// ===== collectionGroup('public') =====
+
+describe("collectionGroup('public')", () => {
+  const alice = uid('alice');
+  const bob = uid('bob');
+
+  async function seedPublicProfiles() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}/public/profile`).set({
+        uid: alice,
+        displayName: 'Alice',
+        username: 'alice',
+        avatarUrl: null,
+        bio: null,
+        isSearchable: true,
+        updatedAt: new Date(),
+      });
+      await ctx.firestore().doc(`users/${bob}/public/profile`).set({
+        uid: bob,
+        displayName: 'Bob',
+        username: 'bob',
+        avatarUrl: null,
+        bio: null,
+        isSearchable: true,
+        updatedAt: new Date(),
+      });
+    });
+  }
+
+  test('authed username + isSearchable query succeeds', async () => {
+    await seedPublicProfiles();
+    const snap = await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .collectionGroup('public')
+        .where('username', '==', 'alice')
+        .where('isSearchable', '==', true)
+        .get(),
+    );
+    expect(snap.docs.map((doc) => doc.data().uid)).toEqual([alice]);
+  });
+
+  test('authed uid in query succeeds', async () => {
+    await seedPublicProfiles();
+    const snap = await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .collectionGroup('public')
+        .where('uid', 'in', [alice, bob])
+        .get(),
+    );
+    expect(snap.docs.map((doc) => doc.data().uid).sort()).toEqual(
+      [alice, bob].sort(),
+    );
+  });
+
+  test('unauthenticated collection group query fails', async () => {
+    await seedPublicProfiles();
+    await assertFails(
+      unauthed()
+        .firestore()
+        .collectionGroup('public')
+        .where('username', '==', 'alice')
+        .where('isSearchable', '==', true)
+        .get(),
     );
   });
 });
@@ -307,6 +442,42 @@ describe('/users/{uid} — field validation', () => {
     });
     await assertFails(
       authed(alice).firestore().doc(`users/${alice}`).update({ spaceCount: 999 }),
+    );
+  });
+
+  test('owner cannot set displayName > 50 chars', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`users/${alice}`)
+        .update({ displayName: 'A'.repeat(51) }),
+    );
+  });
+
+  test('owner cannot set avatarUrl > 500 chars', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`users/${alice}`)
+        .update({ avatarUrl: 'a'.repeat(501) }),
+    );
+  });
+
+  test('owner cannot set bio > 300 chars', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${alice}`).set(validProfile);
+    });
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`users/${alice}`)
+        .update({ bio: 'b'.repeat(301) }),
     );
   });
 
@@ -1257,6 +1428,18 @@ describe('/friendships/{pid}', () => {
   test('non-member cannot read', async () => {
     await seedFriendship();
     await assertFails(authed(stranger).firestore().doc(`friendships/${PID}`).get());
+  });
+
+  test('member cannot read friendship with mismatched pairId', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('friendships/not-the-pair-id').set({
+        members: [alice, bob],
+        createdAt: new Date(),
+      });
+    });
+    await assertFails(
+      authed(alice).firestore().doc('friendships/not-the-pair-id').get(),
+    );
   });
 
   test('client cannot create (server-side only)', async () => {

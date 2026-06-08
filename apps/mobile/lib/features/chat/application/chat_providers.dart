@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:meep/features/auth/application/auth_providers.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/chat/application/chat_controller.dart';
 import 'package:meep/features/chat/data/conversation.dart';
 import 'package:meep/features/chat/data/message.dart';
@@ -74,15 +74,15 @@ Map<String, int> unreadCounts(Ref ref) {
   return result;
 }
 
-/// Resolve a single [UserProfile] by [uid] for display in chat tiles,
+/// Resolve a single [PublicProfile] by [uid] for display in chat tiles,
 /// headers, and member lists.
 ///
-/// Uses [UserRepository.getProfile] (auth module). Riverpod auto-deduplicates
+/// Uses [UserRepository.getPublicProfile] (auth module). Riverpod auto-deduplicates
 /// when multiple widgets watch the same uid — only one Firestore read per uid.
 @riverpod
-Future<UserProfile?> chatUserProfile(Ref ref, String uid) async {
+Future<PublicProfile?> chatUserProfile(Ref ref, String uid) async {
   if (uid.isEmpty) return null;
-  return ref.watch(userRepositoryProvider).getProfile(uid);
+  return ref.watch(userRepositoryProvider).getPublicProfile(uid);
 }
 
 /// Live Space document for a group conversation header / tile.
