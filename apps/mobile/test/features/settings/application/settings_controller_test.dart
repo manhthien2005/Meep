@@ -10,6 +10,7 @@ import 'package:meep/features/notification/application/notification_controller.d
 import 'package:meep/features/notification/data/notification_repository.dart';
 import 'package:meep/features/settings/application/settings_controller.dart';
 import 'package:meep/features/settings/data/block_repository.dart';
+import 'package:meep/features/widget/application/widget_data_service.dart';
 
 class MockAuthRepository extends Mock implements AuthRepository {}
 
@@ -17,6 +18,8 @@ class MockBlockRepository extends Mock implements BlockRepository {}
 
 class MockNotificationRepository extends Mock
     implements NotificationRepository {}
+
+class MockWidgetDataService extends Mock implements WidgetDataService {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -160,30 +163,36 @@ void main() {
   group('logout', () {
     late MockAuthRepository auth;
     late MockNotificationRepository notif;
+    late MockWidgetDataService widgetData;
     late ProviderContainer container;
 
     setUp(() {
       auth = MockAuthRepository();
       notif = MockNotificationRepository();
+      widgetData = MockWidgetDataService();
       when(() => auth.currentUid).thenReturn('me');
       when(() => auth.signOut()).thenAnswer((_) async {});
       when(() => notif.deleteFcmToken(any())).thenAnswer((_) async {});
+      when(() => widgetData.clearData()).thenAnswer((_) async {});
 
       container = ProviderContainer(
         overrides: [
           authRepositoryProvider.overrideWithValue(auth),
           notificationRepositoryProvider.overrideWithValue(notif),
+          widgetDataServiceProvider.overrideWithValue(widgetData),
         ],
       );
     });
 
     tearDown(() => container.dispose());
 
-    test('gọi deleteFcmToken(uid) → signOut() theo đúng thứ tự', () async {
+    test('gọi deleteFcmToken(uid) → clearData() → signOut() theo đúng thứ tự',
+        () async {
       await container.read(settingsControllerProvider.notifier).logout();
 
       verifyInOrder([
         () => notif.deleteFcmToken('me'),
+        () => widgetData.clearData(),
         () => auth.signOut(),
       ]);
     });
@@ -194,6 +203,7 @@ void main() {
       await container.read(settingsControllerProvider.notifier).logout();
 
       verifyNever(() => notif.deleteFcmToken(any()));
+      verifyNever(() => widgetData.clearData());
       verify(() => auth.signOut()).called(1);
     });
 
@@ -226,31 +236,37 @@ void main() {
   group('deleteAccount', () {
     late MockAuthRepository auth;
     late MockNotificationRepository notif;
+    late MockWidgetDataService widgetData;
     late ProviderContainer container;
 
     setUp(() {
       auth = MockAuthRepository();
       notif = MockNotificationRepository();
+      widgetData = MockWidgetDataService();
       when(() => auth.currentUid).thenReturn('me');
       when(() => auth.deleteAccountCascade()).thenAnswer((_) async {});
       when(() => notif.deleteFcmToken(any())).thenAnswer((_) async {});
+      when(() => widgetData.clearData()).thenAnswer((_) async {});
 
       container = ProviderContainer(
         overrides: [
           authRepositoryProvider.overrideWithValue(auth),
           notificationRepositoryProvider.overrideWithValue(notif),
+          widgetDataServiceProvider.overrideWithValue(widgetData),
         ],
       );
     });
 
     tearDown(() => container.dispose());
 
-    test('gọi deleteFcmToken(uid) → deleteAccountCascade() theo đúng thứ tự',
-        () async {
+    test(
+        'gọi deleteFcmToken(uid) → clearData() → '
+        'deleteAccountCascade() theo đúng thứ tự', () async {
       await container.read(settingsControllerProvider.notifier).deleteAccount();
 
       verifyInOrder([
         () => notif.deleteFcmToken('me'),
+        () => widgetData.clearData(),
         () => auth.deleteAccountCascade(),
       ]);
       expect(container.read(settingsControllerProvider).isLoading, isFalse);
@@ -264,6 +280,7 @@ void main() {
       await container.read(settingsControllerProvider.notifier).deleteAccount();
 
       verifyNever(() => notif.deleteFcmToken(any()));
+      verifyNever(() => widgetData.clearData());
       verifyNever(() => auth.deleteAccountCascade());
       final state = container.read(settingsControllerProvider);
       expect(state.errorMessage, isNotNull);

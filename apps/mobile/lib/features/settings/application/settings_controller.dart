@@ -118,6 +118,7 @@ class SettingsController extends _$SettingsController {
     }
     try {
       await _deleteFcmToken(uid);
+      await _clearWidgetCache();
       // Reset FCM listeners + flag — match logout flow (N2).
       await _resetNotificationSession();
       await auth.deleteAccountCascade();
