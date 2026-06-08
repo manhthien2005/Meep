@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -65,6 +66,16 @@ void main() async {
     FirebaseFirestore.instance.useFirestoreEmulator(_emulatorHost, 9999);
     await FirebaseStorage.instance.useStorageEmulator(_emulatorHost, 9199);
   }
+
+  // App Check chặn automated abuse traffic tới Firestore/Storage/Functions.
+  // Phải activate sau Firebase.initializeApp và TRƯỚC mọi Firebase service call
+  // để token đính kèm ngay request đầu tiên. Debug build dùng AndroidProvider.debug
+  // — Logcat in token cần allowlist qua Firebase Console > App Check > Debug tokens.
+  // Release build dùng Play Integrity attestation từ Google Play (SEC-APPCHECK-001).
+  await FirebaseAppCheck.instance.activate(
+    androidProvider:
+        kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+  );
 
   // Crashlytics: bật collection chỉ ở production build (tắt debug + emulator để
   // dashboard không nhiễu). Bắt cả Flutter framework error lẫn Dart-zone error.
