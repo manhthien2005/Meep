@@ -138,6 +138,23 @@ describe('/friendships/{pairId}', () => {
     await assertFails(authed(charlie).firestore().doc(`friendships/${pid}`).get());
   });
 
+  test('member cannot read friendship with mismatched pairId', async () => {
+    const alice = uid('alice');
+    const bob = uid('bob');
+    const badPid = 'friendship-random-id';
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`friendships/${badPid}`).set({
+        uid1: alice,
+        uid2: bob,
+        members: [alice, bob],
+        createdAt: new Date(),
+      });
+    });
+
+    await assertFails(authed(alice).firestore().doc(`friendships/${badPid}`).get());
+  });
+
   test('unauthenticated cannot read friendship', async () => {
     const alice = uid('alice');
     const bob = uid('bob');

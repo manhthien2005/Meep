@@ -11,6 +11,12 @@ export { onPostDeleted } from "./feed/onPostDeleted.js";
 export { blockUser } from "./settings/blockUser.js";
 export { deleteAccount } from "./settings/deleteAccount.js";
 
+// User module
+export {
+  migratePublicProfiles,
+  onUserProfileChanged,
+} from "./user/publicProfile.js";
+
 initializeApp();
 
 setGlobalOptions({

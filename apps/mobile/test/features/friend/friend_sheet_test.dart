@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/application/friend_state.dart';
 import 'package:meep/features/friend/data/friend_request.dart';
@@ -89,12 +89,10 @@ void main() {
 
     testWidgets('shows friend list when has friends', (tester) async {
       final friends = [
-        UserProfile(
+        PublicProfile(
           uid: 'friend1',
-          email: 'friend1@test.com',
           displayName: 'Friend One',
           username: 'friend1',
-          createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
       ];
@@ -173,7 +171,7 @@ void main() {
     });
 
     testWidgets('search shows "Thêm" for a non-friend result', (tester) async {
-      final stranger = _userProfile(uid: 'stranger', name: 'Stranger');
+      final stranger = _publicProfile(uid: 'stranger', name: 'Stranger');
 
       await _pumpSearch(tester, searchResult: stranger);
 
@@ -184,7 +182,7 @@ void main() {
 
     testWidgets('search shows "Đã gửi" when request already sent',
         (tester) async {
-      final target = _userProfile(uid: 'target', name: 'Target');
+      final target = _publicProfile(uid: 'target', name: 'Target');
       final sent = [
         FriendRequest(
           requestId: 'req-sent',
@@ -204,7 +202,7 @@ void main() {
 
     testWidgets('search shows "Bạn bè" when result is already a friend',
         (tester) async {
-      final friend = _userProfile(uid: 'friend1', name: 'Friend One');
+      final friend = _publicProfile(uid: 'friend1', name: 'Friend One');
 
       await _pumpSearch(
         tester,
@@ -218,7 +216,7 @@ void main() {
 
     testWidgets('tap X on a friend then confirm calls unfriend',
         (tester) async {
-      final friend = _userProfile(uid: 'friend1', name: 'Friend One');
+      final friend = _publicProfile(uid: 'friend1', name: 'Friend One');
       final fake = FakeFriendController(friends: [friend]);
 
       await tester.pumpWidget(
@@ -249,7 +247,7 @@ void main() {
 
     testWidgets('tap X on a friend then Lưu does not call unfriend',
         (tester) async {
-      final friend = _userProfile(uid: 'friend1', name: 'Friend One');
+      final friend = _publicProfile(uid: 'friend1', name: 'Friend One');
       final fake = FakeFriendController(friends: [friend]);
 
       await tester.pumpWidget(
@@ -276,13 +274,11 @@ void main() {
   });
 }
 
-UserProfile _userProfile({required String uid, required String name}) {
-  return UserProfile(
+PublicProfile _publicProfile({required String uid, required String name}) {
+  return PublicProfile(
     uid: uid,
-    email: '$uid@test.com',
     displayName: name,
     username: uid,
-    createdAt: DateTime.now(),
     updatedAt: DateTime.now(),
   );
 }
@@ -291,8 +287,8 @@ UserProfile _userProfile({required String uid, required String name}) {
 /// surfaces [searchResult] in the search view.
 Future<void> _pumpSearch(
   WidgetTester tester, {
-  required UserProfile searchResult,
-  List<UserProfile> friends = const [],
+  required PublicProfile searchResult,
+  List<PublicProfile> friends = const [],
   List<FriendRequest> sentRequests = const [],
 }) async {
   await tester.pumpWidget(
@@ -324,19 +320,19 @@ Future<void> _pumpSearch(
 // Fake controller for testing
 class FakeFriendController extends FriendController {
   FakeFriendController({
-    List<UserProfile>? friends,
+    List<PublicProfile>? friends,
     List<FriendRequest>? pendingRequests,
     List<FriendRequest>? sentRequests,
-    UserProfile? searchResult,
+    PublicProfile? searchResult,
   })  : _friends = friends ?? [],
         _pendingRequests = pendingRequests ?? [],
         _sentRequests = sentRequests ?? [],
         _searchResult = searchResult;
 
-  final List<UserProfile> _friends;
+  final List<PublicProfile> _friends;
   final List<FriendRequest> _pendingRequests;
   final List<FriendRequest> _sentRequests;
-  final UserProfile? _searchResult;
+  final PublicProfile? _searchResult;
 
   /// Captures unfriend(friendUid) calls so widget tests can assert the
   /// X-button + confirm-dialog flow reaches the controller.

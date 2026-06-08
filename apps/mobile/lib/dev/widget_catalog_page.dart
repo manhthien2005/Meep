@@ -6,7 +6,7 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/application/friend_state.dart';
 import 'package:meep/features/friend/data/friend_repository.dart';
@@ -21,26 +21,24 @@ import 'package:meep/shared/widgets/app_text_input.dart';
 
 /// Mock FriendRepository for dev catalog
 class _MockFriendRepository implements FriendRepository {
-  final List<UserProfile> _mockFriends = List.generate(
+  final List<PublicProfile> _mockFriends = List.generate(
     12,
-    (i) => UserProfile(
+    (i) => PublicProfile(
       uid: 'mock-uid-$i',
-      email: 'user$i@meep.dev',
       displayName: 'User $i',
       username: 'user$i',
       avatarUrl: null,
-      createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     ),
   );
 
   @override
-  Stream<List<UserProfile>> watchFriends(String uid) {
+  Stream<List<PublicProfile>> watchFriends(String uid) {
     return Stream.value(_mockFriends);
   }
 
   @override
-  Future<UserProfile?> searchUser(String username) async {
+  Future<PublicProfile?> searchUser(String username) async {
     return _mockFriends
         .where((f) => f.username.toLowerCase() == username.toLowerCase())
         .firstOrNull;
@@ -296,52 +294,40 @@ class _MockFriendController extends FriendController {
   FriendState build(String uid) {
     return FriendState(
       friends: [
-        UserProfile(
+        PublicProfile(
           uid: 'friend1',
-          email: 'alice@test.com',
           displayName: 'Alice Nguyen',
           username: 'alice',
-          createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
-        UserProfile(
+        PublicProfile(
           uid: 'friend2',
-          email: 'bob@test.com',
           displayName: 'Bob Tran',
           username: 'bob',
-          createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
-        UserProfile(
+        PublicProfile(
           uid: 'friend3',
-          email: 'charlie@test.com',
           displayName: 'Charlie Le',
           username: 'charlie',
-          createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
-        UserProfile(
+        PublicProfile(
           uid: 'friend4',
-          email: 'david@test.com',
           displayName: 'David Pham',
           username: 'david',
-          createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
-        UserProfile(
+        PublicProfile(
           uid: 'friend5',
-          email: 'eva@test.com',
           displayName: 'Eva Hoang',
           username: 'eva',
-          createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
-        UserProfile(
+        PublicProfile(
           uid: 'friend6',
-          email: 'frank@test.com',
           displayName: 'Frank Vo',
           username: 'frank',
-          createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
       ],

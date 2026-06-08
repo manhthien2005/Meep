@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meep/features/auth/data/firebase_user_repository.dart';
@@ -70,6 +71,32 @@ void main() {
     });
   });
 
+  group('getPublicProfile', () {
+    test('trả null khi public profile chưa tồn tại', () async {
+      final result = await repo.getPublicProfile('nonexistent');
+      expect(result, isNull);
+    });
+
+    test('trả PublicProfile đúng khi tồn tại', () async {
+      await fakeFirestore.doc('users/${alice.uid}/public/profile').set({
+        'uid': alice.uid,
+        'displayName': alice.displayName,
+        'username': alice.username,
+        'avatarUrl': null,
+        'bio': null,
+        'isSearchable': true,
+        'updatedAt': Timestamp.fromDate(DateTime(2026, 1, 1)),
+      });
+
+      final result = await repo.getPublicProfile(alice.uid);
+
+      expect(result, isNotNull);
+      expect(result!.uid, alice.uid);
+      expect(result.displayName, alice.displayName);
+      expect(result.username, alice.username);
+    });
+  });
+
   group('isUsernameAvailable', () {
     test('trả true khi username chưa có', () async {
       final available = await repo.isUsernameAvailable('newuser');
@@ -99,6 +126,30 @@ void main() {
       await repo.createProfile(alice);
       final profile = await repo.watchProfile(alice.uid).first;
       expect(profile?.uid, alice.uid);
+    });
+  });
+
+  group('watchPublicProfile', () {
+    test('emits null khi public profile không tồn tại', () async {
+      final profile = await repo.watchPublicProfile('nonexistent').first;
+      expect(profile, isNull);
+    });
+
+    test('emits public profile sau khi tạo', () async {
+      await fakeFirestore.doc('users/${alice.uid}/public/profile').set({
+        'uid': alice.uid,
+        'displayName': alice.displayName,
+        'username': alice.username,
+        'avatarUrl': null,
+        'bio': null,
+        'isSearchable': true,
+        'updatedAt': Timestamp.fromDate(DateTime(2026, 1, 1)),
+      });
+
+      final profile = await repo.watchPublicProfile(alice.uid).first;
+
+      expect(profile?.uid, alice.uid);
+      expect(profile?.displayName, alice.displayName);
     });
   });
 }

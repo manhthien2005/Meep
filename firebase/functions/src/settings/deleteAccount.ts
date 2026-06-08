@@ -130,7 +130,8 @@ async function softDeleteConversations(uid: string): Promise<number> {
  * Thứ tự BẮT BUỘC (acceptance T7 #119):
  *   1. Storage prefixes: posts/{uid}/, avatars/{uid}/, diary/{uid}/
  *   2. Firestore subcollections của /users/{uid}: feed, notifications,
- *      fcmTokens, private (xóa trước parent doc — Firestore không cascade)
+ *      fcmTokens, private, public (xóa trước parent doc — Firestore không
+ *      cascade)
  *   3. Cross-collection queries:
  *      a. diary where authorUid == uid
  *      b. posts where authorId == uid (triggers onPostDeleted cho mỗi post
@@ -224,6 +225,7 @@ export const deleteAccount = onCall(
         'users/fcmTokens',
       ),
       deleteCollectionInBatches(userRef.collection('private'), 'users/private'),
+      deleteCollectionInBatches(userRef.collection('public'), 'users/public'),
       deleteCollectionInBatches(
         userRef.collection('space_count_events'),
         'users/space_count_events',

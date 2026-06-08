@@ -6,7 +6,7 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:meep/core/utils/pair_id.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
-import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/friend/data/friend_repository.dart';
 import 'package:meep/features/friend/data/friend_request.dart';
@@ -27,7 +27,7 @@ void main() {
 
     // Setup default streams
     when(() => friendRepo.watchFriends(any())).thenAnswer(
-      (_) => Stream.value(<UserProfile>[]),
+      (_) => Stream.value(<PublicProfile>[]),
     );
     when(() => requestRepo.watchPendingRequests(any())).thenAnswer(
       (_) => Stream.value(<FriendRequest>[]),
@@ -41,14 +41,7 @@ void main() {
     test('searchUser debounces 500ms - only calls repo once', () async {
       // Arrange
       when(() => friendRepo.searchUser(any())).thenAnswer(
-        (_) async => UserProfile(
-          uid: 'user1',
-          email: 'test@meep.app',
-          displayName: 'Test User',
-          username: 'testuser',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
+        (_) async => _publicProfile(uid: 'user1', name: 'Test User'),
       );
 
       final container = ProviderContainer(
@@ -267,14 +260,7 @@ void main() {
     test(
         'unfriend deletes friendship by pairId and drops friend optimistically',
         () async {
-      final friend = UserProfile(
-        uid: 'friendX',
-        email: 'friendx@meep.app',
-        displayName: 'Friend X',
-        username: 'friendx',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+      final friend = _publicProfile(uid: 'friendX', name: 'Friend X');
       when(() => friendRepo.watchFriends(any())).thenAnswer(
         (_) => Stream.value([friend]),
       );
@@ -321,14 +307,7 @@ void main() {
 
     test('unfriend reverts the friend list when the repository throws',
         () async {
-      final friend = UserProfile(
-        uid: 'friendX',
-        email: 'friendx@meep.app',
-        displayName: 'Friend X',
-        username: 'friendx',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+      final friend = _publicProfile(uid: 'friendX', name: 'Friend X');
       when(() => friendRepo.watchFriends(any())).thenAnswer(
         (_) => Stream.value([friend]),
       );
@@ -362,4 +341,13 @@ void main() {
       container.dispose();
     });
   });
+}
+
+PublicProfile _publicProfile({required String uid, required String name}) {
+  return PublicProfile(
+    uid: uid,
+    displayName: name,
+    username: uid.toLowerCase(),
+    updatedAt: DateTime.now(),
+  );
 }

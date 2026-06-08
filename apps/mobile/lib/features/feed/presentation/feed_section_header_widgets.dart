@@ -95,10 +95,10 @@ class _AuthorAvatar extends ConsumerWidget {
   }
 }
 
-/// Fetches a user's current avatar URL from their Firestore profile.
+/// Fetches a user's current avatar URL from their public Firestore profile.
 final _authorAvatarUrlProvider =
     FutureProvider.family<String?, String>((ref, uid) async {
-  final profile = await ref.read(userRepositoryProvider).getProfile(uid);
+  final profile = await ref.read(userRepositoryProvider).getPublicProfile(uid);
   return profile?.avatarUrl;
 });
 

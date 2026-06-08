@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
 import 'package:meep/features/feed/presentation/feed_filter_dropdown.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
@@ -22,6 +23,19 @@ UserProfile _profile({
       username: displayName.toLowerCase(),
       avatarUrl: avatarUrl,
       createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
+    );
+
+PublicProfile _publicProfile({
+  String uid = 'friend',
+  String displayName = 'Han',
+  String? avatarUrl,
+}) =>
+    PublicProfile(
+      uid: uid,
+      displayName: displayName,
+      username: displayName.toLowerCase(),
+      avatarUrl: avatarUrl,
       updatedAt: DateTime(2026),
     );
 
@@ -47,7 +61,7 @@ Future<void> _pump(
   required String selectedLabel,
   required void Function(String?, String) onFilterSelected,
   required void Function(Space) onSpaceFilterSelected,
-  List<UserProfile> friends = const [],
+  List<PublicProfile> friends = const [],
   List<Space> spaces = const [],
   UserProfile? currentProfile,
 }) async {
@@ -123,7 +137,7 @@ void main() {
         onFilterSelected: (_, __) {},
         onSpaceFilterSelected: (_) {},
         currentProfile: _profile(),
-        friends: [_profile(uid: 'f1', displayName: 'Han')],
+        friends: [_publicProfile(uid: 'f1', displayName: 'Han')],
       );
       expect(find.text('Han'), findsOneWidget);
     });

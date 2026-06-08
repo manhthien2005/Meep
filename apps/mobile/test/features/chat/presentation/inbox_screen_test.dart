@@ -42,9 +42,9 @@ void main() {
             c.toJson(),
           );
     }
-    // Also seed user profiles so chatUserProfileProvider can resolve them.
+    // Also seed public profiles so chatUserProfileProvider can resolve them.
     for (final entry in ChatSeed.usersByUid.entries) {
-      await firestore.collection('users').doc(entry.key).set(
+      await firestore.doc('users/${entry.key}/public/profile').set(
             entry.value.toJson(),
           );
     }
