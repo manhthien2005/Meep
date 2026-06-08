@@ -2,10 +2,12 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 
-const transferOwnershipSchema = z.object({
-  spaceId: z.string().min(1),
-  newCreatorUid: z.string().min(1),
-});
+const transferOwnershipSchema = z
+  .object({
+    spaceId: z.string().min(1),
+    newCreatorUid: z.string().min(1),
+  })
+  .strict();
 
 /**
  * Creator chuyển quyền sở hữu Space cho member khác. Bước bắt buộc trước

@@ -2,9 +2,11 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 
-const leaveSpaceSchema = z.object({
-  spaceId: z.string().min(1),
-});
+const leaveSpaceSchema = z
+  .object({
+    spaceId: z.string().min(1),
+  })
+  .strict();
 
 /**
  * Member rời Space (không phải creator).

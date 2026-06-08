@@ -1,6 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- WidgetSyncWorker (T3) reaches Firestore/Storage over network -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Reschedule WidgetSyncWorker periodic work sau khi device reboot —
+         WorkManager tự handle reschedule khi có permission này (PERM-001). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Android 13+ runtime notification permission cho FCM push. Plugin
+         request runtime nhưng phải declare ở manifest (PERM-001). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:label="Meep"

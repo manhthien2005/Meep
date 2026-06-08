@@ -328,10 +328,17 @@ describe('/conversations/{conversationId}', () => {
 
   // --- Write: conversations -------------------------------------------------
 
-  test('authenticated user can create conversation with self as participant',
-      () async {
-    const newConvId = [alice, uid('charlie')].sort().join('_');
-    // Must create with rules ENABLED to verify `allow create` works.
+  test('friend can create direct conversation (CHAT-SEC-001)',
+      async () => {
+    const charlie = uid('charlie');
+    const newConvId = [alice, charlie].sort().join('_');
+    // Friendship doc gate create — seed trước (id == sorted pairId).
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`friendships/${newConvId}`).set({
+        members: [alice, charlie],
+        createdAt: new Date(),
+      });
+    });
     await assertSucceeds(
       authed(alice)
         .firestore()
@@ -339,7 +346,28 @@ describe('/conversations/{conversationId}', () => {
         .set({
           conversationId: newConvId,
           type: 'direct',
-          participantIds: [alice, uid('charlie')],
+          participantIds: [alice, charlie],
+          status: 'active',
+          lastMessage: '',
+          lastMessageAt: new Date(),
+          lastSenderId: '',
+          createdAt: new Date(),
+        }),
+    );
+  });
+
+  test('non-friend cannot create direct conversation (CHAT-SEC-001)',
+      async () => {
+    const newConvId = [alice, stranger].sort().join('_');
+    // No friendship doc → create denied (chống stranger spam DM).
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${newConvId}`)
+        .set({
+          conversationId: newConvId,
+          type: 'direct',
+          participantIds: [alice, stranger],
           status: 'active',
           lastMessage: '',
           lastMessageAt: new Date(),
