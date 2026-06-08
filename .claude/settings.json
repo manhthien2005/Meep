@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/block_dangerous_commands.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/block_dangerous_commands.py\""
           }
         ]
       },
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/protect_secrets.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect_secrets.py\""
           }
         ]
       }
@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/protect_secrets.py"
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect_secrets.py\""
           }
         ]
       }
