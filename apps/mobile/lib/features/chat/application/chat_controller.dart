@@ -25,7 +25,7 @@ class ChatController extends _$ChatController {
   @override
   ChatSendStatus build() => const ChatSendStatus();
 
-  Future<void> sendMessage({
+  Future<bool> sendMessage({
     required String conversationId,
     required String text,
   }) async {
@@ -34,7 +34,7 @@ class ChatController extends _$ChatController {
       state = const ChatSendStatus(
         errorMessage: 'Đang khởi tạo phiên đăng nhập, thử lại sau giây lát',
       );
-      return;
+      return false;
     }
     state = const ChatSendStatus(isSending: true);
     try {
@@ -45,6 +45,7 @@ class ChatController extends _$ChatController {
             senderDisplayName: _resolveDisplayName(),
           );
       state = const ChatSendStatus();
+      return true;
     } catch (e, s) {
       developer.log(
         'sendMessage failed',
@@ -53,6 +54,7 @@ class ChatController extends _$ChatController {
         stackTrace: s,
       );
       state = ChatSendStatus(errorMessage: AppError.fromUnknown(e).message);
+      return false;
     }
   }
 

@@ -114,7 +114,7 @@ void main() {
     testWidgets('blurred shows quick-send emoji, no send icon', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: ChatInputBar(onSend: (_) {})),
+          home: Scaffold(body: ChatInputBar(onSend: (_) async => true)),
         ),
       );
 
@@ -126,7 +126,7 @@ void main() {
     testWidgets('typing hides quick-send and reveals send', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: ChatInputBar(onSend: (_) {})),
+          home: Scaffold(body: ChatInputBar(onSend: (_) async => true)),
         ),
       );
 
@@ -141,7 +141,14 @@ void main() {
       final sent = <String>[];
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: ChatInputBar(onSend: sent.add)),
+          home: Scaffold(
+            body: ChatInputBar(
+              onSend: (text) async {
+                sent.add(text);
+                return true;
+              },
+            ),
+          ),
         ),
       );
 
@@ -155,7 +162,14 @@ void main() {
       final sent = <String>[];
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: ChatInputBar(onSend: sent.add)),
+          home: Scaffold(
+            body: ChatInputBar(
+              onSend: (text) async {
+                sent.add(text);
+                return true;
+              },
+            ),
+          ),
         ),
       );
 
@@ -168,11 +182,46 @@ void main() {
       expect(find.text('  hello  '), findsNothing);
     });
 
+    testWidgets('failed send keeps text and retry uses the same draft',
+        (tester) async {
+      final sent = <String>[];
+      var succeeds = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChatInputBar(
+              errorText: 'Không gửi được',
+              onSend: (text) async {
+                sent.add(text);
+                return succeeds;
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField), '  retry me  ');
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.send_rounded));
+      await tester.pump();
+
+      expect(sent, ['retry me']);
+      expect(find.text('  retry me  '), findsOneWidget);
+      expect(find.text('Thử lại'), findsOneWidget);
+
+      succeeds = true;
+      await tester.tap(find.text('Thử lại'));
+      await tester.pump();
+
+      expect(sent, ['retry me', 'retry me']);
+      expect(find.text('  retry me  '), findsNothing);
+    });
+
     testWidgets('tap emoji picker icon opens EmojiPicker bottom sheet (Bug #6)',
         (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: ChatInputBar(onSend: (_) {})),
+          home: Scaffold(body: ChatInputBar(onSend: (_) async => true)),
         ),
       );
 
@@ -190,7 +239,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: ChatInputBar(onSend: (_) {}, isSending: true),
+            body: ChatInputBar(onSend: (_) async => true, isSending: true),
           ),
         ),
       );

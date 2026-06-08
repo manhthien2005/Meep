@@ -55,10 +55,10 @@ void main() {
   });
 
   group('ReactionListSheet', () {
-    testWidgets('renders title "Phản ứng"', (tester) async {
+    testWidgets('renders title with reaction count', (tester) async {
       await tester
           .pumpWidget(_makeScope(const ReactionListSheet(postId: 'p1')));
-      expect(find.text('Phản ứng'), findsOneWidget);
+      expect(find.text('Phản ứng (0)'), findsOneWidget);
     });
   });
 }

@@ -16,6 +16,7 @@ import 'package:meep/features/diary/presentation/widgets/delete_diary_dialog.dar
 import 'package:meep/features/diary/presentation/widgets/diary_menu_sheet.dart';
 import 'package:meep/features/diary/presentation/widgets/polaroid_image_block.dart';
 import 'package:meep/features/diary/presentation/widgets/text_style_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Re-export [DiaryCanvasMode] để các screen khác (`diary_list_screen`,...)
 /// import từ canvas screen như cũ, không phải đổi imports loạt.
@@ -122,6 +123,20 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
   /// 1 lần khi loadEntry hoàn thành. Tránh re-emit stream đè text user
   /// vừa gõ trong edit mode.
   bool _hasSyncedFromEntry = false;
+  bool _allowPop = false;
+  bool _isConfirmingPop = false;
+  bool _isRestoringDraft = false;
+  Timer? _autosaveDebounce;
+
+  bool get _shouldConfirmDiscard =>
+      widget.mode == DiaryCanvasMode.create &&
+      (_captionController.text.isNotEmpty ||
+          _contentController.text.isNotEmpty);
+
+  bool get _canPopWithoutConfirm => _allowPop || !_shouldConfirmDiscard;
+
+  String get _draftKeyPrefix =>
+      'diary.draft.${widget.moodTemplate?.name ?? 'new'}';
 
   @override
   void initState() {
@@ -134,6 +149,11 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
     // Content: prefill nếu có (read/edit mode), trống cho create mode.
     _contentController =
         TextEditingController(text: widget.initialContent ?? '');
+    _captionController.addListener(_onDraftChanged);
+    _contentController.addListener(_onDraftChanged);
+    if (widget.mode == DiaryCanvasMode.create) {
+      unawaited(_restoreDraft());
+    }
     // Date hiển thị topbar: entryDate (read/edit) hoặc hôm nay (create).
     _displayDate = widget.entryDate ?? DateTime.now();
     _loadedCoverUrl = widget.initialImageUrl;
@@ -149,6 +169,42 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
         ref.read(diaryControllerProvider.notifier).loadEntry(entryId);
       });
     }
+  }
+
+  void _onDraftChanged() {
+    if (widget.mode != DiaryCanvasMode.create) return;
+    setState(() {});
+    if (_isRestoringDraft) return;
+    _autosaveDebounce?.cancel();
+    _autosaveDebounce = Timer(
+      const Duration(milliseconds: 700),
+      () => unawaited(_saveDraft()),
+    );
+  }
+
+  Future<void> _restoreDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    final caption = prefs.getString('$_draftKeyPrefix.caption');
+    final content = prefs.getString('$_draftKeyPrefix.content');
+    if (!mounted || (caption == null && content == null)) return;
+    _isRestoringDraft = true;
+    if (caption != null) _captionController.text = caption;
+    if (content != null) _contentController.text = content;
+    _isRestoringDraft = false;
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _saveDraft() async {
+    if (widget.mode != DiaryCanvasMode.create) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('$_draftKeyPrefix.caption', _captionController.text);
+    await prefs.setString('$_draftKeyPrefix.content', _contentController.text);
+  }
+
+  Future<void> _clearDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_draftKeyPrefix.caption');
+    await prefs.remove('$_draftKeyPrefix.content');
   }
 
   /// Sync controllers + local state khi controller emit `currentEntry`.
@@ -187,6 +243,9 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
 
   @override
   void dispose() {
+    _autosaveDebounce?.cancel();
+    _captionController.removeListener(_onDraftChanged);
+    _contentController.removeListener(_onDraftChanged);
     _captionController.dispose();
     _contentController.dispose();
     _contentFocus.dispose();
@@ -318,6 +377,9 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
     // Clear inline bytes sau success — tránh re-upload nếu user back gesture
     // cancel pop rồi tap check lại (duplicate upload + content blocks).
     _inlineImageBytes.clear();
+    if (widget.mode == DiaryCanvasMode.create) {
+      unawaited(_clearDraft());
+    }
     unawaited(Navigator.of(context).maybePop());
   }
 
@@ -394,20 +456,24 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
   /// Back handler — create mode + có nội dung → DiscardChangesDialog;
   /// read/edit mode → pop trực tiếp.
   Future<void> _handleBack() async {
-    final hasContent = _captionController.text.isNotEmpty ||
-        _contentController.text.isNotEmpty;
-    final shouldConfirm = widget.mode == DiaryCanvasMode.create && hasContent;
-
-    if (!shouldConfirm) {
+    if (!_shouldConfirmDiscard) {
+      _allowPop = true;
       // ignore: unawaited_futures
       Navigator.of(context).maybePop();
       return;
     }
 
+    if (_isConfirmingPop) return;
+    _isConfirmingPop = true;
     final discard = await DiscardChangesDialog.show(context);
+    _isConfirmingPop = false;
     if (discard == true && mounted) {
+      unawaited(_clearDraft());
+      setState(() => _allowPop = true);
       // ignore: unawaited_futures
-      Navigator.of(context).maybePop();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).maybePop();
+      });
     }
   }
 
@@ -482,23 +548,30 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
       },
     );
 
-    return Scaffold(
-      backgroundColor: _canvasBg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopbar(),
-            // Box border đen + dots — hug content vertically, width fixed
-            // theo margin ngoài. Scroll cả màn khi content vượt screen height.
-            Expanded(
-              child: SingleChildScrollView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                child: _buildCanvasBox(),
+    return PopScope<void>(
+      canPop: _canPopWithoutConfirm,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        unawaited(_handleBack());
+      },
+      child: Scaffold(
+        backgroundColor: _canvasBg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildTopbar(),
+              // Box border đen + dots — hug content vertically, width fixed
+              // theo margin ngoài. Scroll cả màn khi content vượt screen height.
+              Expanded(
+                child: SingleChildScrollView(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  child: _buildCanvasBox(),
+                ),
               ),
-            ),
-            if (!_isReadOnly) _buildToolbar(),
-          ],
+              if (!_isReadOnly) _buildToolbar(),
+            ],
+          ),
         ),
       ),
     );

@@ -69,6 +69,7 @@ class GroupChatScreen extends ConsumerWidget {
               curve: Curves.easeOut,
               child: ChatInputBar(
                 isSending: sendStatus.isSending,
+                errorText: sendStatus.errorMessage,
                 onSend: (text) => ref
                     .read(chatControllerProvider.notifier)
                     .sendMessage(conversationId: conversationId, text: text),
