@@ -15,6 +15,32 @@ import { z } from 'zod';
 const deleteAccountSchema = z.unknown();
 
 /**
+ * Reauth window cho destructive ops — 5 phút (giây).
+ *
+ * Firebase Auth SDK enforce recent-login cho `user.delete()` NATIVE, nhưng
+ * KHÔNG áp dụng cho callable CF. id_token sống ~1h → gọi CF trực tiếp với
+ * token cũ vẫn cascade-delete được dù client UI đã prompt reauth (bypass).
+ * Server-side check `auth_time` đóng gap đó (AUTH-SEC-001).
+ */
+export const REAUTH_WINDOW_SECONDS = 5 * 60;
+
+/**
+ * True khi token được cấp/refresh trong [windowSec] gần đây.
+ *
+ * Pure để unit test không cần emulator — handler truyền Date.now()/1000.
+ * `authTimeSec` = claim `auth_time` (epoch seconds, thời điểm user thực sự
+ * nhập credential gần nhất). Clamp âm: clock skew (authTime > now) vẫn coi là
+ * fresh.
+ */
+export function isReauthWithinWindow(
+  authTimeSec: number,
+  nowSec: number,
+  windowSec: number = REAUTH_WINDOW_SECONDS,
+): boolean {
+  return nowSec - authTimeSec <= windowSec;
+}
+
+/**
  * Firestore batch limit: 500 writes/batch (admin SDK). Dùng 499 để chừa 1 slot
  * an toàn cho race case (mặc dù trong cascade này không có race nhưng giữ
  * consistent với pattern onSpaceDeleted).
@@ -132,9 +158,10 @@ async function softDeleteConversations(uid: string): Promise<number> {
  * login retry. Order Auth LAST đảm bảo Storage/Firestore cleanup không bị
  * mất quyền truy cập (Auth gone = không re-auth được).
  *
- * Pre-condition: client (DeleteAccountDialog) phải reauthenticate trước
- * khi gọi CF này (Firebase Auth requires-recent-login policy). CF chỉ check
- * `request.auth` exists, không enforce recent-login (Firebase SDK enforce).
+ * Pre-condition: client (DeleteAccountDialog) phải reauthenticate trước khi
+ * gọi CF này. CF enforce lại server-side qua `auth_time` claim
+ * (isReauthWithinWindow) — chặn bypass khi gọi callable trực tiếp với
+ * id_token cũ (AUTH-SEC-001).
  */
 export const deleteAccount = onCall(
   {
@@ -147,6 +174,21 @@ export const deleteAccount = onCall(
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Login required');
+    }
+
+    // Reauth window: token phải fresh (≤ 5 phút từ last credential entry).
+    // Client DeleteAccountDialog reauth trước khi gọi — server enforce lại để
+    // chặn bypass khi gọi CF trực tiếp với id_token cũ (AUTH-SEC-001).
+    const authTime = request.auth.token.auth_time;
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (
+      typeof authTime !== 'number' ||
+      !isReauthWithinWindow(authTime, nowSec)
+    ) {
+      throw new HttpsError(
+        'failed-precondition',
+        'Vui lòng đăng nhập lại trước khi xoá tài khoản',
+      );
     }
 
     const parsed = deleteAccountSchema.safeParse(request.data);
@@ -182,6 +224,10 @@ export const deleteAccount = onCall(
         'users/fcmTokens',
       ),
       deleteCollectionInBatches(userRef.collection('private'), 'users/private'),
+      deleteCollectionInBatches(
+        userRef.collection('space_count_events'),
+        'users/space_count_events',
+      ),
     ]);
 
     // Step 3a-3c: Cross-collection queries có Firestore trigger downstream

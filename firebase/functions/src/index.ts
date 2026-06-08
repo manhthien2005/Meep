@@ -21,9 +21,11 @@ setGlobalOptions({
 
 // ===== Schemas =====
 
-const sendFriendRequestSchema = z.object({
-  toUid: z.string().min(1).max(128),
-});
+const sendFriendRequestSchema = z
+  .object({
+    toUid: z.string().min(1).max(128),
+  })
+  .strict();
 
 // ===== Callable functions =====
 

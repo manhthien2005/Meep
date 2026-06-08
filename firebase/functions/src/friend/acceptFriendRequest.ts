@@ -2,9 +2,11 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 
-const acceptFriendRequestSchema = z.object({
-  requestId: z.string().min(1),
-});
+const acceptFriendRequestSchema = z
+  .object({
+    requestId: z.string().min(1),
+  })
+  .strict();
 
 /**
  * Accept a pending friend request and create the friendship doc.

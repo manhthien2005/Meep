@@ -12,7 +12,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterAll, beforeAll, beforeEach, describe, test } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 
 // ===== Setup =====
 
@@ -834,6 +834,7 @@ describe('/conversations/{conversationId}', () => {
   });
 
   test('participant cannot send message when conversation is blocked', async () => {
+    await seedConversation();
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc(`conversations/${CONV_ID}`).update({
         status: 'blocked',
@@ -894,6 +895,387 @@ describe('/conversations/{conversationId}', () => {
         .doc(`conversations/${CONV_ID}/messages/msg-del`)
         .delete(),
     );
+  });
+});
+
+// ===== /posts — update field whitelist + caption cap (POST-SEC-001) =====
+
+describe('/posts/{postId} — update', () => {
+  const alice = uid('alice');
+  const bob = uid('bob');
+  const POST_ID = 'post-upd';
+
+  async function seedPost() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`posts/${POST_ID}`).set({
+        authorId: alice,
+        authorName: 'Alice',
+        imageUrl: 'https://example.com/photo.jpg',
+        audienceType: 'all',
+        caption: 'ok',
+        createdAt: new Date(),
+      });
+    });
+  }
+
+  test('author can edit caption (within cap)', async () => {
+    await seedPost();
+    await assertSucceeds(
+      authed(alice).firestore().doc(`posts/${POST_ID}`).update({ caption: 'updated' }),
+    );
+  });
+
+  test('author cannot set caption > 200 chars', async () => {
+    await seedPost();
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`posts/${POST_ID}`)
+        .update({ caption: 'a'.repeat(201) }),
+    );
+  });
+
+  test('author cannot mutate imageUrl (not in whitelist)', async () => {
+    await seedPost();
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`posts/${POST_ID}`)
+        .update({ imageUrl: 'https://evil.com/x.jpg' }),
+    );
+  });
+
+  test('author cannot mutate authorId', async () => {
+    await seedPost();
+    await assertFails(
+      authed(alice).firestore().doc(`posts/${POST_ID}`).update({ authorId: bob }),
+    );
+  });
+
+  test('non-author cannot update', async () => {
+    await seedPost();
+    await assertFails(
+      authed(bob).firestore().doc(`posts/${POST_ID}`).update({ caption: 'hijack' }),
+    );
+  });
+});
+
+// ===== /posts/{postId}/reactions — field validation (REACTION-SEC-001) =====
+
+describe('/posts/{postId}/reactions/{reactorUid}', () => {
+  const alice = uid('alice');
+  const bob = uid('bob');
+  const POST_ID = 'post-react';
+
+  async function seedPostAndFeed() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`posts/${POST_ID}`).set({
+        authorId: alice,
+        authorName: 'Alice',
+        imageUrl: 'https://example.com/photo.jpg',
+        audienceType: 'all',
+        createdAt: new Date(),
+      });
+      // bob nhận post qua feed fan-out → được react.
+      await ctx.firestore().doc(`users/${bob}/feed/${POST_ID}`).set({ postId: POST_ID });
+    });
+  }
+
+  test('reactor can create valid reaction', async () => {
+    await seedPostAndFeed();
+    await assertSucceeds(
+      authed(bob).firestore().doc(`posts/${POST_ID}/reactions/${bob}`).set({
+        reactorUid: bob,
+        reactorName: 'Bob',
+        emoji: '❤️',
+        createdAt: new Date(),
+      }),
+    );
+  });
+
+  test('reactorName > 50 chars rejected on create', async () => {
+    await seedPostAndFeed();
+    await assertFails(
+      authed(bob).firestore().doc(`posts/${POST_ID}/reactions/${bob}`).set({
+        reactorUid: bob,
+        reactorName: 'B'.repeat(51),
+        emoji: '❤️',
+        createdAt: new Date(),
+      }),
+    );
+  });
+
+  test('emoji > 32 chars rejected on create', async () => {
+    await seedPostAndFeed();
+    await assertFails(
+      authed(bob).firestore().doc(`posts/${POST_ID}/reactions/${bob}`).set({
+        reactorUid: bob,
+        reactorName: 'Bob',
+        emoji: '😀'.repeat(20),
+        createdAt: new Date(),
+      }),
+    );
+  });
+
+  test('reactor cannot tamper reactorName > 50 on update', async () => {
+    await seedPostAndFeed();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`posts/${POST_ID}/reactions/${bob}`).set({
+        reactorUid: bob,
+        reactorName: 'Bob',
+        emoji: '❤️',
+        createdAt: new Date(),
+      });
+    });
+    await assertFails(
+      authed(bob)
+        .firestore()
+        .doc(`posts/${POST_ID}/reactions/${bob}`)
+        .update({ reactorName: 'X'.repeat(51) }),
+    );
+  });
+});
+
+// ===== /conversations — create gate + update tamper (CHAT-SEC-001/002) =====
+
+describe('/conversations — create friend/space gate', () => {
+  const alice = uid('alice');
+  const bob = uid('bob');
+  const stranger = uid('stranger');
+
+  test('friend can create direct conversation', async () => {
+    const convId = [alice, bob].sort().join('_');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`friendships/${convId}`).set({
+        members: [alice, bob],
+        createdAt: new Date(),
+      });
+    });
+    await assertSucceeds(
+      authed(alice).firestore().doc(`conversations/${convId}`).set({
+        conversationId: convId,
+        type: 'direct',
+        participantIds: [alice, bob],
+        status: 'active',
+        lastMessage: '',
+        lastMessageAt: new Date(),
+        lastSenderId: '',
+        createdAt: new Date(),
+      }),
+    );
+  });
+
+  test('stranger (no friendship) cannot create direct conversation', async () => {
+    const convId = [alice, stranger].sort().join('_');
+    await assertFails(
+      authed(alice).firestore().doc(`conversations/${convId}`).set({
+        conversationId: convId,
+        type: 'direct',
+        participantIds: [alice, stranger],
+        status: 'active',
+        lastMessage: '',
+        lastMessageAt: new Date(),
+        lastSenderId: '',
+        createdAt: new Date(),
+      }),
+    );
+  });
+
+  test('cannot forge conversationId to a friend pairId while DM-ing a non-friend', async () => {
+    // alice friend bob (friendships/alice_bob exists). alice tries to create
+    // doc at id=alice_bob but with participantIds=[alice, stranger] → must DENY
+    // (conversationId không khớp pairId của participantIds).
+    const bobPair = [alice, bob].sort().join('_');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`friendships/${bobPair}`).set({
+        members: [alice, bob],
+        createdAt: new Date(),
+      });
+    });
+    await assertFails(
+      authed(alice).firestore().doc(`conversations/${bobPair}`).set({
+        conversationId: bobPair,
+        type: 'direct',
+        participantIds: [alice, stranger],
+        status: 'active',
+        lastMessage: '',
+        lastMessageAt: new Date(),
+        lastSenderId: '',
+        createdAt: new Date(),
+      }),
+    );
+  });
+
+  test('space member can create space conversation', async () => {
+    const SPACE_ID = 'space-conv-1';
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`spaces/${SPACE_ID}`).set({
+        creatorId: alice,
+        memberIds: [alice, bob],
+        name: 'Space',
+        createdAt: new Date(),
+      });
+    });
+    await assertSucceeds(
+      authed(alice).firestore().doc(`conversations/${SPACE_ID}`).set({
+        conversationId: SPACE_ID,
+        type: 'space',
+        participantIds: [alice, bob],
+        status: 'active',
+        lastMessage: '',
+        lastMessageAt: new Date(),
+        lastSenderId: '',
+        createdAt: new Date(),
+      }),
+    );
+  });
+});
+
+describe('/conversations — update tamper guards', () => {
+  const alice = uid('alice');
+  const bob = uid('bob');
+  const CONV_ID = [alice, bob].sort().join('_');
+
+  async function seedConversation() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`conversations/${CONV_ID}`).set({
+        conversationId: CONV_ID,
+        type: 'direct',
+        participantIds: [alice, bob],
+        status: 'active',
+        lastMessage: '',
+        lastMessageAt: new Date(),
+        lastSenderId: '',
+        createdAt: new Date(),
+      });
+    });
+  }
+
+  test('participant can update with valid lastMessage + own lastSenderId', async () => {
+    await seedConversation();
+    await assertSucceeds(
+      authed(alice).firestore().doc(`conversations/${CONV_ID}`).update({
+        lastMessage: 'Hi',
+        lastMessageAt: new Date(),
+        lastSenderId: alice,
+      }),
+    );
+  });
+
+  test('cannot forge lastSenderId to another user', async () => {
+    await seedConversation();
+    await assertFails(
+      authed(alice).firestore().doc(`conversations/${CONV_ID}`).update({
+        lastMessage: 'fake from bob',
+        lastSenderId: bob,
+      }),
+    );
+  });
+
+  test('cannot set lastMessage > 500 chars', async () => {
+    await seedConversation();
+    await assertFails(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}`)
+        .update({ lastMessage: 'a'.repeat(501), lastSenderId: alice }),
+    );
+  });
+
+  test('markAsRead dot-notation lastReadAt still allowed', async () => {
+    await seedConversation();
+    await assertSucceeds(
+      authed(alice)
+        .firestore()
+        .doc(`conversations/${CONV_ID}`)
+        .update({ [`lastReadAt.${alice}`]: new Date() }),
+    );
+  });
+});
+
+// ===== /diary — update privacy enum + type guard (DIARY-SEC-001) =====
+
+describe('/diary/{entryId} — update validation', () => {
+  const alice = uid('alice');
+  const ENTRY_ID = 'entry-upd';
+
+  async function seedEntry() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`diary/${ENTRY_ID}`).set({
+        authorUid: alice,
+        privacy: 'private',
+        moodTemplate: 'happy',
+        coverImageUrl: 'https://example.com/cover.jpg',
+        moodCaption: 'Title',
+        content: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    });
+  }
+
+  test('owner can update with valid privacy', async () => {
+    await seedEntry();
+    await assertSucceeds(
+      authed(alice).firestore().doc(`diary/${ENTRY_ID}`).update({
+        moodCaption: 'New title',
+        updatedAt: new Date(),
+      }),
+    );
+  });
+
+  test('invalid privacy enum rejected on update', async () => {
+    await seedEntry();
+    await assertFails(
+      authed(alice).firestore().doc(`diary/${ENTRY_ID}`).update({ privacy: 'leaked' }),
+    );
+  });
+});
+
+// ===== /friendships/{pid} (TESTING-SEC-001 coverage) =====
+
+describe('/friendships/{pid}', () => {
+  const alice = uid('alice');
+  const bob = uid('bob');
+  const stranger = uid('stranger');
+  const PID = [alice, bob].sort().join('_');
+
+  async function seedFriendship() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`friendships/${PID}`).set({
+        members: [alice, bob],
+        createdAt: new Date(),
+      });
+    });
+  }
+
+  test('member can read', async () => {
+    await seedFriendship();
+    await assertSucceeds(authed(alice).firestore().doc(`friendships/${PID}`).get());
+  });
+
+  test('non-member cannot read', async () => {
+    await seedFriendship();
+    await assertFails(authed(stranger).firestore().doc(`friendships/${PID}`).get());
+  });
+
+  test('client cannot create (server-side only)', async () => {
+    await assertFails(
+      authed(alice).firestore().doc(`friendships/${PID}`).set({
+        members: [alice, bob],
+        createdAt: new Date(),
+      }),
+    );
+  });
+
+  test('member can delete (unfriend)', async () => {
+    await seedFriendship();
+    await assertSucceeds(authed(alice).firestore().doc(`friendships/${PID}`).delete());
+  });
+
+  test('non-member cannot delete', async () => {
+    await seedFriendship();
+    await assertFails(authed(stranger).firestore().doc(`friendships/${PID}`).delete());
   });
 });
 

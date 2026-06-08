@@ -8,9 +8,11 @@ import { z } from 'zod';
  * Server source of truth: client (`FirebaseBlockRepository.blockUser`) chỉ
  * gửi `targetUid` — server tự derive `blockerUid` từ `request.auth.uid`.
  */
-const blockUserSchema = z.object({
-  targetUid: z.string().min(1).max(128),
-});
+const blockUserSchema = z
+  .object({
+    targetUid: z.string().min(1).max(128),
+  })
+  .strict();
 
 /**
  * Block a user atomically.

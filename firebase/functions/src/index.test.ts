@@ -3,9 +3,12 @@ import { z } from 'zod';
 
 // Re-declare the schema here for testing (intentional duplication —
 // keeps the test stable even if index.ts later splits the schema out).
-const sendFriendRequestSchema = z.object({
-  toUid: z.string().min(1).max(128),
-});
+// .strict() mirror FUNC-SEC-001 — reject excess properties.
+const sendFriendRequestSchema = z
+  .object({
+    toUid: z.string().min(1).max(128),
+  })
+  .strict();
 
 describe('sendFriendRequestSchema', () => {
   test('accepts a valid uid', () => {
@@ -25,6 +28,14 @@ describe('sendFriendRequestSchema', () => {
 
   test('rejects a non-string uid', () => {
     const result = sendFriendRequestSchema.safeParse({ toUid: 12345 });
+    expect(result.success).toBe(false);
+  });
+
+  test('rejects excess properties (.strict — FUNC-SEC-001)', () => {
+    const result = sendFriendRequestSchema.safeParse({
+      toUid: 'user-abc',
+      evil: 'payload',
+    });
     expect(result.success).toBe(false);
   });
 });

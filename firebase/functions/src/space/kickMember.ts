@@ -2,10 +2,12 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 
-const kickMemberSchema = z.object({
-  spaceId: z.string().min(1),
-  targetUid: z.string().min(1),
-});
+const kickMemberSchema = z
+  .object({
+    spaceId: z.string().min(1),
+    targetUid: z.string().min(1),
+  })
+  .strict();
 
 /**
  * Creator kick một member khỏi Space.

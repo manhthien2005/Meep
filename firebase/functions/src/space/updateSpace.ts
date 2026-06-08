@@ -24,6 +24,7 @@ const updateSpaceSchema = z
       .regex(/^#[0-9A-Fa-f]{6}$/, 'colorHex must be #RRGGBB')
       .optional(),
   })
+  .strict()
   .refine(
     (d) =>
       d.name !== undefined ||

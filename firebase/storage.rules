@@ -3,10 +3,57 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    // ===== Helpers — mirror friend boundary của firestore.rules =====
+    // Storage path posts/{uid}/{postId}/... và diary/{uid}/{entryId}/... chứa
+    // doc ID nên đọc cross-service được /posts + /diary doc để mirror CHÍNH
+    // XÁC Firestore read rule (STORAGE-001/002). KHÔNG còn `if authed` lax.
+
+    /// Sorted pair ID — same as Dart pairIdOf() + firestore.rules pairId().
+    function pairId(a, b) {
+      return a < b ? a + '_' + b : b + '_' + a;
+    }
+
+    /// True khi caller là friend của [other] (friendship doc tồn tại).
+    function isFriend(other) {
+      return request.auth != null && firestore.exists(
+        /databases/(default)/documents/friendships/$(pairId(request.auth.uid, other))
+      );
+    }
+
+    /// True khi caller có feed fan-out doc cho [postId] (friend của author
+    /// nhận post qua CF onPostCreated). exists() — rẻ, không cần đọc post doc.
+    function hasFeedDoc(postId) {
+      return request.auth != null && firestore.exists(
+        /databases/(default)/documents/users/$(request.auth.uid)/feed/$(postId)
+      );
+    }
+
+    /// True khi caller là member của Space chứa [postId]. Đọc memberIds
+    /// denormalized trên post doc — mirror disjunct (3) của /posts read rule.
+    /// Space post KHÔNG fan-out tới friend feed nên phải check memberIds trực
+    /// tiếp. Pattern `'memberIds' in data && ...hasAny` y hệt firestore.rules
+    /// (post thường không có memberIds → branch đầu false → an toàn).
+    function postData(postId) {
+      return firestore.get(/databases/(default)/documents/posts/$(postId)).data;
+    }
+    function isSpaceMemberOfPost(postId) {
+      return request.auth != null
+        && firestore.exists(/databases/(default)/documents/posts/$(postId))
+        && 'memberIds' in postData(postId)
+        && postData(postId).memberIds.hasAny([request.auth.uid]);
+    }
+
     // User's own posts — uploaded by the owner only.
-    match /posts/{uid}/{allPaths=**} {
-      // Anyone authenticated can read (Firestore rule controls visibility).
-      allow read: if request.auth != null;
+    // Read mirror /posts: owner OR friend(author) OR space-member OR feed-doc.
+    // Stranger hoàn toàn (không friend + không chung space) bị chặn dù có URL
+    // (STORAGE-001). `uid` trong path = authorId của post.
+    match /posts/{uid}/{postId}/{fileName=**} {
+      allow read: if request.auth != null && (
+        request.auth.uid == uid ||
+        isFriend(uid) ||
+        hasFeedDoc(postId) ||
+        isSpaceMemberOfPost(postId)
+      );
 
       allow write: if request.auth != null
         && request.auth.uid == uid
@@ -15,6 +62,8 @@ service firebase.storage {
     }
 
     // Avatars — owner-only write, anyone authenticated reads.
+    // Avatar là minimal-profile asset (hiển thị cho stranger lookup, friend
+    // list) — giữ authed-read OK, không phải friend boundary.
     // Size cap 5MB khớp Profile spec §Security (docs/specs/2026-05-22-profile.md)
     // và client-side check trong FirebaseProfileRepository._maxAvatarBytes.
     match /avatars/{uid}/{filename} {
@@ -25,9 +74,20 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
-    // Diary images — owner-only write, anyone authenticated reads.
-    match /diary/{uid}/{allPaths=**} {
-      allow read: if request.auth != null;
+    // Diary images — owner-only write.
+    // Read mirror /diary: owner OR (privacy=='public' AND friend(author)).
+    // Private diary image chặn mọi non-owner dù lộ URL (STORAGE-002).
+    // `uid` trong path = authorUid của entry.
+    match /diary/{uid}/{entryId}/{fileName=**} {
+      allow read: if request.auth != null && (
+        request.auth.uid == uid ||
+        (
+          firestore.exists(/databases/(default)/documents/diary/$(entryId))
+          && firestore.get(/databases/(default)/documents/diary/$(entryId))
+               .data.privacy == 'public'
+          && isFriend(uid)
+        )
+      );
       allow write: if request.auth != null
         && request.auth.uid == uid
         && request.resource.size < 10 * 1024 * 1024  // 10MB

@@ -9,19 +9,21 @@ import { z } from 'zod';
  * truyền name/iconEmoji/colorHex/friendUids. Server validate lại đầy đủ —
  * KHÔNG tin client.
  */
-const createSpaceSchema = z.object({
-  name: z.string().trim().min(1).max(30),
-  // ZWJ emoji sequences (👨‍👩‍👧‍👦) có JS length 11 vì code units + ZWJ joiners.
-  // Cap 32 đủ rộng cho mọi single emoji + flag + ZWJ family, vẫn chặn abuse.
-  iconEmoji: z.string().min(1).max(32),
-  // 7-char hex `#RRGGBB`. Reject malformed để Camera UI parser luôn an toàn.
-  colorHex: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'colorHex must be #RRGGBB'),
-  // friendUids: invited friends; creator auto-added → tổng ≤ 10 (max 9 friends).
-  // min(2) = Space cần ≥ 3 thành viên (creator + 2 friends) — match client
-  // guard (SpaceController.createSpace) + UI button "Tiếp tục" disabled khi
-  // < 2 friend chọn.
-  friendUids: z.array(z.string().min(1).max(128)).min(2).max(9),
-});
+const createSpaceSchema = z
+  .object({
+    name: z.string().trim().min(1).max(30),
+    // ZWJ emoji sequences (👨‍👩‍👧‍👦) có JS length 11 vì code units + ZWJ joiners.
+    // Cap 32 đủ rộng cho mọi single emoji + flag + ZWJ family, vẫn chặn abuse.
+    iconEmoji: z.string().min(1).max(32),
+    // 7-char hex `#RRGGBB`. Reject malformed để Camera UI parser luôn an toàn.
+    colorHex: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'colorHex must be #RRGGBB'),
+    // friendUids: invited friends; creator auto-added → tổng ≤ 10 (max 9 friends).
+    // min(2) = Space cần ≥ 3 thành viên (creator + 2 friends) — match client
+    // guard (SpaceController.createSpace) + UI button "Tiếp tục" disabled khi
+    // < 2 friend chọn.
+    friendUids: z.array(z.string().min(1).max(128)).min(2).max(9),
+  })
+  .strict();
 
 /**
  * Create a Space + group conversation in 1 atomic batch.
