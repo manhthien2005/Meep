@@ -74,7 +74,7 @@ jobs:
 
       - name: Decode signing keystore
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/release.keystore
           cat > android/key.properties <<EOF
           storeFile=release.keystore
           storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -158,17 +158,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Determine version
+      - name: Determine version (single source = pubspec.yaml)
         id: version
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            LAST_TAG=$(git tag --sort=-v:refname | head -n1 || echo "v0.0.0")
-            VERSION=$(echo "$LAST_TAG" | awk -F. -v OFS=. '{$NF = $NF + 1; print}')
+          # pubspec.yaml la source-of-truth duy nhat: version: X.Y.Z+BUILD
+          PUBSPEC_VERSION=$(grep '^version:' apps/mobile/pubspec.yaml | sed 's/version:[[:space:]]*//' | cut -d'+' -f1)
+          VERSION="v${PUBSPEC_VERSION}"
+          # workflow_dispatch input (neu co) PHAI khop pubspec -> chan version drift.
+          INPUT="${{ github.event.inputs.version }}"
+          if [ -n "$INPUT" ] && [ "$INPUT" != "$VERSION" ]; then
+            echo "::error::Version drift: input '$INPUT' != pubspec '$VERSION'. Bump pubspec.yaml truoc khi deploy."
+            exit 1
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION"
+          echo "Version (tu pubspec.yaml): $VERSION"
 
       - name: Generate changelog
         id: changelog
