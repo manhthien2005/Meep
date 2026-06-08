@@ -2,13 +2,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:meep/core/config/app_config.dart';
+import 'package:meep/core/observability/crashlytics_helper.dart';
 import 'package:meep/core/router/app_router.dart';
 import 'package:meep/core/theme/app_theme.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
@@ -58,6 +61,25 @@ void main() async {
     FirebaseFirestore.instance.useFirestoreEmulator(_emulatorHost, 9999);
     await FirebaseStorage.instance.useStorageEmulator(_emulatorHost, 9199);
   }
+
+  // Crashlytics: bật collection chỉ ở production build (tắt debug + emulator để
+  // dashboard không nhiễu). Bắt cả Flutter framework error lẫn Dart-zone error.
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
+    !kDebugMode && !_useEmulator,
+  );
+  final crashlytics = CrashlyticsHelper(FirebaseCrashlytics.instance);
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    crashlytics.recordScrubbedError(
+      details.exception,
+      details.stack,
+      fatal: true,
+    );
+  };
+  WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
+    crashlytics.recordScrubbedError(error, stack, fatal: true);
+    return true;
+  };
 
   final prefs = await SharedPreferences.getInstance();
 
