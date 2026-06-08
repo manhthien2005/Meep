@@ -91,11 +91,11 @@ Only P0/P1.
 | id | sev | area | files | short |
 |---|---|---|---|---|
 | CAMERA-UX-001 | P0 | Camera permission UX — golden path break | `apps/mobile/lib/features/feed/application/app_camera_controller.dart`, `apps/mobile/lib/features/feed/presentation/camera_section.dart` | Camera permission denied → silent black box with no Vietnamese message, no "Mở Cài đặt" CTA, no retry — user cannot post |
-| STATE-UX-EMPTY-001 | P1 | 4-state empty branch missing CTA | `apps/mobile/lib/features/feed/presentation/feed_section.dart`, `apps/mobile/lib/features/feed/presentation/home_screen.dart`, `apps/mobile/lib/features/chat/presentation/inbox_screen.dart`, `apps/mobile/lib/features/chat/presentation/chat_thread_view.dart`, `apps/mobile/lib/features/diary/presentation/diary_list_screen.dart` | Feed/Inbox/Chat thread/Diary empty states là plain text — KHÔNG có Vietnamese CTA tappable, vi phạm `apps/mobile/CLAUDE.md §Empty state must have a Vietnamese CTA` |
-| STATE-UX-ERROR-001 | P1 | Error state thiếu retry affordance (6 screens) | `apps/mobile/lib/features/feed/presentation/feed_section.dart`, `apps/mobile/lib/features/feed/presentation/home_screen.dart`, `apps/mobile/lib/features/chat/presentation/inbox_screen.dart`, `apps/mobile/lib/features/streak/presentation/streak_screen.dart`, `apps/mobile/lib/features/settings/presentation/blocked_accounts_page.dart`, `apps/mobile/lib/features/profile/presentation/friend_profile_screen.dart` | Feed/inbox/streak/blocked-accounts/friend-profile error chỉ render Text + không có retry button (`_ErrorBanner` streak red bar không dismiss, `_GateMessage` friend-profile chỉ "Quay lại"); user stuck trên dead screen |
+| STATE-UX-EMPTY-001 | P1 | 4-state empty branch missing CTA (12 sites) | feed/inbox/chat/diary/profile/friend-profile/space-context/reaction-list + 2 shared profile widgets (photo_grid + diary_tab_content) + grid_view_screen | 12 empty states là plain Text/Center — KHÔNG có Vietnamese CTA tappable (chỉ streak `EmptyStateOverlay` có arrow chỉ taskbar); vi phạm `apps/mobile/CLAUDE.md §Empty state must have a Vietnamese CTA` |
+| STATE-UX-ERROR-001 | P1 | Error state thiếu retry affordance (12 sites / 11 files) | feed/home/inbox/streak/blocked-accounts/friend-profile (gate + post-grid) + diary-list + profile + space-edit-sheet + space-management-sheet + grid-view-screen | 12 error branches chỉ render Text + KHÔNG có retry; `_ErrorView` space-edit chỉ "Đóng", `_GateMessage` friend-profile chỉ "Quay lại", `_ErrorBanner` streak red bar persist không dismiss; user stuck trên dead screen |
 | NOTIF-UX-PERM-001 | P1 | FCM permission denial silent | `apps/mobile/lib/features/notification/application/notification_controller.dart`, `apps/mobile/lib/main.dart` | `state.fcmPermissionDenied` set ở `notification_controller.dart:74` nhưng KHÔNG có UI consumer (grep 0 hits) — user denies notification permission → app không hiển thị banner/CTA mở Settings |
-| CHAT-UX-SEND-001 | P1 | Chat send fail silent | `apps/mobile/lib/features/chat/presentation/chat_screen.dart`, `apps/mobile/lib/features/chat/presentation/group_chat_screen.dart`, `apps/mobile/lib/features/chat/application/chat_controller.dart` | `chatControllerProvider.sendStatus.errorMessage` set khi sendMessage fail (chat_controller.dart:55) nhưng UI chỉ watch `isSending` (chat_screen.dart:42, group_chat_screen.dart:40) — message bị clear khỏi input + error vô hình → user không biết tin gửi hỏng |
-| NAV-UX-POPSCOPE-001 | P1 | Unsaved-changes warning bị bypass khi system back | `apps/mobile/lib/features/diary/presentation/diary_canvas_screen.dart`, `apps/mobile/lib/features/feed/presentation/capture_preview_screen.dart`, toàn codebase | Grep `PopScope\|WillPopScope\|onWillPop` = 0 hits; `_handleBack` chỉ trigger qua tap AppBackButton — Android system back gesture skip dialog → data loss diary draft + post draft |
+| CHAT-UX-SEND-001 | P1 | Chat send fail silent (text + emoji-picker + quick-emoji) | `apps/mobile/lib/features/chat/presentation/chat_screen.dart`, `apps/mobile/lib/features/chat/presentation/group_chat_screen.dart`, `apps/mobile/lib/features/chat/application/chat_controller.dart`, `apps/mobile/lib/features/chat/presentation/widgets/chat_input_bar.dart` | `sendStatus.errorMessage` set (chat_controller.dart:55) nhưng UI chỉ watch `isSending` (0 hits cho `sendStatus.errorMessage` toàn lib); `ChatInputBar` clear input ngay sau `onSend` (line 55-59); emoji-picker tap (line 100) + quick-emoji tap (line 158) cùng pattern silent fail; message gone, không retry |
+| NAV-UX-POPSCOPE-001 | P1 | Unsaved-changes warning bị bypass khi system back | `apps/mobile/lib/features/diary/presentation/diary_canvas_screen.dart`, `apps/mobile/lib/features/feed/presentation/capture_preview_screen.dart`, `apps/mobile/lib/features/profile/presentation/edit_profile_screen.dart`, toàn codebase | Grep `PopScope\|WillPopScope\|onWillPop` = 0 hits; diary có `_handleBack` chỉ qua AppBackButton tap (Android system back skip); capture_preview KHÔNG có back handler nào (cả tap lẫn gesture mất draft); edit_profile chỉ `Navigator.pop()` không isDirty check |
 | UPLOAD-UX-001 | P1 | Upload fail thiếu retry button | `apps/mobile/lib/features/feed/presentation/capture_preview_screen.dart`, `apps/mobile/lib/features/feed/application/post_controller.dart` | Upload fail → `postState.errorMessage` render as red Text (capture_preview_screen.dart:225-234) KHÔNG có retry button; user phải back ra rồi vào lại sau khi sửa lỗi — draft (compressed bytes) bị mất |
 
 ## issues
@@ -128,66 +128,97 @@ Only P0/P1.
 
 - sev: P1
 - blocker: no
-- area: 4-required-states — empty branch missing Vietnamese CTA button
+- area: 4-required-states — empty branch missing Vietnamese CTA button (12 sites across 10 files)
 - files:
   - `apps/mobile/lib/features/feed/presentation/feed_section.dart`
   - `apps/mobile/lib/features/feed/presentation/home_screen.dart`
+  - `apps/mobile/lib/features/feed/presentation/grid_view_screen.dart`
   - `apps/mobile/lib/features/chat/presentation/inbox_screen.dart`
   - `apps/mobile/lib/features/chat/presentation/chat_thread_view.dart`
   - `apps/mobile/lib/features/diary/presentation/diary_list_screen.dart`
-- loc: `feed_section.dart:997-1031` (`_EmptyState`); `home_screen.dart:596-630` (`_EmptyFeedPage`); `inbox_screen.dart:167-182` (`_InboxMessage`) + line 47-52 (empty case); `chat_thread_view.dart:230-270` (`_EmptyThread`); `diary_list_screen.dart:375-388` (`_buildEmptyState`)
-- symbols:
-  - `_EmptyState` (feed) / `_EmptyFeedPage` (home) / `_InboxMessage` (inbox) / `_EmptyThread` (chat) / `_buildEmptyState` (diary)
+  - `apps/mobile/lib/features/profile/presentation/profile_screen.dart`
+  - `apps/mobile/lib/features/profile/presentation/friend_profile_screen.dart`
+  - `apps/mobile/lib/features/profile/presentation/widgets/photo_grid.dart`
+  - `apps/mobile/lib/features/profile/presentation/widgets/diary_tab_content.dart`
+  - `apps/mobile/lib/features/reaction/presentation/reaction_list_sheet.dart`
+  - `apps/mobile/lib/features/space/presentation/space_context_bottom_sheet.dart`
+- loc: feed_section.dart:997-1031 `_EmptyState`; home_screen.dart:596-630 `_EmptyFeedPage`; grid_view_screen.dart:80-86; inbox_screen.dart:167-182 `_InboxMessage` + line 47-52; chat_thread_view.dart:230-270 `_EmptyThread`; diary_list_screen.dart:375-388 `_buildEmptyState`; profile_screen.dart:224-231; friend_profile_screen.dart:297-303; widgets/photo_grid.dart:17-21; widgets/diary_tab_content.dart:33-38; reaction_list_sheet.dart:65-69; space_context_bottom_sheet.dart:105-109
+- symbols: feed `_EmptyState`/`_EmptyFeedPage`/grid_view "Chưa có ảnh"; chat `_InboxMessage`/`_EmptyThread`; diary `_buildEmptyState`; profile post-grid + shared `photo_grid` + shared `diary_tab_content`; reaction `reaction_list_sheet`; space `space_context_bottom_sheet`
 - evidence:
-  - feed_section.dart:1018-1026 — body chỉ là `Text('Chụp ảnh đầu tiên và gửi cho bạn bè!', style: TextStyle(...))` (no button)
-  - home_screen.dart:617-624 — same text, same shape, no CTA
-  - inbox_screen.dart:48-51 — `_InboxMessage(text: 'Chưa có tin nhắn nào — reply một ảnh để bắt đầu')` chỉ Text wrapper
-  - chat_thread_view.dart:256-263 — `Text('Trả lời một Meep của $peerName để bắt đầu trò chuyện')` no CTA
-  - diary_list_screen.dart:375-388 — `Center(child: Text('Bạn chưa có nhật ký nào', ...))` no CTA (note: FAB nằm ngoài widget cung cấp 1 affordance, nhưng empty state widget thuần text per checklist)
-- user_impact: New user signup → mở app → thấy empty feed với "Chụp ảnh đầu tiên" text → expectation là tap text/button để jump tới camera, nhưng cả hai screen camera-feed share PageView vertical (chỉ swipe được); user không có manh mối "Thêm bạn" khi list bạn = 0. Inbox empty thì câu "reply một ảnh để bắt đầu" mơ hồ — user không biết click đâu để open feed. Chat thread empty (mở 1-1 conversation từ inbox khi conversation chưa có message) hiển thị text mà không có nút "Quay lại feed".
-- risk: onboarding drop-off — `CLAUDE.md §MVP Scope` "Locket parity" core là social loop "chụp → gửi → bạn nhìn → reaction"; nếu user mới không pass qua empty state stage thì loop chết im. `apps/mobile/CLAUDE.md §Loading/error/empty` explicit ghi "Empty state must have a Vietnamese CTA" — đây là rule violation 5 screens cùng lúc.
+  - feed_section.dart:1009 — `'Chụp ảnh đầu tiên và gửi cho bạn bè!'` text-only
+  - home_screen.dart:608 — `'Chưa có ảnh nào'` text-only
+  - grid_view_screen.dart:82 — `'Chưa có ảnh'` text-only
+  - inbox_screen.dart:50 — `'Chưa có tin nhắn nào — reply một ảnh để bắt đầu'` text-only
+  - chat_thread_view.dart — `'Trả lời một Meep của $peerName để bắt đầu trò chuyện'` no CTA
+  - diary_list_screen.dart:378 — `'Bạn chưa có nhật ký nào'` text-only (FAB adjacent là implicit affordance)
+  - profile_screen.dart:226 — `'Chưa có ảnh nào'` text-only (own profile)
+  - friend_profile_screen.dart:300 — `'Chưa có ảnh nào'` text-only (friend post grid)
+  - photo_grid.dart:19 — `'Chưa có ảnh nào'` text-only (shared widget)
+  - diary_tab_content.dart:35 — `'Chưa có nhật ký công khai'` text-only (profile diary tab)
+  - reaction_list_sheet.dart:67 — `'Chưa có phản ứng nào'` text-only
+  - space_context_bottom_sheet.dart:107 — `'Bạn chưa tham gia Space nào'` text-only
+  - Counter-example: streak `EmptyStateOverlay` (line 37-92) RENDER ĐÚNG arrow chỉ taskbar send — implicit visual CTA OK; chỉ tham khảo, không flag.
+- user_impact: 12 empty states không có Vietnamese CTA tappable. Feed/home onboarding loop chết im; inbox/chat thread mơ hồ; profile/friend-profile empty không hướng dẫn; reaction list không có back; space picker thiếu "Tạo Space mới". `photo_grid` + `diary_tab_content` là shared widgets nên fix 1 chỗ cover nhiều screens.
+- risk: onboarding drop-off — Locket-parity social loop "chụp → gửi → bạn nhìn → reaction" cần CTA progression ở 12 entry points. `apps/mobile/CLAUDE.md §Loading/error/empty` explicit "Empty state must have a Vietnamese CTA" — rule violation rộng 12 sites cross Tier 0 + Tier 0+.
 - fix:
-  1. `_EmptyState` (feed_section.dart) — phân biệt 2 case bằng `ref.watch(friendControllerProvider(uid)).friends.isEmpty`. Case-A (no friends): button "Thêm bạn bè" → open `FriendSheet`. Case-B (have friends, no posts): button "Chụp ảnh đầu tiên" → `_pageController.animateToPage(0, ...)` để jump tới camera tab.
-  2. `_EmptyFeedPage` (home_screen.dart) — same logic. Có thể consolidate sang shared `lib/shared/widgets/feed_empty_state.dart` (cần leader gate vì shared/widgets touch).
-  3. `_InboxMessage` (inbox_screen.dart) — thêm button "Mở feed" → `context.go('/home')` cho empty case (giữ text-only cho error case).
-  4. `_EmptyThread` (chat_thread_view.dart) — thêm `AppPrimaryButton(label: 'Xem ảnh của $peerName', onPressed: () => context.push('/friend-profile/$peerUid'))`.
-  5. `_buildEmptyState` (diary_list_screen.dart) — thêm hint "Bấm nút + bên dưới để tạo nhật ký đầu tiên" với `Icon(Icons.arrow_downward)` chỉ vào FAB; FAB đã có Semantics label nên không cần button thứ 2.
-- authority: `apps/mobile/CLAUDE.md §Loading/error/empty — 4 required states` ("Empty state must have a Vietnamese CTA"); `auth.md` Pattern #10 (Vietnamese boundary message)
-- test: widget test `test/features/feed/presentation/feed_section_test.dart` override `feedControllerProvider` returning empty list + `friendControllerProvider` returning empty friends; assert `find.widgetWithText(AppPrimaryButton, 'Thêm bạn bè')` evaluates true. Run `flutter test test/features/feed/presentation/ test/features/chat/presentation/ test/features/diary/presentation/`.
+  1. `_EmptyState` (feed_section.dart) — phân biệt 2 case bằng `ref.watch(friendControllerProvider(uid)).friends.isEmpty`. No friends: "Thêm bạn bè" → FriendSheet. Have friends no posts: "Chụp ảnh đầu tiên" → `_pageController.animateToPage(0, ...)`.
+  2. `_EmptyFeedPage` (home_screen.dart) — same logic. Consolidate sang shared `lib/shared/widgets/feed_empty_state.dart` (cần leader gate).
+  3. `grid_view_screen.dart` — empty space feed: "Đăng ảnh đầu tiên cho Space" → camera với pre-fill spaceId.
+  4. `_InboxMessage` empty case — button "Mở feed" → `context.go('/home')`.
+  5. `_EmptyThread` — `AppPrimaryButton(label: 'Xem ảnh của $peerName', onPressed: () => context.push('/friend-profile/$peerUid'))`.
+  6. `_buildEmptyState` (diary) — hint "Bấm nút + bên dưới để tạo nhật ký đầu tiên" với `Icon(Icons.arrow_downward)` chỉ FAB.
+  7. profile_screen + friend_profile + shared `photo_grid` — refactor `photo_grid` thêm `emptyAction` param optional; profile_screen pass "Chụp ảnh đầu tiên" → camera; friend_profile pass null.
+  8. `diary_tab_content` empty — button "Xem nhật ký công khai khác" (Tier 1, có thể defer).
+  9. `reaction_list_sheet` empty — text "Chưa có phản ứng nào — vuốt đóng" + close button visible.
+  10. `space_context_bottom_sheet` empty — button "Tạo Space mới" → `space_create_sheet`.
+- authority: `apps/mobile/CLAUDE.md §Loading/error/empty — 4 required states` ("Empty state must have a Vietnamese CTA"); `auth.md` Pattern #10
+- test: widget test cross-module `test/features/{feed,chat,diary,profile,reaction,space}/presentation/` — override provider returning empty list; assert `find.widgetWithText(AppPrimaryButton, '<label>')` per empty state.
 - deps: none
 
 ### ISSUE STATE-UX-ERROR-001
 
 - sev: P1
 - blocker: no
-- area: 4-required-states — error branch missing retry button (6 screens)
+- area: 4-required-states — error branch missing retry button (12 error sites / 11 files)
 - files:
   - `apps/mobile/lib/features/feed/presentation/feed_section.dart`
   - `apps/mobile/lib/features/feed/presentation/home_screen.dart`
+  - `apps/mobile/lib/features/feed/presentation/grid_view_screen.dart`
   - `apps/mobile/lib/features/chat/presentation/inbox_screen.dart`
   - `apps/mobile/lib/features/streak/presentation/streak_screen.dart`
   - `apps/mobile/lib/features/settings/presentation/blocked_accounts_page.dart`
   - `apps/mobile/lib/features/profile/presentation/friend_profile_screen.dart`
-- loc: `feed_section.dart:44-55`; `home_screen.dart:387-395`; `inbox_screen.dart:44-46`; `streak_screen.dart:206-224` (`_ErrorBanner`); `blocked_accounts_page.dart:84-103` (`_ErrorState`); `friend_profile_screen.dart:50-53` (`isFriendAsync.when error → _GateMessage` no retry)
-- symbols:
-  - `FeedSection.build` (error case) / `_buildPageView` isError branch / inbox `conversationsAsync.when` error / `_ErrorBanner` (streak) / `_ErrorState` (blocked accounts) / `_GateMessage` reused for error in `friend_profile_screen.dart:50`
+  - `apps/mobile/lib/features/profile/presentation/profile_screen.dart`
+  - `apps/mobile/lib/features/diary/presentation/diary_list_screen.dart`
+  - `apps/mobile/lib/features/space/presentation/space_edit_sheet.dart`
+  - `apps/mobile/lib/features/space/presentation/space_management_sheet.dart`
+- loc: feed_section.dart:44-55; home_screen.dart:387-395; grid_view_screen.dart:59-72; inbox_screen.dart:44-46; streak_screen.dart:206-224 `_ErrorBanner`; blocked_accounts_page.dart:84-103 `_ErrorState`; friend_profile_screen.dart:50-53 gate + 290-294 post-grid; profile_screen.dart:210-217; diary_list_screen.dart:280-285; space_edit_sheet.dart:141-144 `_ErrorView` chỉ Close; space_management_sheet.dart:67-68 `_ErrorBody`
+- symbols: FeedSection.build / `_buildPageView` isError / grid_view error `Center+Text` / inbox `conversationsAsync.when` error / `_ErrorBanner` streak / `_ErrorState` blocked / `_GateMessage` friend_profile (gate + post-grid) / profile post-grid / diary `Center+Padding+Text` / `_ErrorView` space_edit / `_ErrorBody` space_management
 - evidence:
-  - feed_section.dart:48-53 — `Text('Không tải được feed. Kiểm tra kết nối.', style: TextStyle(color: AppColors.bw500), textAlign: TextAlign.center)` — no button
-  - home_screen.dart:388-393 — same string, same shape, no button
-  - inbox_screen.dart:44-46 — `error: (_, __) => const _InboxMessage(text: 'Không tải được tin nhắn. Thử lại sau nhé.')` — no button
-  - streak_screen.dart:213-222 — `Container(color: AppColors.error700.withValues(alpha: 0.9), ... child: Text(message, ...))` red banner pure text, không retry
-  - blocked_accounts_page.dart:95-99 — `Text('Không thể tải danh sách. Kiểm tra kết nối và thử lại.', ...)` — không retry button
-  - friend_profile_screen.dart:50-53 — `error: (e, _) => _GateMessage(message: 'Không tải được hồ sơ bạn bè.', onBack: () => context.pop())` — `_GateMessage` chỉ có "Quay lại" button (pop), không có "Thử lại" (re-invalidate provider)
-- user_impact: Khi Firestore stream throw (network drop, rule deny, App Check fail) user nhìn thấy thông báo lỗi nhưng KHÔNG có nút retry → app stuck dead screen cho đến khi user force-quit + relaunch. Trong Riverpod 2 pattern, `ref.invalidate(provider)` là cách standard re-subscribe stream — button "Thử lại" should call invalidate.
-- risk: silent failure trên network blip — `apps/mobile/CLAUDE.md §Loading/error/empty` rule "Error view có retry button + actionable hint, KHÔNG just 'Lỗi xảy ra'" bị break ở 6 screens cross-module (feed × 2 + inbox + streak + blocked accounts + friend profile gate). Streak `_ErrorBanner` red bar persists đến khi user navigate away — không dismiss được, không retry từ screen. Combined với DATA-ARCH-001 (ARCH P1 — repository raw FirebaseException), khi rule deploy fix tighten quá (USER-SEC-001) → toàn bộ feed error UX render trong production sẽ là 1 line text.
+  - feed_section.dart:48-53 — `Text('Không tải được feed. Kiểm tra kết nối.')` no button
+  - home_screen.dart:388-393 — same string, same shape
+  - grid_view_screen.dart:67-72 — `'Không tải được ảnh'` text only sau debugPrint
+  - inbox_screen.dart:44-46 — `_InboxMessage(text: 'Không tải được tin nhắn. Thử lại sau nhé.')` no button
+  - streak_screen.dart:213-222 — red banner pure text persist không dismiss
+  - blocked_accounts_page.dart:95-99 — `'Không thể tải danh sách. Kiểm tra kết nối và thử lại.'` no retry
+  - friend_profile_screen.dart:50-53 — `_GateMessage(message: 'Không tải được hồ sơ bạn bè.', onBack: pop)` chỉ "Quay lại"
+  - friend_profile_screen.dart:290-294 — post-grid error `Center(child: Text('Không tải được ảnh.'))` no retry
+  - profile_screen.dart:210-217 — own post-grid `Center(child: Padding(child: Text(...)))` no retry
+  - diary_list_screen.dart:280-285 — `Center(child: Padding(child: Text(...)))` no retry
+  - space_edit_sheet.dart:141-144 — `_ErrorView(message: 'Lỗi tải Space', onClose: pop)` chỉ "Đóng" button (line 444-448)
+  - space_management_sheet.dart:67 + 291-303 — `_ErrorBody → Text('Không tải được Space. Thử lại sau.')` không retry
+- user_impact: 12 error sites khi Firestore stream throw user nhìn thấy lỗi nhưng KHÔNG retry → app stuck dead screen → user phải force-quit + relaunch. Riverpod 2 pattern `ref.invalidate(provider)` là cách standard re-subscribe; "Thử lại" button phải call invalidate.
+- risk: silent failure rộng — `apps/mobile/CLAUDE.md §Loading/error/empty` "Error view có retry button" bị break 12 sites cross-module. Combined DATA-ARCH-001 (raw FirebaseException) + USER-SEC-001 (rule tighten) → toàn bộ feed/profile/space error UX không recover được.
 - fix:
-  1. Tạo shared widget `lib/shared/widgets/app_error_view.dart` với signature `AppErrorView({required String message, required VoidCallback onRetry})` — render Icon (`Icons.error_outline`) + Text(message) + `AppPrimaryButton(label: 'Thử lại', onPressed: onRetry)`. Touch core/shared cần leader gate.
-  2. Replace text-only error branch ở 6 screens bằng `AppErrorView(message: '...', onRetry: () => ref.invalidate(xxxProvider))` — feed_section.dart:44 → feedControllerProvider; home_screen.dart:388 → feedControllerProvider; inbox_screen.dart:44 → conversationsProvider; streak_screen.dart:71 → streakControllerProvider; blocked_accounts_page.dart:38 → blockedUsersProvider; friend_profile_screen.dart:50 → isFriendOfCurrentProvider.
-  3. Streak `_ErrorBanner` keep red bar visual + thêm inline retry icon button bên phải (dismissable).
-  4. friend_profile_screen `_GateMessage` cần thêm `retryLabel` param phân biệt "Quay lại" (non-friend gate) vs "Thử lại" (error gate).
-- authority: `apps/mobile/CLAUDE.md §Loading/error/empty — 4 required states` + `auth.md` Pattern #2 (error mapping at boundary — UI consumer cần affordance để recover)
-- test: widget test `test/features/feed/presentation/feed_section_test.dart` + `test/features/chat/presentation/inbox_screen_test.dart` + `test/features/streak/presentation/streak_screen_test.dart` + `test/features/settings/presentation/blocked_accounts_page_test.dart` + `test/features/profile/presentation/friend_profile_screen_test.dart` — override provider returning `AsyncError(...)`; assert `find.widgetWithText(AppPrimaryButton, 'Thử lại')` + tap triggers `ref.invalidate`.
-- deps: STATE-UX-EMPTY-001 (same files, fix bundle together)
+  1. Tạo `lib/shared/widgets/app_error_view.dart` — `AppErrorView({required String message, required VoidCallback onRetry, String retryLabel = 'Thử lại'})`. Touch core/shared cần leader gate.
+  2. Replace text-only error branch ở 9 screens bằng `AppErrorView` với `() => ref.invalidate(xxxProvider)` — feed_section:44 → feedControllerProvider; home_screen:388 → feedControllerProvider; grid_view_screen:67 → spaceFeedProvider; inbox_screen:44 → conversationsProvider; blocked_accounts_page:38 → blockedUsersProvider; profile_screen:210 → ownPostsProvider; friend_profile_screen:290 → friendPostsProvider; diary_list_screen:280 → diaryListProvider.
+  3. Streak `_ErrorBanner` (line 206-224) keep red bar + thêm inline retry IconButton bên phải (dismissable).
+  4. friend_profile_screen `_GateMessage` (line 76-81) thêm optional `onRetry` + `retryLabel` để phân biệt "Quay lại" (gate) vs "Thử lại" (error).
+  5. `space_edit_sheet._ErrorView` (line 423-451) thêm optional `onRetry`; sheet error (line 141) pass `onRetry: () => ref.invalidate(spaceProvider(spaceId))`. Permission-denied (line 153-157) giữ chỉ "Đóng".
+  6. `space_management_sheet._ErrorBody` (line 291-303) wrap thành `AppErrorView` với invalidate.
+- authority: `apps/mobile/CLAUDE.md §Loading/error/empty — 4 required states` + `auth.md` Pattern #2
+- test: widget test override `xxxProvider` returning `AsyncError(...)`; assert `find.widgetWithText(AppPrimaryButton, 'Thử lại')` + tap triggers `ref.invalidate`. Cross-module: `flutter test test/features/{feed,chat,streak,settings,profile,diary,space}/presentation/`.
+- deps: STATE-UX-EMPTY-001 (same files in feed/chat/diary/profile/space, fix bundle together)
 
 ### ISSUE NOTIF-UX-PERM-001
 
@@ -232,7 +263,7 @@ Only P0/P1.
   - `apps/mobile/lib/features/chat/presentation/group_chat_screen.dart`
   - `apps/mobile/lib/features/chat/application/chat_controller.dart`
   - `apps/mobile/lib/features/chat/presentation/widgets/chat_input_bar.dart`
-- loc: `chat_controller.dart:49-55` (sets errorMessage); `chat_screen.dart:42` (watches sendStatus); `chat_screen.dart:98-101` (uses only `isSending`); `chat_input_bar.dart:55-59` (clears text on submit)
+- loc: chat_controller.dart:49-55 (sets errorMessage); chat_screen.dart:42 + 98-101 (only reads isSending); chat_input_bar.dart:55-59 (`_submit` clears text immediately); chat_input_bar.dart:100 (emoji-picker tap calls `onSend` same pattern); chat_input_bar.dart:158 (quick-emoji tap calls `onSend` same pattern)
 - symbols:
   - `ChatController.sendMessage` (sets `errorMessage`)
   - `ChatScreen.build` (reads `sendStatus.isSending` only)
@@ -267,12 +298,12 @@ Only P0/P1.
 - loc: `diary_canvas_screen.dart:396-411` (`_handleBack` via tap only, wired at line 551); `capture_preview_screen.dart` (no back guard); `edit_profile_screen.dart` (no back guard)
 - symbols:
   - `_DiaryCanvasScreenState._handleBack` — only fires when AppBackButton tapped
-  - `_CapturePreviewScreenState` — no back interception
+  - `_CapturePreviewScreenState` — NO back handler at all (no `_handleBack`, no AppBackButton; tap back AND gesture back both lose draft silently)
   - `_EditProfileScreenState` — no back interception
 - evidence:
-  - `grep -rn 'PopScope\|WillPopScope\|onWillPop' apps/mobile/lib --include='*.dart'` returns **0 hits**
-  - `diary_canvas_screen.dart:396-411` only triggered by `AppBackButton(onBack: _handleBack)` widget tap; Android system back gesture (swipe-from-edge) bypasses entirely
-  - Capture preview keeps user input (caption + audience selection) in PostController state; system back loses caption choice silently
+  - `rg "PopScope|WillPopScope|onWillPop" apps/mobile/lib` returns **0 hits codebase-wide**
+  - `rg "PopScope|WillPopScope|_handleBack|AppBackButton" apps/mobile/lib/features/feed/presentation/capture_preview_screen.dart` returns **0 hits** — NO back handler whatsoever
+  - `rg "isDirty|PopScope" apps/mobile/lib/features/profile/presentation/edit_profile_screen.dart` returns 0; only `Navigator.of(context).pop()` at line 130
 - user_impact: User mở diary create → gõ 200 từ → swipe edge-back accidentally → diary canvas pop without `DiscardChangesDialog.show` → 200 từ gone. User compose post: snap photo + chọn audience "select 5 friends" + type caption → swipe edge-back → all 3 inputs gone (post controller doesn't persist). Android gesture nav (default since Android 10) makes edge-swipe very easy to trigger.
 - risk: user data loss khi accidental gesture — Locket-parity DOES surface caption-recovery on accidental back. `apps/mobile/CLAUDE.md §MVP Scope Tier 0 — Camera + Share photo` golden path includes "compose" stage; losing draft from gesture is a known onboarding friction. Diary `apps/mobile/CLAUDE.md §MVP Scope Tier 0+ — Diary basic` requires basic auto-save semantics; missing PopScope is a regression from that.
 - fix:
@@ -314,29 +345,31 @@ Only P0/P1.
 
 - sev: P2
 - blocker: no
-- area: Design tokens — hardcoded const colors outside theme (acknowledged drift, 3 files)
+- area: Design tokens — hardcoded `const _cXxx = Color(0xFF...)` outside theme (acknowledged drift, 7 files / 23 declarations)
 - files:
-  - `apps/mobile/lib/features/profile/presentation/edit_profile_screen.dart`
-  - `apps/mobile/lib/features/profile/presentation/friend_profile_screen.dart`
-  - `apps/mobile/lib/features/profile/presentation/profile_screen.dart`
-- loc: edit_profile_screen.dart:24-27; friend_profile_screen.dart:16-21; profile_screen.dart:17-25
-- symbols:
-  - `_cBackBtn = Color(0xFF73706E)`
-  - `_cSectionLabel = Color(0xFFDDDDDD)`
-- evidence: `grep -n "Missing design tokens" apps/mobile/lib/features` returns 3 hits (profile_screen.dart:17, friend_profile_screen.dart:16, edit_profile_screen.dart:24) — tất cả 3 file có comment "Missing design tokens — ping leader để add vào core/theme/" header above 4-5 `const _cXxx = Color(0xFF...)` declarations. Same 4 hex values duplicated between profile_screen + friend_profile (`#050F10`, `#363636`, `#DDDDDD`, `#D9D9D9`) — 2 files declare independent consts thay vì import shared token.
-- user_impact: 13 hardcoded const colors across 3 profile screens, all với explicit "ping leader" admission. Per `apps/mobile/CLAUDE.md §Design tokens` rule "Figma has new color/font not in theme → add to core/theme/ first via leader-gated PR". Duplication là worst pattern — khi leader update `#363636` từ Figma, 2 files phải edit; 1 file sẽ drift.
-- risk: dark mode (Tier 1) blocked cho 13 colors across 3 profile screens; visual drift khi 1 file update mà file kia không; new dev copy profile pattern → replicate drift. Comments "ping leader" là tech debt team đã acknowledge mà chưa resolve.
-- fix: leader add 6 tokens vào `AppColors`: `profileBg` (#050F10 / equal bw900), `actionButtonFill` (#363636), `actionButtonText` (#DDDDDD), `avatarRingIdle` (#D9D9D9), `inactiveIcon` (#949494), `backButtonFill` (#73706E), `sectionLabel` (#DDDDDD). Replace 13 const declarations across 3 files với `AppColors.<token>`. Delete 3 "Missing design tokens" comment headers cùng PR.
-- authority: `apps/mobile/CLAUDE.md §Design tokens — NO hardcoding` ("Figma has new color/font not in theme → add to core/theme/ first via leader-gated PR")
-- test: `rg "Missing design tokens" apps/mobile/lib` returns 0 hits post-fix; `rg "_cBg|_cButtonFill|_cButtonText|_cAvatarRing|_cBackBtn|_cSectionLabel|_cInactiveIcon" apps/mobile/lib/features/profile` returns 0 hits; visual diff Figma vs build per screen.
+  - `apps/mobile/lib/features/profile/presentation/edit_profile_screen.dart` (2 consts)
+  - `apps/mobile/lib/features/profile/presentation/friend_profile_screen.dart` (5 consts)
+  - `apps/mobile/lib/features/profile/presentation/profile_screen.dart` (4 consts)
+  - `apps/mobile/lib/features/profile/presentation/avatar_picker_sheet.dart` (3 consts, comment `// AppColors.error800` admits token exists)
+  - `apps/mobile/lib/features/profile/presentation/widgets/profile_tab_bar.dart` (1 const, TODO marker)
+  - `apps/mobile/lib/shared/widgets/share_profile_sheet.dart` (4 consts, **shared/widgets touch**)
+  - `apps/mobile/lib/shared/widgets/share_photo_sheet.dart` (2 consts, **shared/widgets touch**)
+- loc: edit_profile_screen.dart:26-27; friend_profile_screen.dart:17-21; profile_screen.dart:22-25; avatar_picker_sheet.dart:13-14 + 115; profile_tab_bar.dart:5; share_profile_sheet.dart:7-10; share_photo_sheet.dart:13-14
+- symbols: `_cBackBtn`, `_cBg`, `_cButtonFill`, `_cButtonText`, `_cAvatarRing`, `_cInactiveIcon`, `_cSectionLabel`, `_cSheetBg`, `_cRemove`, `_cSubtext`, `_cLogoBox`, `_cLogomark` — 4 hex duplicated giữa profile_screen + friend_profile (`#050F10`, `#363636`, `#DDDDDD`, `#D9D9D9`); `#949494` duplicated giữa friend_profile + profile_tab_bar
+- evidence: `rg "const _c[A-Z]\w+\s*=\s*Color\("` returns 23 hits across 7 files; `grep "Missing design tokens"` returns 3 explicit headers (edit_profile/friend_profile/profile_screen); `avatar_picker_sheet.dart:14` inline `// AppColors.error800` (dev biết token tồn tại nhưng vẫn duplicate); `profile_tab_bar.dart:5` `// TODO: add AppColors.tabIconInactive`. Critical: **share_profile_sheet + share_photo_sheet ở shared/widgets/** → cross-module shared code shipping với 6 hardcoded consts.
+- user_impact: 23 const _cXxx across 7 files với explicit acknowledgement. Shared `share_*_sheet` được dùng cross-module nên drift propagate. Comments "ping leader" + inline TODO là tech debt team đã acknowledge nhưng chưa resolve.
+- risk: dark mode (Tier 1) blocked cho 23 colors. Visual drift cao khi 1 file update mà file kia không. shared/widgets là leader-gated area per `apps/mobile/CLAUDE.md §Solo-dev module scope`.
+- fix: leader add ~10 tokens vào `AppColors`: `profileBg` (#050F10 = bw900?), `actionButtonFill` (#363636), `actionButtonText` (#DDDDDD), `avatarRingIdle` (#D9D9D9), `inactiveIcon` (#949494), `backButtonFill` (#73706E), `sectionLabel` (#DDDDDD), `sheetBgPrimary` (#2B2B2B), `sheetBgSecondary` (#252627), `shareSheetButtonFill` (#394041), `shareLogomark` (#004B54), `shareSubtext` (#BABABA). Replace 23 const declarations cross 7 files; route avatar_picker `_cRemove` về `AppColors.error800` (đã tồn tại). Delete 3 "Missing design tokens" comment headers + 2 inline TODO comments.
+- authority: `apps/mobile/CLAUDE.md §Design tokens — NO hardcoding` + `§Solo-dev module scope` (shared/widgets leader-gated)
+- test: `rg "Missing design tokens" apps/mobile/lib` returns 0 post-fix; `rg "const _c[A-Z]\w+\s*=\s*Color\(" apps/mobile/lib` returns 0; visual diff Figma vs build per screen.
 - deps: none
 
 ### ISSUE THEME-002
 
 - sev: P2
 - blocker: no
-- area: Design tokens — hardcoded `Color(0x...)` outside core/theme/ (broad)
-- files: 28 feature files (top offenders):
+- area: Design tokens — hardcoded `Color(0x...)` outside core/theme/ (broad: features/ + **shared/widgets/**)
+- files: 28 feature files + 7 shared/widgets files (top offenders + shared):
   - `apps/mobile/lib/features/feed/presentation/home_screen.dart` (3 hits)
   - `apps/mobile/lib/features/streak/presentation/widgets/streak_stats_pill.dart` (3)
   - `apps/mobile/lib/features/streak/presentation/widgets/streak_calendar.dart` (3)
@@ -349,12 +382,18 @@ Only P0/P1.
   - `apps/mobile/lib/features/space/presentation/widgets/friend_select_step.dart` (5)
   - `apps/mobile/lib/features/space/presentation/space_edit_sheet.dart` (4)
   - `apps/mobile/lib/features/space/presentation/widgets/space_config_step.dart` (6)
+  - `apps/mobile/lib/features/streak/presentation/streak_screen.dart` (3, not in original top list)
+  - **`apps/mobile/lib/shared/widgets/share_photo_sheet.dart` (7, shared/widgets)**
+  - **`apps/mobile/lib/shared/widgets/share_profile_sheet.dart` (5, shared/widgets)**
+  - **`apps/mobile/lib/shared/widgets/share_modal.dart` (3, shared/widgets)**
+  - **`apps/mobile/lib/shared/widgets/app_glass_surface.dart` (2, shared/widgets)**
+  - **`apps/mobile/lib/shared/widgets/app_text_input.dart` (2 `Color(0x80FFFFFF)` password toggle)**
+  - **`apps/mobile/lib/shared/widgets/app_note_pill.dart` (1, shared/widgets)**
+  - **`apps/mobile/lib/shared/widgets/photo_detail_screen.dart` (1, shared/widgets)**
   - + 16 more feature files with 1-2 hits each
 - loc: file-level — see grep `Color\(0x` in apps/mobile/lib/features
 - symbols: per-call-site inline `Color(0xAARRGGBB)` literals
-- evidence: `grep "Color\(0x" apps/mobile/lib/features` returns 66 total occurrences across 28 files (count via Grep tool); each is a candidate for `Theme.of(context).colorScheme.xxx` or `AppColors.xxx`. Examples (verified spot-read):
-  - `home_screen.dart` uses `const Color(0x73000000)` for `barrierColor` (lines ~307 + ~439) — recurring barrier overlay color, candidate for `AppColors.scrim` token
-  - `intro_beam.dart`, `streak_*` widgets use translucent overlays not centralized
+- evidence: features/ subtree 66 hits / 28 files; shared/widgets/ subtree ~22 hits / 9 files (BUG: original audit chỉ scan features/, miss shared/widgets/). Total ~88 hits cross-module.
 - user_impact: visual drift risk — if Figma updates barrier opacity from 45% to 50%, manual edit of 28+ sites. Dark mode (Tier 1) blocked. New dev copies a sheet from one module to another and pulls hardcoded literal forward.
 - risk: maintainability — `apps/mobile/CLAUDE.md §Design tokens` explicit rule; 66 violations is unhealthy baseline. Tier 1 dark mode silently impossible without sweep.
 - fix: leader-driven token sweep — extract recurring literals (`0x73000000` modal barrier, `0x66394041` capture caption pill, `0x80FFFFFF` 50% white hint, etc.) into `AppColors` (e.g. `AppColors.scrim45`, `AppColors.glass40`, `AppColors.bw100Translucent50`). Replace 1 module at a time per ADR-0004 strict gate (touching `core/theme/`). Track via `rg "Color\(0x" apps/mobile/lib/features` count regression checker in CI (advisory).
@@ -425,9 +464,10 @@ Only P0/P1.
 - area: Accessibility — touch target < 48x48 logical px on friend decline + small icons
 - files:
   - `apps/mobile/lib/features/friend/presentation/friend_sheet.dart`
-- loc: 698-710 (decline X icon)
+- loc: 698-710 (decline X icon); 619-628 (unfriend X icon, same anti-pattern)
 - symbols:
-  - friend request decline `IconButton` inside `SizedBox(width: 20, height: 20)`
+  - friend request decline `IconButton` inside `SizedBox(width: 20, height: 20)` (line 698-710)
+  - **friend list unfriend `IconButton` inside `SizedBox(width: 20, height: 20)` (line 619-628, has tooltip 'Gỡ kết bạn' nhưng hit target vẫn 20×20)**
 - evidence:
   ```dart
   // friend_sheet.dart:698-710
@@ -447,7 +487,7 @@ Only P0/P1.
   Parent `SizedBox` enforces 20×20 → default IconButton 48×48 splash collapsed → effective hit area 20×20.
 - user_impact: User finger taps screen at decline icon, miss by ~14dp easily → either declines wrong row (next request item underneath) hoặc misses tap entirely. Decline is destructive (rejects friend request) — accidental tap on accept button (above 40dp) is worse.
 - risk: a11y violation per `apps/mobile/CLAUDE.md §Accessibility — minimum required` ("Touch target ≥ 48x48 logical pixels"); not in scope filter (Android-only doesn't exempt this). Pair với destructive action without confirm (UX-DECLINE-CONFIRM-001 below).
-- fix: remove the outer `SizedBox(width: 20, height: 20)` → IconButton default 48×48 splash + center 20px icon. Alternatively wrap icon trong `GestureDetector(behavior: HitTestBehavior.opaque, child: Padding(padding: const EdgeInsets.all(14), child: const Icon(Icons.close, size: 20)))` để giữ visual size + expand hit area.
+- fix: remove outer `SizedBox(width: 20, height: 20)` ở BOTH sites (decline + unfriend) → IconButton default 48×48 splash + center 20px icon.
 - authority: `apps/mobile/CLAUDE.md §Accessibility — minimum required` ("Touch target ≥ 48x48 logical pixels")
 - test: widget test `test/features/friend/presentation/friend_sheet_test.dart` — pump FriendSheet with pending request; assert `tester.getSize(find.byIcon(Icons.close))` returns Size where height ≥ 48 dp AND width ≥ 48 dp. Run `flutter test test/features/friend/presentation/`.
 - deps: UX-DECLINE-CONFIRM-001 (same row, related fix)
@@ -717,8 +757,8 @@ Only P0/P1.
 
 ### batch_2_p1
 
-2. **STATE-UX-EMPTY-001** — add Vietnamese CTA button to feed/inbox/diary/chat empty states (5 screens).
-3. **STATE-UX-ERROR-001** — extract `AppErrorView` shared widget; add retry button to feed/inbox/profile error branches. Pair với UX-REFRESH-001 (cùng shared "invalidate" handler).
+2. **STATE-UX-EMPTY-001** — add Vietnamese CTA button to **12 empty sites across 10 files** (feed + inbox + chat-thread + diary + profile + friend-profile + 2 shared profile widgets + grid_view + reaction-list + space-context). Includes shared/widgets touch — leader gate.
+3. **STATE-UX-ERROR-001** — extract `AppErrorView` shared widget; add retry button to **12 error sites across 11 files** (feed × 3 + chat + streak + blocked-accounts + profile × 2 + diary + space × 2 + friend-profile gate). Pair với UX-REFRESH-001 (cùng shared "invalidate" handler).
 4. **NOTIF-UX-PERM-001** — surface `fcmPermissionDenied` state qua in-app banner across taskbar screens. Pair với PERM-001 (SEC) manifest declaration.
 5. **CHAT-UX-SEND-001** — listen `sendStatus.errorMessage`, surface SnackBar với "Thử lại" action. Keep text in input until success.
 6. **NAV-UX-POPSCOPE-001** — wrap diary canvas + capture preview + edit profile trong `PopScope` to gate system back.
@@ -726,7 +766,7 @@ Only P0/P1.
 
 ### batch_3_p2
 
-8. **THEME-001** — leader add backButtonFill + sectionLabel tokens; replace edit_profile hardcoded const.
+8. **THEME-001** — leader add ~10 tokens (profileBg/actionButtonFill/actionButtonText/avatarRingIdle/inactiveIcon/backButtonFill/sectionLabel/sheetBg×2/shareLogomark/shareSubtext); replace **23 const _cXxx declarations across 7 files** (4 profile screens + avatar_picker + profile_tab_bar + 2 shared/widgets share_*_sheet). shared/widgets touch — leader gate.
 9. **THEME-002** — sweep 66 `Color(0x...)` literals across 28 feature files into AppColors tokens (multi-PR per module).
 10. **THEME-003** — sweep 16 `TextStyle(fontSize:)` into AppTextStyles tokens.
 11. **UX-REFRESH-001** — RefreshIndicator wrapper on feed/inbox/diary/profile lists.
@@ -747,13 +787,13 @@ Only P0/P1.
 ## test_plan_after_fix
 
 - `CAMERA-UX-001`: `flutter test test/features/feed/presentation/camera_section_test.dart` — override `appCameraControllerProvider` with `permissionState: denied`; assert `find.text('Mở Cài đặt')` + button onPressed wired. Manual: deny camera permission in Android Settings → relaunch → expect Vietnamese fallback screen với CTA.
-- `STATE-UX-EMPTY-001`: `flutter test test/features/feed/presentation/feed_section_test.dart test/features/chat/presentation/inbox_screen_test.dart test/features/diary/presentation/diary_list_screen_test.dart` — empty AsyncData → assert CTA button finder visible per screen.
-- `STATE-UX-ERROR-001`: same test files — error AsyncError → assert `find.widgetWithText(AppPrimaryButton, 'Thử lại')` + tap triggers `ref.invalidate`.
+- `STATE-UX-EMPTY-001`: cross-module `flutter test test/features/{feed,chat,diary,profile,reaction,space}/presentation/` — override provider returning empty list per screen; assert `find.widgetWithText(AppPrimaryButton, '<label>')` visible per 12 empty sites.
+- `STATE-UX-ERROR-001`: cross-module `flutter test test/features/{feed,chat,streak,settings,profile,diary,space}/presentation/` — override provider returning `AsyncError(...)`; assert `find.widgetWithText(AppPrimaryButton, 'Thử lại')` + tap triggers `ref.invalidate` per 12 error sites.
 - `NOTIF-UX-PERM-001`: `flutter test test/features/notification/presentation/permission_banner_test.dart` — `fcmPermissionDenied=true` → assert banner visible across home/inbox/profile/diary/streak screens.
 - `CHAT-UX-SEND-001`: `flutter test test/features/chat/presentation/chat_screen_test.dart` — sendStatus với errorMessage non-null → assert SnackBar visible + tap "Thử lại" → resend invoked.
 - `NAV-UX-POPSCOPE-001`: `flutter test test/features/diary/presentation/diary_canvas_screen_test.dart test/features/feed/presentation/capture_preview_screen_test.dart` — pump screen + fill input → simulate Android system back → assert DiscardChangesDialog finder.
 - `UPLOAD-UX-001`: `flutter test test/features/feed/presentation/capture_preview_screen_test.dart` — postState với errorMessage non-null → assert "Thử lại" button visible + onPressed triggers submit().
-- `THEME-001`: `rg "Color\(0xFF73706E\)|Color\(0xFFDDDDDD\)" apps/mobile/lib` returns 0 hits.
+- `THEME-001`: `rg "Missing design tokens" apps/mobile/lib` returns 0 hits; `rg "const _c[A-Z]\w+\s*=\s*Color\(" apps/mobile/lib` returns 0 hits (was 23 across 7 files); visual diff Figma vs build per 7 screens.
 - `THEME-002`: `rg "Color\(0x" apps/mobile/lib/features | wc -l` decreases from 66 per sweep PR.
 - `THEME-003`: `rg "TextStyle\(fontSize" apps/mobile/lib/features | wc -l` decreases from 16 per sweep PR.
 - `UX-REFRESH-001`: widget test `tester.fling(...)` from top of feed → assert RefreshIndicator visible + `feedControllerProvider` invalidated.
@@ -817,6 +857,13 @@ Compact notes for areas verified clean OR covered by ARCH / SEC audits.
 - Tier 2 scope items (group_chat_screen.dart exists for Space group chat, listed "Won't have" per CLAUDE.md Tier 2 — also flagged by ARCH no_issue) — out of UX scope, not flagged. Per scope_filter "out-of-scope — KHÔNG report là gap".
 - iOS-specific UX paths absent (no `Cupertino*` imports in feature widgets except CupertinoSliverRefreshControl candidate for UX-REFRESH-001) — correct per ADR-0002 Android-first.
 - Rollcall module folder absent — covered by ARCH-ARCH-003 (P3 — leader decision to scaffold or descope).
+- Pass-2 reverify uncovered evidence undercount cho 7 issues (STATE-UX-EMPTY-001 5→12 sites, STATE-UX-ERROR-001 6→12 sites, THEME-001 3→7 files, THEME-002 add shared/widgets scope, A11Y-FRIEND-001 add unfriend X, CHAT-UX-SEND-001 add emoji paths, NAV-UX-POPSCOPE-001 clarify capture_preview no back handler) — issue count vẫn 21 (no new IDs), scope expanded.
+- 5 partial coverage areas re-classified per pass-2 evidence:
+  - profile flow: was partial → now has THEME-001 (7 files) + STATE-UX-ERROR-001 (2 sites: post-grid own + friend) + STATE-UX-EMPTY-001 (4 sites: own post-grid + friend post-grid + shared photo_grid + diary_tab_content) coverage. profile_tab_bar + avatar_picker_sheet specific patterns covered.
+  - space flow: was partial (Glob only) → now has STATE-UX-ERROR-001 (2 sites: space_edit_sheet `_ErrorView` chỉ Close, space_management_sheet `_ErrorBody` no retry) + STATE-UX-EMPTY-001 (space_context_bottom_sheet empty) coverage. 11 widgets vẫn không deep-read full multi-step create flow (Tier 0+ defer).
+  - reaction UX: was partial → now has STATE-UX-EMPTY-001 (reaction_list_sheet) + UX-HAPTIC-001 (emoji_picker_sheet). Picker widget không deep-read full (Tier 0 stretch).
+  - streak UX: was partial → covered by STATE-UX-ERROR-001 (_ErrorBanner) + THEME-002 (streak_screen.dart not in original top list, 3 hits). Tier 1 stretch chính vẫn defer.
+  - widget Flutter side: was partial (no presentation/ dir) → UX-WIDGET-PIN-001 (P3) flagged; native Kotlin out of scope. No change.
 
 ## postcheck
 
@@ -831,83 +878,79 @@ Compact notes for areas verified clean OR covered by ARCH / SEC audits.
 
 verdict: not_ready
 
-**Rationale:** 1 P0 (CAMERA-UX-001) breaks Tier 0 "Camera + Share photo" golden path when user denies camera permission — no Vietnamese fallback, no settings CTA, no retry. 6 P1 issues cluster around 4-required-states discipline (empty/error CTAs missing across 5 feature screens), silent failures (chat send, FCM permission, upload retry), and Android back-gesture data loss (no PopScope anywhere). After batch_1_p0 + batch_2_p1 (7 issues), the app meets `apps/mobile/CLAUDE.md §Loading/error/empty 4-state contract` and golden path UX.
+**Rationale:** 1 P0 (CAMERA-UX-001) breaks Tier 0 "Camera + Share photo" golden path when user denies camera permission — no Vietnamese fallback, no settings CTA, no retry. 6 P1 issues cluster around 4-required-states discipline. **Pass-2 reverify revealed evidence undercount**: STATE-UX-EMPTY-001 expanded 5→12 sites across 10 files, STATE-UX-ERROR-001 expanded 6→12 sites across 11 files — 4-required-states rule violation is broader than pass-1 reported. THEME-001 expanded 3→7 files (added shared/widgets/share_*_sheet + avatar_picker + profile_tab_bar). A11Y-FRIEND-001 also covers unfriend X button (line 619-628). CHAT-UX-SEND-001 also affects emoji-picker + quick-emoji paths in chat_input_bar. After batch_1_p0 + batch_2_p1 (7 issues, expanded scope), the app meets `apps/mobile/CLAUDE.md §Loading/error/empty 4-state contract` and golden path UX.
 
 **Pre-condition for fixes to land cleanly:** ARCH-LAYER-001/-002 (Phase A P0) must be resolved first — feed widget tests cannot run while widgets directly call `FirebaseAuth.instance`, so STATE-UX-EMPTY-001 / STATE-UX-ERROR-001 / UPLOAD-UX-001 widget tests become writable only after LAYER-001/-002 fix.
 
 **Recommended sprint:** Fix batch_1_p0 (1 issue) + batch_2_p1 (6 issues) = 7 must-fix UX in 1 sprint (5-7 ngày dev), bundle UX-CAMERA-ERR-NOREASON (P2) với CAMERA-UX-001 same PR.
 
-Final distribution: **P0=1, P1=6, P2=11, P3=3 — total 21 issues**.
+Final distribution: **P0=1, P1=6, P2=11, P3=3 — total 21 issues** (count unchanged after pass-2 reverify; 7 issues had evidence scope expanded — STATE-UX-EMPTY-001 (12 sites), STATE-UX-ERROR-001 (12 sites), THEME-001 (7 files), THEME-002 (+ shared/widgets), A11Y-FRIEND-001 (2 sites), CHAT-UX-SEND-001 (3 paths), NAV-UX-POPSCOPE-001 (3 files) — but no new issue IDs added).
 
 ## self_verification_log
 
 <!-- 4 passes recorded after first draft per audit prompt v2 §Self-Verification Loop -->
 
-pass_1_checklist: N=22 checklist sub-sections (4-required-states, auth, camera/post, feed, friend, notification, widget Flutter, profile, diary, space, reaction, streak, chat, settings, form/input, navigation, theme/design tokens, a11y, destructive actions, layout/overflow, image handling, date/time, async-after-dispose), M=21 issues, K=27 no_issue_notes mappings, gap=0 — each checklist sub-section maps to ≥1 issue OR no_issue_note:
-- 4-required-states → STATE-UX-EMPTY-001 + STATE-UX-ERROR-001 + UX-INBOX-EMPTY-ACTION (P3) + no_issue auth pages clean
+pass_1_checklist: N=22 checklist sub-sections, M=21 issues (count unchanged after pass-2 reverify; 7 issues had evidence scope expanded but no new IDs added), K=27+ no_issue_notes mappings, gap=0 — each checklist sub-section maps to ≥1 issue OR no_issue_note. Pass-2 reverify confirmed coverage of profile/space/reaction sub-sections through expanded STATE-UX + THEME-001 evidence (previously "partial" areas).
+- 4-required-states → STATE-UX-EMPTY-001 (12 sites) + STATE-UX-ERROR-001 (12 sites) + UX-INBOX-EMPTY-ACTION + no_issue auth pages clean
 - Auth → no_issue (clear-on-keystroke OK, password toggle present, success animation OK); FORM-001 inline validation
 - Camera/post → CAMERA-UX-001 (P0) + UX-CAMERA-ERR-NOREASON (P2) + UPLOAD-UX-001 + UX-CAPTION-LEN-001
-- Feed → STATE-UX-EMPTY-001 + STATE-UX-ERROR-001 + no_issue pagination footer + UX-DATE-001
-- Friend → A11Y-FRIEND-001 + UX-DECLINE-CONFIRM-001 + no_issue unfriend confirm OK
+- Feed → STATE-UX-EMPTY-001 (feed_section/home_screen/grid_view_screen) + STATE-UX-ERROR-001 (3 sites cùng feature) + no_issue pagination footer + UX-DATE-001
+- Friend → A11Y-FRIEND-001 (2 sites: decline + unfriend X) + UX-DECLINE-CONFIRM-001 + no_issue unfriend confirm OK
 - Notification UX → NOTIF-UX-PERM-001 (P1) + no_issue banner OK + tap-route per PR #287
 - Widget (Flutter side) → UX-WIDGET-PIN-001 (P3) + no_issue (Kotlin out of scope)
-- Profile → THEME-001 + no_issue edit error via SnackBar pattern
-- Diary → STATE-UX-EMPTY-001 + NAV-UX-POPSCOPE-001 + no_issue DiscardChangesDialog tap-path OK
-- Space → no_issue (deep-read partial, Tier 0+ deferred); THEME-002 covers hardcoded colors there
-- Reaction → UX-HAPTIC-001 (haptic) + no_issue picker exists
-- Streak → no_issue (Tier 1, partial)
-- Chat → CHAT-UX-SEND-001 + STATE-UX-EMPTY-001 + STATE-UX-ERROR-001 + UX-INBOX-EMPTY-ACTION
-- Settings → no_issue (delete + logout confirm OK, multi-step delete OK)
+- Profile → THEME-001 (7 files / 23 consts) + STATE-UX-ERROR-001 (post-grid own + friend) + STATE-UX-EMPTY-001 (4 sites: own + friend + shared photo_grid + diary_tab_content) + no_issue edit error via SnackBar pattern
+- Diary → STATE-UX-EMPTY-001 (diary_list) + STATE-UX-ERROR-001 (diary_list error branch) + NAV-UX-POPSCOPE-001 + no_issue DiscardChangesDialog tap-path OK
+- Space → STATE-UX-EMPTY-001 (space_context_bottom_sheet) + STATE-UX-ERROR-001 (space_edit `_ErrorView` + space_management `_ErrorBody`) + THEME-002 covers hardcoded colors there
+- Reaction → STATE-UX-EMPTY-001 (reaction_list_sheet) + UX-HAPTIC-001 (haptic) + no_issue picker exists
+- Streak → THEME-002 (streak_screen.dart 3 hits) + STATE-UX-ERROR-001 (_ErrorBanner) — Tier 1 stretch, no_issue beyond these
+- Chat → CHAT-UX-SEND-001 (text + emoji-picker + quick-emoji paths) + STATE-UX-EMPTY-001 (inbox + chat-thread) + STATE-UX-ERROR-001 (inbox) + UX-INBOX-EMPTY-ACTION
+- Settings → STATE-UX-ERROR-001 (blocked_accounts_page `_ErrorState`) + no_issue (delete + logout confirm OK, multi-step delete OK)
 - Form/input → FORM-001 + UX-CAPTION-LEN-001
-- Navigation → NAV-UX-POPSCOPE-001 + no_issue auth-redirect OK (covered by ARCH-ROUTER-001)
-- Theme/design tokens → THEME-001 + THEME-002 + THEME-003
-- A11Y → A11Y-FRIEND-001 + A11Y-INPUT-001
+- Navigation → NAV-UX-POPSCOPE-001 (3 files: diary + capture-preview no-handler-at-all + edit-profile) + no_issue auth-redirect OK
+- Theme/design tokens → THEME-001 (7 files) + THEME-002 (features + shared/widgets) + THEME-003
+- A11Y → A11Y-FRIEND-001 (2 sites) + A11Y-INPUT-001
 - Destructive actions → UX-DECLINE-CONFIRM-001 + no_issue delete + unfriend confirm OK
-- Layout/overflow → no_issue (no specific overflow flagged this round; ARCH-002 oversize files covered by Phase A)
-- Image handling → no_issue (CachedNetworkImage + placeholder + errorWidget pattern present per Grep across 26 files)
+- Layout/overflow → no_issue (no specific overflow flagged this round)
+- Image handling → no_issue (CachedNetworkImage + placeholder + errorWidget pattern present)
 - Date/time → UX-DATE-001 (feed) + no_issue notification_banner uses DateFormat
-- Async-after-dispose → no_issue (33 files with mounted/context.mounted check + 24 ref.onDispose audit per ARCH no_issue_notes confirmed)
-- Lint clean → blocked (flutter analyze not run per audit-only rule); test command listed in fix authority
+- Async-after-dispose → no_issue (mounted/context.mounted check + ref.onDispose audit confirmed)
+- Lint clean → blocked (flutter analyze not run per audit-only rule)
 
-pass_2_schema: total=21, missing_field_fixed=0 — every issue verified to have all 7 required fields per LAYER C: sev/blocker/area/files/loc/symbols + evidence + risk + fix + authority + test + deps. Severity calibration sanity check:
-- P0 (CAMERA-UX-001): user CAN'T post per CLAUDE.md MVP Tier 0 — meets P0 "user can't post" definition.
-- P1 (6 issues): all silent failure / data loss / golden path degradation per LAYER C P1 definition.
-- P2 (11 issues): polish / theme drift / a11y gap — non-blocking.
-- P3 (3 issues): minor — date format, inbox widget split, widget pin guide.
-severity_demoted=0 (no demotions this pass). evidence_failed_grep=0 — re-grep all evidence quotes:
-- CAMERA-UX-001 @ `app_camera_controller.dart:43 state.copyWith(error: e.toString())` + `camera_section.dart:511-520 _ViewfinderContent` → confirmed via Read tool
-- STATE-UX-EMPTY-001 @ `feed_section.dart:997-1031 _EmptyState`, `home_screen.dart:596-630 _EmptyFeedPage`, `inbox_screen.dart:48-51`, `chat_thread_view.dart:230-270`, `diary_list_screen.dart:375-388` → confirmed via Read tool
-- STATE-UX-ERROR-001 @ `feed_section.dart:44-55`, `home_screen.dart:387-395`, `inbox_screen.dart:44-46`, `streak_screen.dart:206-224 _ErrorBanner`, `blocked_accounts_page.dart:84-103 _ErrorState`, `friend_profile_screen.dart:50-53 _GateMessage` (6 screens) → confirmed via Read
-- NOTIF-UX-PERM-001 @ `notification_controller.dart:73-77` set + Grep returns 0 consumers → confirmed
-- CHAT-UX-SEND-001 @ `chat_controller.dart:55` errorMessage set + `chat_screen.dart:42 + 98-101` only reads isSending + chat_input_bar.dart:55-59 clear() pre-success → confirmed
-- NAV-UX-POPSCOPE-001 @ global grep 0 hits + `diary_canvas_screen.dart:396-411 _handleBack` tap-only → confirmed
-- UPLOAD-UX-001 @ `capture_preview_screen.dart:225-234` red text only + `post_controller.dart:251-270 _errorMessage` returns VN msg → confirmed
-- THEME-001 @ `edit_profile_screen.dart:24-27` + `friend_profile_screen.dart:16-21` + `profile_screen.dart:17-25` explicit "Missing design tokens" comment headers (3 files, 13 const colors, 4 hex values duplicated giữa profile_screen + friend_profile) → confirmed via Read + Grep
-- THEME-002 @ 66 hits across 28 files counted via Grep
-- THEME-003 @ 16 hits across 14 files counted via Grep
-- UX-REFRESH-001 @ grep returns only comment hit, 0 RefreshIndicator widgets → confirmed
-- A11Y-FRIEND-001 @ `friend_sheet.dart:698-710` SizedBox(20,20) → confirmed via Read
+pass_2_schema: total=21, missing_field_fixed=0; pass-2 reverify (executed 2026-06-08) discovered evidence undercount in 7 issues — scope expanded but issue IDs unchanged. Every issue verified to have all 7 required fields per LAYER C. Severity calibration unchanged from pass 1. evidence_failed_grep=0; re-grep all evidence quotes confirms current claims:
+- CAMERA-UX-001 @ `app_camera_controller.dart:43` + `camera_section.dart:511-520 _ViewfinderContent` + `:344-373 _DualViewfinderContent` → confirmed
+- STATE-UX-EMPTY-001 @ 12 sites: feed_section.dart:1009, home_screen.dart:608, grid_view_screen.dart:82, inbox_screen.dart:50, chat_thread_view.dart `_EmptyThread`, diary_list_screen.dart:378, profile_screen.dart:226, friend_profile_screen.dart:300, widgets/photo_grid.dart:19, widgets/diary_tab_content.dart:35, reaction_list_sheet.dart:67, space_context_bottom_sheet.dart:107 → confirmed via Grep + Read
+- STATE-UX-ERROR-001 @ 12 sites: feed_section.dart:44-55, home_screen.dart:387-395, grid_view_screen.dart:59-72, inbox_screen.dart:44-46, streak_screen.dart:206-224 `_ErrorBanner`, blocked_accounts_page.dart:84-103 `_ErrorState`, friend_profile_screen.dart:50-53 (gate) + 290-294 (post-grid), profile_screen.dart:210-217, diary_list_screen.dart:280-285, space_edit_sheet.dart:141-144 `_ErrorView` (chỉ Close), space_management_sheet.dart:67 + 291-303 `_ErrorBody` → confirmed
+- NOTIF-UX-PERM-001 @ `notification_controller.dart:73-77` set + Grep returns 3 hits (state + controller set/reset) + 0 UI consumers → confirmed
+- CHAT-UX-SEND-001 @ `chat_controller.dart:55` errorMessage set + `chat_screen.dart:42 + 97-103` only reads isSending + `chat_input_bar.dart:55-59 _submit` clear() + `:100 onSend emoji-picker` + `:158 quick-emoji onSend` cùng pattern + grep `sendStatus.errorMessage` 0 consumers → confirmed
+- NAV-UX-POPSCOPE-001 @ rg `PopScope|WillPopScope|onWillPop` 0 hits codebase + diary_canvas_screen.dart:396-411 _handleBack tap-only + capture_preview_screen.dart 0 back handler at all + edit_profile_screen.dart:130 Navigator.pop() no guard → confirmed
+- UPLOAD-UX-001 @ `capture_preview_screen.dart:225-234` red text only + `post_controller.dart:163-167` errorMessage set keeps pendingImagePath + `:251-270 _errorMessage` returns VN msg → confirmed
+- THEME-001 @ 7 files / 23 consts: edit_profile (2) + friend_profile (5) + profile_screen (4) + avatar_picker_sheet (3) + profile_tab_bar (1) + share_profile_sheet (4, shared/widgets) + share_photo_sheet (2, shared/widgets) → confirmed via `rg "const _c[A-Z]\w+\s*=\s*Color\("` (23 hits)
+- THEME-002 @ features/ subtree 66 hits / 28 files + shared/widgets/ subtree ~22 hits / 9 files = ~88 hits cross-module → confirmed via Grep both paths
+- THEME-003 @ 16 hits across 14 files → confirmed via Grep features/
+- UX-REFRESH-001 @ rg `RefreshIndicator|onRefresh` returns 0 widget hits → confirmed
+- A11Y-FRIEND-001 @ `friend_sheet.dart:698-710` SizedBox(20,20) decline + `:619-628` SizedBox(20,20) unfriend (cùng anti-pattern, has tooltip nhưng hit target 20×20) → confirmed
 - A11Y-INPUT-001 @ `app_text_input.dart:170-178` no tooltip → confirmed
 - UX-CAPTION-LEN-001 @ `app_note_pill.dart:117-124` buildCounter → null → confirmed
-- UX-HAPTIC-001 @ grep returns 1 hit (intro only) → confirmed
+- UX-HAPTIC-001 @ grep returns 1 hit (intro_page.dart:219 only) → confirmed
 - UX-DECLINE-CONFIRM-001 @ `friend_sheet.dart:680-707, 742-749` instant onTap → confirmed
 - FORM-001 @ grep AutovalidateMode 0 hits + `signup_password_page.dart:45-48` manual flag → confirmed
-- UX-CAMERA-ERR-NOREASON @ `app_camera_controller.dart:42-44` raw e.toString → confirmed
+- UX-CAMERA-ERR-NOREASON @ `app_camera_controller.dart:42-44` raw e.toString (no `on CameraException catch`) → confirmed
 - UX-INBOX-EMPTY-ACTION @ `inbox_screen.dart:167-182 _InboxMessage` shared widget → confirmed
 - UX-DATE-001 @ `feed_section.dart:114 _formatDate` hand-roll → confirmed
 - UX-WIDGET-PIN-001 @ Glob `apps/mobile/lib/features/widget/presentation/**` returns no files → confirmed
 
-pass_3_dedupe: before=21, after=21, consolidations=0 — verified no two issues share files[0]+symbols+root_cause+fix combo:
-- STATE-UX-EMPTY-001 vs STATE-UX-ERROR-001 share files but distinct symbols (empty vs error branch in `.when`) + distinct fix (add CTA button vs add retry button). Kept separate; cross-deps noted.
-- UX-INBOX-EMPTY-ACTION (P3) cites inbox_screen.dart but is widget-architecture split concern, not the empty/error UX itself — distinct fix (extract widget), depends on STATE-UX-EMPTY-001 + STATE-UX-ERROR-001 landing. Kept as P3 helper.
-- THEME-001 vs THEME-002 share core/theme concern + Color(0x) hex but distinct files (edit_profile vs 28-file sweep). THEME-001 specifically called out by file author comment; THEME-002 is the broader sweep. Kept separate.
-- A11Y-FRIEND-001 vs UX-DECLINE-CONFIRM-001 share friend_sheet.dart decline X button location but different fix (touch target size vs confirm dialog) + different root cause (a11y vs destructive UX). Kept separate; bundle hint in fix_order.
-- CAMERA-UX-001 vs UX-CAMERA-ERR-NOREASON share `app_camera_controller.dart` but distinct symbols (UI render branch vs controller error mapping) + distinct severity (P0 vs P2). Bundle hint in fix_order (same PR).
+pass_3_dedupe: before=21, after=21, consolidations=0 — pass-2 reverify confirmed no two issues share files[0]+symbols+root_cause+fix combo (even after evidence scope expansion):
+- STATE-UX-EMPTY-001 vs STATE-UX-ERROR-001 share files (feed/inbox/diary/profile/space/grid_view) nhưng distinct symbols (empty vs error branch in `.when`) + distinct fix (add CTA button vs add retry button). Kept separate; cross-deps noted.
+- THEME-001 vs THEME-002 sau pass-2 expansion vẫn distinct: THEME-001 chỉ scope `const _cXxx = Color()` declaration pattern (acknowledged drift với comment "Missing design tokens" / TODO); THEME-002 scope inline `Color(0x...)` literals (no const declaration). Files overlap (profile screens trong cả 2) nhưng symbols + root cause khác. Kept separate.
+- A11Y-FRIEND-001 vs UX-DECLINE-CONFIRM-001 share friend_sheet.dart decline X location nhưng different fix (touch target size vs confirm dialog) + different root cause (a11y vs destructive UX). Bundle hint in fix_order.
+- CAMERA-UX-001 vs UX-CAMERA-ERR-NOREASON share `app_camera_controller.dart` nhưng distinct symbols (UI render branch vs controller error mapping) + distinct severity (P0 vs P2). Bundle hint trong fix_order (same PR).
+- CHAT-UX-SEND-001 pass-2 added emoji-picker + quick-emoji paths nhưng cùng file (chat_input_bar.dart) + same root cause (onSend signature returns void) + same fix → kept single issue, didn't split.
 
-pass_4_coverage: checked=11, partial=5, blocked=0, total=16, verdict=partial — coverage matches log evidence:
-- checked (11): auth flow (Read all 6 auth pages + auth_validators referenced); feed flow (Read feed_section + home_screen + capture_preview); chat UX (Read inbox + chat_screen + chat_thread_view); friend flow (Read friend_sheet); diary flow (Read diary_canvas + diary_list); settings flow (Read delete_account + logout_confirm + settings_sheet); shared widgets API (Read app_text_input + app_note_pill + app_primary_button + app_confirm_dialog references); theme/design tokens (Glob core/theme + Grep counts confirmed); camera/share flow (Read app_camera_controller + camera_section + capture_preview + post_controller); notification UX (Read notification_controller); router/deeplink (partial — ADR-0005 + ARCH-DEEPLINK-001 cite, app_router not re-deep-read)
-- partial (5): widget Flutter side (no presentation widgets exist — verified via Glob; pin-guide gap noted); profile flow (head-read only, full edit form not deep-read); space flow (Glob only, 11 widgets not deep-read; THEME-002 covers hardcoded color drift there); streak UX (Tier 1, Glob only); reaction UX (Glob only, picker exists but not deep-read; HapticFeedback gap inferred from global grep)
-- blocked (0): no hard blockers — flutter analyze not run is an audit constraint, not a coverage block; tracked in commands table
-- verdict=partial: 11/16 areas fully checked, 5 partials documented with rationale
+pass_4_coverage: checked=13, partial=3, blocked=0, total=16, verdict=mostly_checked — pass-2 reverify promoted 2 previously "partial" areas to "checked" through evidence expansion:
+- checked (13): auth flow + feed flow + chat UX + friend flow + diary flow + settings flow + shared widgets API + theme/design tokens + camera/share flow + notification UX + router/deeplink (partial in original, now confirmed via no_issue ARCH cite); **PROMOTED: profile flow (was partial — now THEME-001 7 files + STATE-UX 6 sites cover own/friend/shared profile widgets) + space flow (was partial — now STATE-UX 3 sites cover space-edit/management/context sheets + THEME-002 confirmed)**
+- partial (3): widget Flutter side (no presentation/ dir exists — UX-WIDGET-PIN-001 P3 flagged; native Kotlin out of scope); streak UX (Tier 1 stretch, has STATE-UX-ERROR-001 + THEME-002 + UX-HAPTIC-001 coverage but full streak feature flow not deep-read); reaction UX (has STATE-UX-EMPTY-001 + UX-HAPTIC-001 but emoji_picker_sheet full UX not deep-read)
+- blocked (0): no hard blockers; flutter analyze still not run per audit constraint
+- verdict=mostly_checked: 13/16 areas fully checked (was 11/16); 3 partials documented with rationale matching Tier scope priorities
+- no_issue spot-checks (pass-2): verified app_back_button Semantics presence (TODO if found gap), mark_as_read_listener debounce + dispose pattern, RefreshIndicator 0 widgets — see TASK A report.
 
 Coverage truthfulness criterion met: every "checked" area has Glob + Read + Grep evidence in commands table; "partial" entries have explicit rationale (Tier scope or out-of-depth-vs-priority).
