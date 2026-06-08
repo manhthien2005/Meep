@@ -92,7 +92,7 @@ Only P0/P1.
 |---|---|---|---|---|
 | CAMERA-UX-001 | P0 | Camera permission UX — golden path break | `apps/mobile/lib/features/feed/application/app_camera_controller.dart`, `apps/mobile/lib/features/feed/presentation/camera_section.dart` | Camera permission denied → silent black box with no Vietnamese message, no "Mở Cài đặt" CTA, no retry — user cannot post |
 | STATE-UX-EMPTY-001 | P1 | 4-state empty branch missing CTA | `apps/mobile/lib/features/feed/presentation/feed_section.dart`, `apps/mobile/lib/features/feed/presentation/home_screen.dart`, `apps/mobile/lib/features/chat/presentation/inbox_screen.dart`, `apps/mobile/lib/features/chat/presentation/chat_thread_view.dart`, `apps/mobile/lib/features/diary/presentation/diary_list_screen.dart` | Feed/Inbox/Chat thread/Diary empty states là plain text — KHÔNG có Vietnamese CTA tappable, vi phạm `apps/mobile/CLAUDE.md §Empty state must have a Vietnamese CTA` |
-| STATE-UX-ERROR-001 | P1 | Error state thiếu retry affordance | `apps/mobile/lib/features/feed/presentation/feed_section.dart`, `apps/mobile/lib/features/feed/presentation/home_screen.dart`, `apps/mobile/lib/features/chat/presentation/inbox_screen.dart` | Feed error chỉ render `Text('Không tải được feed. Kiểm tra kết nối.')` — KHÔNG có retry button; user stuck trên dead screen |
+| STATE-UX-ERROR-001 | P1 | Error state thiếu retry affordance (6 screens) | `apps/mobile/lib/features/feed/presentation/feed_section.dart`, `apps/mobile/lib/features/feed/presentation/home_screen.dart`, `apps/mobile/lib/features/chat/presentation/inbox_screen.dart`, `apps/mobile/lib/features/streak/presentation/streak_screen.dart`, `apps/mobile/lib/features/settings/presentation/blocked_accounts_page.dart`, `apps/mobile/lib/features/profile/presentation/friend_profile_screen.dart` | Feed/inbox/streak/blocked-accounts/friend-profile error chỉ render Text + không có retry button (`_ErrorBanner` streak red bar không dismiss, `_GateMessage` friend-profile chỉ "Quay lại"); user stuck trên dead screen |
 | NOTIF-UX-PERM-001 | P1 | FCM permission denial silent | `apps/mobile/lib/features/notification/application/notification_controller.dart`, `apps/mobile/lib/main.dart` | `state.fcmPermissionDenied` set ở `notification_controller.dart:74` nhưng KHÔNG có UI consumer (grep 0 hits) — user denies notification permission → app không hiển thị banner/CTA mở Settings |
 | CHAT-UX-SEND-001 | P1 | Chat send fail silent | `apps/mobile/lib/features/chat/presentation/chat_screen.dart`, `apps/mobile/lib/features/chat/presentation/group_chat_screen.dart`, `apps/mobile/lib/features/chat/application/chat_controller.dart` | `chatControllerProvider.sendStatus.errorMessage` set khi sendMessage fail (chat_controller.dart:55) nhưng UI chỉ watch `isSending` (chat_screen.dart:42, group_chat_screen.dart:40) — message bị clear khỏi input + error vô hình → user không biết tin gửi hỏng |
 | NAV-UX-POPSCOPE-001 | P1 | Unsaved-changes warning bị bypass khi system back | `apps/mobile/lib/features/diary/presentation/diary_canvas_screen.dart`, `apps/mobile/lib/features/feed/presentation/capture_preview_screen.dart`, toàn codebase | Grep `PopScope\|WillPopScope\|onWillPop` = 0 hits; `_handleBack` chỉ trigger qua tap AppBackButton — Android system back gesture skip dialog → data loss diary draft + post draft |
@@ -160,26 +160,33 @@ Only P0/P1.
 
 - sev: P1
 - blocker: no
-- area: 4-required-states — error branch missing retry button
+- area: 4-required-states — error branch missing retry button (6 screens)
 - files:
   - `apps/mobile/lib/features/feed/presentation/feed_section.dart`
   - `apps/mobile/lib/features/feed/presentation/home_screen.dart`
   - `apps/mobile/lib/features/chat/presentation/inbox_screen.dart`
-- loc: `feed_section.dart:44-55` (error branch); `home_screen.dart:387-395` (error branch); `inbox_screen.dart:44-46` (error branch)
+  - `apps/mobile/lib/features/streak/presentation/streak_screen.dart`
+  - `apps/mobile/lib/features/settings/presentation/blocked_accounts_page.dart`
+  - `apps/mobile/lib/features/profile/presentation/friend_profile_screen.dart`
+- loc: `feed_section.dart:44-55`; `home_screen.dart:387-395`; `inbox_screen.dart:44-46`; `streak_screen.dart:206-224` (`_ErrorBanner`); `blocked_accounts_page.dart:84-103` (`_ErrorState`); `friend_profile_screen.dart:50-53` (`isFriendAsync.when error → _GateMessage` no retry)
 - symbols:
-  - `FeedSection.build` (error case) / `_buildPageView` isError branch / inbox conversationsAsync.when error
+  - `FeedSection.build` (error case) / `_buildPageView` isError branch / inbox `conversationsAsync.when` error / `_ErrorBanner` (streak) / `_ErrorState` (blocked accounts) / `_GateMessage` reused for error in `friend_profile_screen.dart:50`
 - evidence:
   - feed_section.dart:48-53 — `Text('Không tải được feed. Kiểm tra kết nối.', style: TextStyle(color: AppColors.bw500), textAlign: TextAlign.center)` — no button
-  - home_screen.dart:388-393 — same string, same shape
+  - home_screen.dart:388-393 — same string, same shape, no button
   - inbox_screen.dart:44-46 — `error: (_, __) => const _InboxMessage(text: 'Không tải được tin nhắn. Thử lại sau nhé.')` — no button
+  - streak_screen.dart:213-222 — `Container(color: AppColors.error700.withValues(alpha: 0.9), ... child: Text(message, ...))` red banner pure text, không retry
+  - blocked_accounts_page.dart:95-99 — `Text('Không thể tải danh sách. Kiểm tra kết nối và thử lại.', ...)` — không retry button
+  - friend_profile_screen.dart:50-53 — `error: (e, _) => _GateMessage(message: 'Không tải được hồ sơ bạn bè.', onBack: () => context.pop())` — `_GateMessage` chỉ có "Quay lại" button (pop), không có "Thử lại" (re-invalidate provider)
 - user_impact: Khi Firestore stream throw (network drop, rule deny, App Check fail) user nhìn thấy thông báo lỗi nhưng KHÔNG có nút retry → app stuck dead screen cho đến khi user force-quit + relaunch. Trong Riverpod 2 pattern, `ref.invalidate(provider)` là cách standard re-subscribe stream — button "Thử lại" should call invalidate.
-- risk: silent failure trên network blip — `apps/mobile/CLAUDE.md §Loading/error/empty` rule "Error view có retry button + actionable hint, KHÔNG just 'Lỗi xảy ra'" bị break ở 3 screens core (feed × 2 + inbox). Combined với DATA-ARCH-001 (ARCH P1 — repository raw FirebaseException), khi rule deploy fix tighten quá (USER-SEC-001) → toàn bộ feed error UX render trong production sẽ là 1 line text.
+- risk: silent failure trên network blip — `apps/mobile/CLAUDE.md §Loading/error/empty` rule "Error view có retry button + actionable hint, KHÔNG just 'Lỗi xảy ra'" bị break ở 6 screens cross-module (feed × 2 + inbox + streak + blocked accounts + friend profile gate). Streak `_ErrorBanner` red bar persists đến khi user navigate away — không dismiss được, không retry từ screen. Combined với DATA-ARCH-001 (ARCH P1 — repository raw FirebaseException), khi rule deploy fix tighten quá (USER-SEC-001) → toàn bộ feed error UX render trong production sẽ là 1 line text.
 - fix:
   1. Tạo shared widget `lib/shared/widgets/app_error_view.dart` với signature `AppErrorView({required String message, required VoidCallback onRetry})` — render Icon (`Icons.error_outline`) + Text(message) + `AppPrimaryButton(label: 'Thử lại', onPressed: onRetry)`. Touch core/shared cần leader gate.
-  2. Trong `feed_section.dart:44`, `home_screen.dart:388`, `inbox_screen.dart:44` replace text-only branch bằng `AppErrorView(message: 'Không tải được feed', onRetry: () => ref.invalidate(feedControllerProvider))`.
-  3. Wire similar pattern cho friend/profile/diary screens nếu có error branch (sau khi DATA-ARCH-001 fix sẽ throw typed AppError → message từ `AppError.message`).
+  2. Replace text-only error branch ở 6 screens bằng `AppErrorView(message: '...', onRetry: () => ref.invalidate(xxxProvider))` — feed_section.dart:44 → feedControllerProvider; home_screen.dart:388 → feedControllerProvider; inbox_screen.dart:44 → conversationsProvider; streak_screen.dart:71 → streakControllerProvider; blocked_accounts_page.dart:38 → blockedUsersProvider; friend_profile_screen.dart:50 → isFriendOfCurrentProvider.
+  3. Streak `_ErrorBanner` keep red bar visual + thêm inline retry icon button bên phải (dismissable).
+  4. friend_profile_screen `_GateMessage` cần thêm `retryLabel` param phân biệt "Quay lại" (non-friend gate) vs "Thử lại" (error gate).
 - authority: `apps/mobile/CLAUDE.md §Loading/error/empty — 4 required states` + `auth.md` Pattern #2 (error mapping at boundary — UI consumer cần affordance để recover)
-- test: widget test `test/features/feed/presentation/feed_section_test.dart` override `feedControllerProvider` returning `AsyncError(...)`; assert `find.widgetWithText(AppPrimaryButton, 'Thử lại')` + tap → `ref.invalidate` triggered. Run `flutter test test/features/feed/presentation/ test/features/chat/presentation/`.
+- test: widget test `test/features/feed/presentation/feed_section_test.dart` + `test/features/chat/presentation/inbox_screen_test.dart` + `test/features/streak/presentation/streak_screen_test.dart` + `test/features/settings/presentation/blocked_accounts_page_test.dart` + `test/features/profile/presentation/friend_profile_screen_test.dart` — override provider returning `AsyncError(...)`; assert `find.widgetWithText(AppPrimaryButton, 'Thử lại')` + tap triggers `ref.invalidate`.
 - deps: STATE-UX-EMPTY-001 (same files, fix bundle together)
 
 ### ISSUE NOTIF-UX-PERM-001
@@ -307,26 +314,21 @@ Only P0/P1.
 
 - sev: P2
 - blocker: no
-- area: Design tokens — hardcoded color outside theme (acknowledged drift)
+- area: Design tokens — hardcoded const colors outside theme (acknowledged drift, 3 files)
 - files:
   - `apps/mobile/lib/features/profile/presentation/edit_profile_screen.dart`
-- loc: 24-27
+  - `apps/mobile/lib/features/profile/presentation/friend_profile_screen.dart`
+  - `apps/mobile/lib/features/profile/presentation/profile_screen.dart`
+- loc: edit_profile_screen.dart:24-27; friend_profile_screen.dart:16-21; profile_screen.dart:17-25
 - symbols:
   - `_cBackBtn = Color(0xFF73706E)`
   - `_cSectionLabel = Color(0xFFDDDDDD)`
-- evidence:
-  ```dart
-  // edit_profile_screen.dart:24-27
-  // ─── Missing design tokens — ping leader để add vào core/theme/ ───────────────
-  // #73706E → backButtonFill
-  const _cBackBtn = Color(0xFF73706E);
-  const _cSectionLabel = Color(0xFFDDDDDD);
-  ```
-- user_impact: Two colors shipped in profile screen không có trong `core/theme/app_colors.dart` (`AppColors`). Per `apps/mobile/CLAUDE.md §Design tokens` rule "Hardcoded color → use Theme.of(context).colorScheme..." — and "Figma has new color/font not in theme → add to core/theme/ first via leader-gated PR". The file author already left explicit "ping leader" comment but token not added.
-- risk: dark mode (Tier 1 stretch) + future theming locked out for 2 colors; new dev copying edit_profile patterns will replicate the drift; leader review of Figma updates won't catch hardcoded hex in this file.
-- fix: leader add `backButtonFill` + `sectionLabel` (or pick existing tokens closest match — `AppColors.bw500` for section label, `AppColors.bw600` for back button fill — visual review needed). Replace const declarations với `AppColors.<token>`. Delete the "Missing design tokens" comment block.
+- evidence: `grep -n "Missing design tokens" apps/mobile/lib/features` returns 3 hits (profile_screen.dart:17, friend_profile_screen.dart:16, edit_profile_screen.dart:24) — tất cả 3 file có comment "Missing design tokens — ping leader để add vào core/theme/" header above 4-5 `const _cXxx = Color(0xFF...)` declarations. Same 4 hex values duplicated between profile_screen + friend_profile (`#050F10`, `#363636`, `#DDDDDD`, `#D9D9D9`) — 2 files declare independent consts thay vì import shared token.
+- user_impact: 13 hardcoded const colors across 3 profile screens, all với explicit "ping leader" admission. Per `apps/mobile/CLAUDE.md §Design tokens` rule "Figma has new color/font not in theme → add to core/theme/ first via leader-gated PR". Duplication là worst pattern — khi leader update `#363636` từ Figma, 2 files phải edit; 1 file sẽ drift.
+- risk: dark mode (Tier 1) blocked cho 13 colors across 3 profile screens; visual drift khi 1 file update mà file kia không; new dev copy profile pattern → replicate drift. Comments "ping leader" là tech debt team đã acknowledge mà chưa resolve.
+- fix: leader add 6 tokens vào `AppColors`: `profileBg` (#050F10 / equal bw900), `actionButtonFill` (#363636), `actionButtonText` (#DDDDDD), `avatarRingIdle` (#D9D9D9), `inactiveIcon` (#949494), `backButtonFill` (#73706E), `sectionLabel` (#DDDDDD). Replace 13 const declarations across 3 files với `AppColors.<token>`. Delete 3 "Missing design tokens" comment headers cùng PR.
 - authority: `apps/mobile/CLAUDE.md §Design tokens — NO hardcoding` ("Figma has new color/font not in theme → add to core/theme/ first via leader-gated PR")
-- test: `rg "Color\(0xFF73706E\)|Color\(0xFFDDDDDD\)" apps/mobile/lib` returns 0 hits post-fix; visual diff against Figma edit_profile frame still pixel-match.
+- test: `rg "Missing design tokens" apps/mobile/lib` returns 0 hits post-fix; `rg "_cBg|_cButtonFill|_cButtonText|_cAvatarRing|_cBackBtn|_cSectionLabel|_cInactiveIcon" apps/mobile/lib/features/profile` returns 0 hits; visual diff Figma vs build per screen.
 - deps: none
 
 ### ISSUE THEME-002
@@ -875,12 +877,12 @@ pass_2_schema: total=21, missing_field_fixed=0 — every issue verified to have 
 severity_demoted=0 (no demotions this pass). evidence_failed_grep=0 — re-grep all evidence quotes:
 - CAMERA-UX-001 @ `app_camera_controller.dart:43 state.copyWith(error: e.toString())` + `camera_section.dart:511-520 _ViewfinderContent` → confirmed via Read tool
 - STATE-UX-EMPTY-001 @ `feed_section.dart:997-1031 _EmptyState`, `home_screen.dart:596-630 _EmptyFeedPage`, `inbox_screen.dart:48-51`, `chat_thread_view.dart:230-270`, `diary_list_screen.dart:375-388` → confirmed via Read tool
-- STATE-UX-ERROR-001 @ `feed_section.dart:44-55`, `home_screen.dart:387-395`, `inbox_screen.dart:44-46` → confirmed
+- STATE-UX-ERROR-001 @ `feed_section.dart:44-55`, `home_screen.dart:387-395`, `inbox_screen.dart:44-46`, `streak_screen.dart:206-224 _ErrorBanner`, `blocked_accounts_page.dart:84-103 _ErrorState`, `friend_profile_screen.dart:50-53 _GateMessage` (6 screens) → confirmed via Read
 - NOTIF-UX-PERM-001 @ `notification_controller.dart:73-77` set + Grep returns 0 consumers → confirmed
 - CHAT-UX-SEND-001 @ `chat_controller.dart:55` errorMessage set + `chat_screen.dart:42 + 98-101` only reads isSending + chat_input_bar.dart:55-59 clear() pre-success → confirmed
 - NAV-UX-POPSCOPE-001 @ global grep 0 hits + `diary_canvas_screen.dart:396-411 _handleBack` tap-only → confirmed
 - UPLOAD-UX-001 @ `capture_preview_screen.dart:225-234` red text only + `post_controller.dart:251-270 _errorMessage` returns VN msg → confirmed
-- THEME-001 @ `edit_profile_screen.dart:24-27` explicit comment → confirmed via Read
+- THEME-001 @ `edit_profile_screen.dart:24-27` + `friend_profile_screen.dart:16-21` + `profile_screen.dart:17-25` explicit "Missing design tokens" comment headers (3 files, 13 const colors, 4 hex values duplicated giữa profile_screen + friend_profile) → confirmed via Read + Grep
 - THEME-002 @ 66 hits across 28 files counted via Grep
 - THEME-003 @ 16 hits across 14 files counted via Grep
 - UX-REFRESH-001 @ grep returns only comment hit, 0 RefreshIndicator widgets → confirmed
