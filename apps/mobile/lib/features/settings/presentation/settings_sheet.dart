@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -168,9 +166,6 @@ class SettingsSheet extends ConsumerWidget {
                 // auto navigate /intro. UX: user không bị stuck nhìn sheet
                 // trong khi CF chạy.
                 Navigator.of(context).pop();
-                unawaited(
-                  ref.read(settingsControllerProvider.notifier).deleteAccount(),
-                );
               },
             ),
             const SizedBox(height: 40),

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 
+import 'package:meep/core/error/app_error.dart';
 import 'package:meep/features/notification/data/app_notification.dart';
 import 'package:meep/features/notification/data/notification_preferences.dart';
 import 'package:meep/features/notification/data/notification_repository.dart';
@@ -16,6 +17,7 @@ class FirebaseNotificationRepository implements NotificationRepository {
 
   final FirebaseFirestore _firestore;
   final NotificationPreferences _prefs;
+  static const _notificationLimit = 50;
 
   CollectionReference<Map<String, dynamic>> _fcmTokensRef(String uid) =>
       _firestore.collection('users').doc(uid).collection('fcmTokens');
@@ -36,20 +38,24 @@ class FirebaseNotificationRepository implements NotificationRepository {
     // các lần login cùng device → tránh 1 read + 1 batch write mỗi initFcm.
     if (_prefs.cachedFcmToken(uid) == token) return;
 
-    final tokenId = sha256.convert(utf8.encode(token)).toString();
-    final existing = await _fcmTokensRef(uid).get();
-    final batch = _firestore.batch();
-    for (final doc in existing.docs) {
-      if (doc.id == tokenId) continue;
-      batch.delete(doc.reference);
+    try {
+      final tokenId = sha256.convert(utf8.encode(token)).toString();
+      final existing = await _fcmTokensRef(uid).get();
+      final batch = _firestore.batch();
+      for (final doc in existing.docs) {
+        if (doc.id == tokenId) continue;
+        batch.delete(doc.reference);
+      }
+      batch.set(_fcmTokensRef(uid).doc(tokenId), {
+        'token': token,
+        'platform': 'android',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      await batch.commit();
+      await _prefs.setCachedFcmToken(uid, token);
+    } on FirebaseException catch (e) {
+      throw _mapFirestoreError(e, 'lưu token thông báo');
     }
-    batch.set(_fcmTokensRef(uid).doc(tokenId), {
-      'token': token,
-      'platform': 'android',
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    await batch.commit();
-    await _prefs.setCachedFcmToken(uid, token);
   }
 
   /// Logout cleanup — remove every fcmTokens doc for this uid.
@@ -58,13 +64,17 @@ class FirebaseNotificationRepository implements NotificationRepository {
     // Clear cache trước để lần login kế tiếp (cùng device, có thể khác user)
     // luôn ghi lại token vào Firestore thay vì skip nhầm theo cache cũ.
     await _prefs.clearCachedFcmToken(uid);
-    final snap = await _fcmTokensRef(uid).get();
-    if (snap.docs.isEmpty) return;
-    final batch = _firestore.batch();
-    for (final doc in snap.docs) {
-      batch.delete(doc.reference);
+    try {
+      final snap = await _fcmTokensRef(uid).get();
+      if (snap.docs.isEmpty) return;
+      final batch = _firestore.batch();
+      for (final doc in snap.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    } on FirebaseException catch (e) {
+      throw _mapFirestoreError(e, 'xoá token thông báo');
     }
-    await batch.commit();
   }
 
   /// Newest first. `new_post` notifications are push-only and never persisted
@@ -76,17 +86,22 @@ class FirebaseNotificationRepository implements NotificationRepository {
   /// without re-passing uid through the abstract API.
   @override
   Future<List<AppNotification>> getNotifications(String uid) async {
-    final snap = await _notificationsRef(uid)
-        .orderBy('createdAt', descending: true)
-        .get();
-    return snap.docs
-        .map(
-          (doc) => AppNotification.fromJson({
-            ...doc.data(),
-            'notifId': doc.reference.path,
-          }),
-        )
-        .toList();
+    try {
+      final snap = await _notificationsRef(uid)
+          .orderBy('createdAt', descending: true)
+          .limit(_notificationLimit)
+          .get();
+      return snap.docs
+          .map(
+            (doc) => AppNotification.fromJson({
+              ...doc.data(),
+              'notifId': doc.reference.path,
+            }),
+          )
+          .toList();
+    } on FirebaseException catch (e) {
+      throw _mapFirestoreError(e, 'tải thông báo');
+    }
   }
 
   /// `notifId` is the full Firestore path produced by [getNotifications].
@@ -109,6 +124,41 @@ class FirebaseNotificationRepository implements NotificationRepository {
             'use AppNotification.notifId from getNotifications().',
       );
     }
-    await _firestore.doc(notifId).update({'read': true});
+    try {
+      await _firestore.doc(notifId).update({'read': true});
+    } on FirebaseException catch (e) {
+      throw _mapFirestoreError(e, 'đánh dấu đã đọc');
+    }
+  }
+
+  AppError _mapFirestoreError(FirebaseException e, String action) {
+    final serverMessage = e.message;
+    return switch (e.code) {
+      'permission-denied' => ForbiddenError.message(
+          message: serverMessage ?? 'Bạn không có quyền $action',
+          code: e.code,
+          cause: e,
+        ),
+      'not-found' => NotFoundError.message(
+          message: serverMessage ?? 'Không tìm thấy thông báo',
+          code: e.code,
+          cause: e,
+        ),
+      'unavailable' || 'deadline-exceeded' || 'cancelled' => NetworkError(
+          message: serverMessage ?? 'Mất kết nối khi $action. Thử lại sau.',
+          code: e.code,
+          cause: e,
+        ),
+      'failed-precondition' => ValidationError(
+          message: serverMessage ?? 'Không thể $action: dữ liệu không hợp lệ',
+          code: e.code,
+          cause: e,
+        ),
+      _ => UnexpectedError(
+          message: serverMessage ?? 'Không thể $action. Thử lại sau.',
+          code: e.code,
+          cause: e,
+        ),
+    };
   }
 }

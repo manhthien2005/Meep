@@ -16,11 +16,13 @@ class ChatInputBar extends StatefulWidget {
     super.key,
     required this.onSend,
     this.isSending = false,
+    this.errorText,
     this.quickEmojis = const ['💙', '🤣', '🥰'],
   });
 
-  final void Function(String text) onSend;
+  final Future<bool> Function(String text) onSend;
   final bool isSending;
+  final String? errorText;
   final List<String> quickEmojis;
 
   @override
@@ -52,10 +54,10 @@ class _ChatInputBarState extends State<ChatInputBar> {
   bool get _isExpanded => _focusNode.hasFocus || _controller.text.isNotEmpty;
   bool get _canSend => _controller.text.trim().isNotEmpty && !widget.isSending;
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_canSend) return;
-    widget.onSend(_controller.text.trim());
-    _controller.clear();
+    final sent = await widget.onSend(_controller.text.trim());
+    if (sent && mounted) _controller.clear();
   }
 
   Future<void> _openEmojiPicker() async {
@@ -97,7 +99,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
       ),
     );
     if (picked == null || !mounted) return;
-    widget.onSend(picked);
+    await widget.onSend(picked);
   }
 
   @override
@@ -108,29 +110,40 @@ class _ChatInputBarState extends State<ChatInputBar> {
         color: const Color(0x66252627),
         borderRadius: BorderRadius.circular(30),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              style: AppTextStyles.mdRegular.copyWith(color: AppColors.bw100),
-              cursorColor: AppColors.turquoise500,
-              maxLines: 4,
-              minLines: 1,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _submit(),
-              decoration: InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                hintText: 'Gửi tin nhắn...',
-                hintStyle:
-                    AppTextStyles.mdRegular.copyWith(color: AppColors.bw400),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  style:
+                      AppTextStyles.mdRegular.copyWith(color: AppColors.bw100),
+                  cursorColor: AppColors.turquoise500,
+                  maxLines: 4,
+                  minLines: 1,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _submit(),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    hintText: 'Gửi tin nhắn...',
+                    hintStyle: AppTextStyles.mdRegular.copyWith(
+                      color: AppColors.bw400,
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              if (_isExpanded)
+                ..._expandedActions()
+              else
+                ..._collapsedActions(),
+            ],
           ),
-          const SizedBox(width: 8),
-          if (_isExpanded) ..._expandedActions() else ..._collapsedActions(),
+          if (widget.errorText != null) _SendErrorRow(onRetry: _submit),
         ],
       ),
     );
@@ -177,4 +190,44 @@ class _ChatInputBarState extends State<ChatInputBar> {
           ),
         ),
       ];
+}
+
+class _SendErrorRow extends StatelessWidget {
+  const _SendErrorRow({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.error_outline,
+            color: AppColors.error500,
+            size: 16,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Chưa gửi được tin nhắn',
+              style: AppTextStyles.xsRegular.copyWith(
+                color: AppColors.error500,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onRetry,
+            child: Text(
+              'Thử lại',
+              style: AppTextStyles.xsSemiBold.copyWith(
+                color: AppColors.turquoise500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

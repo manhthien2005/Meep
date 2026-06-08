@@ -1,6 +1,6 @@
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { logger } from 'firebase-functions/v2';
-import { sendFcmToUser } from '../notification/_fcm.js';
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { logger } from "firebase-functions/v2";
+import { sendFcmToUser } from "../notification/_fcm.js";
 
 interface SpacePost {
   postId: string;
@@ -32,10 +32,16 @@ export async function spacePostFanOut(post: SpacePost): Promise<void> {
   const db = getFirestore();
   const { postId, authorId, authorName, spaceId } = post;
 
-  // Step 1: Verify Space tồn tại + chưa deleted.
-  const spaceDoc = await db.collection('spaces').doc(spaceId).get();
+  // Step 1-2: đọc Space doc và member list song song. Hai read độc lập nên
+  // không cần chờ Space doc xong mới query subcollection members.
+  const [spaceDoc, membersSnap] = await Promise.all([
+    db.collection("spaces").doc(spaceId).get(),
+    db.collection("space_members").doc(spaceId).collection("members").get(),
+  ]);
   if (!spaceDoc.exists) {
-    logger.warn(`spacePostFanOut: Space ${spaceId} not found for post ${postId}`);
+    logger.warn(
+      `spacePostFanOut: Space ${spaceId} not found for post ${postId}`,
+    );
     return;
   }
   const spaceData = spaceDoc.data();
@@ -46,22 +52,18 @@ export async function spacePostFanOut(post: SpacePost): Promise<void> {
 
   // Step 2: Load members từ subcollection. Authoritative source —
   // memberIds array trên /spaces có thể stale 1-2s sau leaveSpace batch.
-  const membersSnap = await db
-    .collection('space_members')
-    .doc(spaceId)
-    .collection('members')
-    .get();
-
   const memberUids: string[] = [];
   for (const doc of membersSnap.docs) {
     const uid: unknown = doc.data().uid;
-    if (typeof uid === 'string' && uid.length > 0) {
+    if (typeof uid === "string" && uid.length > 0) {
       memberUids.push(uid);
     }
   }
 
   if (memberUids.length === 0) {
-    logger.warn(`spacePostFanOut: Space ${spaceId} has 0 members for post ${postId}`);
+    logger.warn(
+      `spacePostFanOut: Space ${spaceId} has 0 members for post ${postId}`,
+    );
     return;
   }
 
@@ -105,7 +107,7 @@ export async function spacePostFanOut(post: SpacePost): Promise<void> {
     authorName,
     postId,
     spaceId,
-    typeof spaceData?.name === 'string' ? spaceData.name : 'Space',
+    typeof spaceData?.name === "string" ? spaceData.name : "Space",
   );
 }
 
@@ -127,14 +129,14 @@ async function sendFcmToSpaceMembers(
   if (recipientUids.length === 0) return;
   const payload = {
     title: `${authorName} → ${spaceName}`,
-    body: 'Vừa chia sẻ ảnh mới trong Space',
+    body: "Vừa chia sẻ ảnh mới trong Space",
     data: {
-      type: 'new_space_post',
+      type: "new_space_post",
       postId,
       authorId,
       spaceId,
     },
-    channelId: 'posts',
+    channelId: "posts",
   };
   await Promise.all(
     recipientUids.map((uid) => sendFcmToUser(db, uid, payload)),

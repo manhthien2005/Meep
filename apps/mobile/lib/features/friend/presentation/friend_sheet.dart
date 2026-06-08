@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'package:meep/core/config/app_config.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
@@ -65,7 +66,7 @@ class _FriendSheetState extends ConsumerState<FriendSheet> {
   }
 
   Future<void> _copyLink(String uid) async {
-    final link = 'https://meep.app/invite/$uid';
+    final link = '${AppConfig.inviteBaseUrl}/$uid';
     await Clipboard.setData(ClipboardData(text: link));
     setState(() => _linkCopied = true);
     await Future<void>.delayed(const Duration(seconds: 2));
@@ -78,7 +79,7 @@ class _FriendSheetState extends ConsumerState<FriendSheet> {
   /// (Messenger, Instagram, SMS, ...). Platform deep-links per app are not
   /// reliable on Android, so all channels route through one share sheet.
   Future<void> _shareInviteLink(String uid) async {
-    final link = 'https://meep.app/invite/$uid';
+    final link = '${AppConfig.inviteBaseUrl}/$uid';
     await Share.share(
       'Kết bạn với mình trên Meep nhé: $link',
     );

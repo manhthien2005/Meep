@@ -41,10 +41,22 @@ class UnauthenticatedError extends AppError {
 
 class ForbiddenError extends AppError {
   ForbiddenError(String action) : super(message: 'Not allowed to $action');
+
+  const ForbiddenError.message({
+    required super.message,
+    super.code,
+    super.cause,
+  });
 }
 
 class NotFoundError extends AppError {
   NotFoundError(String resource) : super(message: '$resource not found');
+
+  const NotFoundError.message({
+    required super.message,
+    super.code,
+    super.cause,
+  });
 }
 
 class ValidationError extends AppError {

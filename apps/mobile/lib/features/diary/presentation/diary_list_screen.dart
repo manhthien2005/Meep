@@ -373,15 +373,39 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   }
 
   Widget _buildEmptyState() {
-    return const Center(
-      child: Text(
-        'Bạn chưa có nhật ký nào',
-        style: TextStyle(
-          fontFamily: 'Nunito',
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-          color: AppColors.bw500, // Empty state muted text
-          height: 24 / 18,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.auto_stories_outlined,
+              color: AppColors.bw500,
+              size: 44,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Bạn chưa có nhật ký nào',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.bw500,
+                height: 24 / 18,
+              ),
+            ),
+            const SizedBox(height: 18),
+            TextButton.icon(
+              onPressed: _togglePicker,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Viết nhật ký đầu tiên'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.turquoise500,
+              ),
+            ),
+          ],
         ),
       ),
     );

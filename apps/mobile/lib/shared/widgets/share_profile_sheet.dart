@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:meep/core/config/app_config.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 
@@ -45,7 +46,7 @@ class ShareProfileSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final profileLink = 'meep://profile/${username ?? uid}';
+    final profileLink = '${AppConfig.shareBaseUrl}/${username ?? uid}';
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Container(

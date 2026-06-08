@@ -50,9 +50,9 @@ class ReactionListSheet extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Phản ứng',
-              style: TextStyle(
+            Text(
+              'Phản ứng (${reactions.length})',
+              style: const TextStyle(
                 color: AppColors.bw100,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,

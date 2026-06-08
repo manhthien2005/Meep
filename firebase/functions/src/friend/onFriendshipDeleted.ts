@@ -1,5 +1,6 @@
-import { onDocumentDeleted } from 'firebase-functions/v2/firestore';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { onDocumentDeleted } from "firebase-functions/v2/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { logger } from "firebase-functions/v2";
 
 /**
  * Clean up friend-related data when a friendship is deleted.
@@ -8,21 +9,21 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
  * 1. Decrement friendCount for uid1 and uid2 using FieldValue.increment(-1)
  * 2. Update /conversations/{pairId}.status = 'unfriended' if conversation exists
  * 3. Batch delete cross-feed entries:
- *    - Delete /users/{uid1}/feed/{postId} WHERE authorId == uid2 AND spaceId == null
- *    - Delete /users/{uid2}/feed/{postId} WHERE authorId == uid1 AND spaceId == null
- * 4. Preserve Space posts (spaceId != null)
+ *    - Delete /users/{uid1}/feed/{postId} WHERE authorId == uid2 AND spaceIds == []
+ *    - Delete /users/{uid2}/feed/{postId} WHERE authorId == uid1 AND spaceIds == []
+ * 4. Preserve Space posts (spaceIds non-empty)
  *
  * Note: This CF owns feed cleanup (Home/Camera/Feed module concern).
  * CF is idempotent: re-running after partial failure produces same final state.
  */
 export const onFriendshipDeleted = onDocumentDeleted(
-  { document: 'friendships/{pairId}', region: 'asia-southeast1' },
+  { document: "friendships/{pairId}", region: "asia-southeast1" },
   async (event) => {
     const pairId = event.params.pairId;
     const friendshipData = event.data?.data();
 
     if (!friendshipData) {
-      console.warn(`onFriendshipDeleted: no data for ${pairId}`);
+      logger.warn(`onFriendshipDeleted: no data for ${pairId}`);
       return;
     }
 
@@ -35,35 +36,47 @@ export const onFriendshipDeleted = onDocumentDeleted(
     // Using Promise.all for parallel execution is safe here because each update
     // operates on a different document. No transaction needed.
     await Promise.all([
-      db.collection('users').doc(uid1).update({
-        friendCount: FieldValue.increment(-1),
-      }),
-      db.collection('users').doc(uid2).update({
-        friendCount: FieldValue.increment(-1),
-      }),
+      db
+        .collection("users")
+        .doc(uid1)
+        .update({
+          friendCount: FieldValue.increment(-1),
+        }),
+      db
+        .collection("users")
+        .doc(uid2)
+        .update({
+          friendCount: FieldValue.increment(-1),
+        }),
     ]);
 
     // Step 2: Update conversation status to 'unfriended' (if exists)
-    const conversationRef = db.collection('conversations').doc(pairId);
+    const conversationRef = db.collection("conversations").doc(pairId);
     const conversationDoc = await conversationRef.get();
 
     if (conversationDoc.exists) {
       await conversationRef.update({
-        status: 'unfriended',
+        status: "unfriended",
         updatedAt: FieldValue.serverTimestamp(),
       });
     }
 
     // Step 3: Batch delete cross-feed entries (preserve Space posts)
     // Delete uid1's feed entries authored by uid2 (non-Space only)
-    const uid1FeedQuery = db.collection('users').doc(uid1).collection('feed')
-      .where('authorId', '==', uid2)
-      .where('spaceId', '==', null);
+    const uid1FeedQuery = db
+      .collection("users")
+      .doc(uid1)
+      .collection("feed")
+      .where("authorId", "==", uid2)
+      .where("spaceIds", "==", []);
 
     // Delete uid2's feed entries authored by uid1 (non-Space only)
-    const uid2FeedQuery = db.collection('users').doc(uid2).collection('feed')
-      .where('authorId', '==', uid1)
-      .where('spaceId', '==', null);
+    const uid2FeedQuery = db
+      .collection("users")
+      .doc(uid2)
+      .collection("feed")
+      .where("authorId", "==", uid1)
+      .where("spaceIds", "==", []);
 
     const [uid1FeedSnapshot, uid2FeedSnapshot] = await Promise.all([
       uid1FeedQuery.get(),

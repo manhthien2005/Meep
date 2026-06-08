@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
@@ -98,6 +100,8 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
   final notifPrefs = NotificationPreferences(prefs: prefs);
+  final firestore = FirebaseFirestore.instance;
+  final friendRepo = FirebaseFriendRepository(firestore);
 
   final authRepo = FirebaseAuthRepository(
     auth: FirebaseAuth.instance,
@@ -109,7 +113,7 @@ void main() async {
   // Đồng bộ cached session với server — phát hiện account đã delete/disable
   // trên Firebase Console (token cached vẫn valid ~1h sau khi xoá nếu không
   // force reload). Network errors swallow để app vẫn launch được offline.
-  await authRepo.revalidateSession();
+  unawaited(authRepo.revalidateSession());
 
   runApp(
     ProviderScope(
@@ -118,11 +122,9 @@ void main() async {
         userRepositoryProvider.overrideWithValue(
           FirebaseUserRepository(firestore: FirebaseFirestore.instance),
         ),
-        friendRepositoryProvider.overrideWithValue(
-          FirebaseFriendRepository(FirebaseFirestore.instance),
-        ),
+        friendRepositoryProvider.overrideWithValue(friendRepo),
         postRepositoryProvider.overrideWithValue(
-          FirebasePostRepository(FirebaseFirestore.instance),
+          FirebasePostRepository(firestore, friendRepository: friendRepo),
         ),
         storageRepositoryProvider.overrideWithValue(
           FirebaseStorageRepository(FirebaseStorage.instance),

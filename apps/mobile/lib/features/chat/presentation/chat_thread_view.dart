@@ -90,25 +90,30 @@ class _ChatThreadViewState extends ConsumerState<ChatThreadView>
       );
     }
 
-    return ListView(
+    return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-      children: [
-        for (var i = 0; i < widget.messages.length; i++) ...[
-          if (_showSeparatorBefore(i))
-            _TimeSeparator(time: widget.messages[i].createdAt),
-          _ThreadMessageRow(
-            message: widget.messages[i],
-            isMine: widget.messages[i].senderId == widget.myUid,
-            isLastInGroup: _isLastInGroup(i),
-            showSenderName: widget.isGroup && _isFirstInGroup(i),
-            // 1-1: peer avatar đã có sẵn từ header — pass thẳng tránh extra
-            // lookup. Group: resolve per-sender qua chatUserProfileProvider.
-            fallbackAvatarUrl: widget.peerAvatarUrl,
-            resolvePerSender: widget.isGroup,
-          ),
-        ],
-      ],
+      itemCount: widget.messages.length,
+      itemBuilder: (context, i) {
+        final message = widget.messages[i];
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_showSeparatorBefore(i))
+              _TimeSeparator(time: message.createdAt),
+            _ThreadMessageRow(
+              message: message,
+              isMine: message.senderId == widget.myUid,
+              isLastInGroup: _isLastInGroup(i),
+              showSenderName: widget.isGroup && _isFirstInGroup(i),
+              // 1-1: peer avatar đã có sẵn từ header — pass thẳng tránh extra
+              // lookup. Group: resolve per-sender qua chatUserProfileProvider.
+              fallbackAvatarUrl: widget.peerAvatarUrl,
+              resolvePerSender: widget.isGroup,
+            ),
+          ],
+        );
+      },
     );
   }
 

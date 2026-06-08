@@ -1,5 +1,6 @@
 abstract final class AppConfig {
   static const shareBaseUrl = 'meep://profile';
+  static const inviteBaseUrl = 'meep://invite';
 
   // Google Sign-In server client ID (Firebase project: meep-staging)
   static const googleServerClientId =

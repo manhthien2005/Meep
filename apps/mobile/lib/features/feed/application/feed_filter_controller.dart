@@ -49,27 +49,17 @@ class FeedFilterController extends _$FeedFilterController {
 
   /// "Mọi người" — bỏ cả author và space.
   void selectAll() {
-    debugPrint(
-      '[Space Feed] FilterController.selectAll() — reset về "Mọi người"',
-    );
     state = const FeedFilterSelection();
   }
 
   /// Filter theo author uid ("Bạn" = currentUid, hoặc friend uid).
   /// Reset space để mutual exclusive.
   void selectAuthor(String authorUid, String label) {
-    debugPrint(
-      '[Space Feed] FilterController.selectAuthor(authorUid=$authorUid, label="$label")',
-    );
     state = FeedFilterSelection(authorUid: authorUid, label: label);
   }
 
   /// Filter theo Space. Reset author để mutual exclusive.
   void selectSpace(Space space) {
-    debugPrint(
-      '[Space Feed] FilterController.selectSpace(spaceId=${space.spaceId}, '
-      'name="${space.name}", colorHex=${space.colorHex})',
-    );
     state = FeedFilterSelection(spaceId: space.spaceId, label: space.name);
   }
 
@@ -77,9 +67,6 @@ class FeedFilterController extends _$FeedFilterController {
   /// HomeScreen `initState` post-frame gọi method này khi route param
   /// non-null. Quyết định UX: deeplink luôn thắng filter cũ.
   void seedFromRoute({required String spaceId, required String label}) {
-    debugPrint(
-      '[Space Feed] FilterController.seedFromRoute(spaceId=$spaceId, label="$label") — deeplink',
-    );
     state = FeedFilterSelection(spaceId: spaceId, label: label);
   }
 }
