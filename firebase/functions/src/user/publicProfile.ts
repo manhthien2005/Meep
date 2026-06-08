@@ -85,14 +85,14 @@ export const onUserProfileChanged = onDocumentWritten(
     const uid = event.params.uid;
     const after = event.data?.after;
 
-    if (!after?.exists) {
+    if (after?.exists !== true) {
       await publicProfileRef(uid).delete();
       logger.info({ uid }, 'publicProfile: deleted');
       return;
     }
 
     const data = after.data();
-    if (!data) {
+    if (data == null) {
       logger.warn({ uid }, 'publicProfile: user doc missing data');
       return;
     }
@@ -130,7 +130,7 @@ export const migratePublicProfiles = onCall(
         .orderBy(FieldPath.documentId())
         .limit(400);
 
-      if (lastDoc) {
+      if (lastDoc !== undefined) {
         query = query.startAfter(lastDoc);
       }
 
