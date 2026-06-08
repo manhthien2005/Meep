@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
-import 'package:meep/core/utils/hex_color.dart';
+import 'package:meep/core/theme/hex_color.dart';
 import 'package:meep/features/space/data/space.dart';
 
 /// Single row trong [SpaceContextBottomSheet] — Space icon (emoji + color
@@ -95,7 +95,7 @@ class _Icon extends StatelessWidget {
       );
     }
 
-    final color = parseHexColor(space!.colorHex) ?? AppColors.bw700;
+    final color = tryHexToColor(space!.colorHex) ?? AppColors.bw700;
     return Container(
       width: 40,
       height: 40,

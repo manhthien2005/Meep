@@ -314,8 +314,8 @@ void main() {
       );
     });
 
-    // ── DEV(C/#142): chat routes bypass auth both ways ───────
-    test('uid null + /inbox → null (stay, dev bypass)', () {
+    // ── Chat routes require auth ─────────────────────────────
+    test('uid null + /inbox → /intro', () {
       expect(
         authRedirect(
           isLoading: false,
@@ -325,7 +325,7 @@ void main() {
           requiresEmailVerification: false,
           location: '/inbox',
         ),
-        isNull,
+        '/intro',
       );
     });
 
@@ -343,7 +343,7 @@ void main() {
       );
     });
 
-    test('uid null + /group-chat/:id → null (stay, dev bypass)', () {
+    test('uid null + /group-chat/:id → /intro', () {
       expect(
         authRedirect(
           isLoading: false,
@@ -353,7 +353,7 @@ void main() {
           requiresEmailVerification: false,
           location: '/group-chat/conv-1',
         ),
-        isNull,
+        '/intro',
       );
     });
   });
@@ -472,7 +472,7 @@ void main() {
       );
     });
 
-    test('unverified BUT /chat dev bypass → null', () {
+    test('unverified + /chat → /verify-email', () {
       expect(
         authRedirect(
           isLoading: false,
@@ -482,7 +482,7 @@ void main() {
           requiresEmailVerification: true,
           location: '/chat/c1',
         ),
-        isNull,
+        '/verify-email',
       );
     });
 
@@ -648,6 +648,33 @@ void main() {
 
     test('missing type → /home (fallback, no crash)', () {
       expect(routeForNotification(const {}), '/home');
+    });
+  });
+
+  group('routeFromExternalUri — custom scheme mapping', () {
+    test('meep://invite/{uid} maps host into first path segment', () {
+      expect(
+        routeFromExternalUri(Uri.parse('meep://invite/u1')),
+        '/invite/u1',
+      );
+    });
+
+    test('meep://profile/{uid} maps host into first path segment', () {
+      expect(
+        routeFromExternalUri(Uri.parse('meep://profile/u1')),
+        '/profile/u1',
+      );
+    });
+
+    test('keeps query parameters when stripping HTTPS host', () {
+      expect(
+        routeFromExternalUri(
+          Uri.parse(
+            'https://meep-staging.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=abc',
+          ),
+        ),
+        '/__/auth/action?mode=resetPassword&oobCode=abc',
+      );
     });
   });
 }

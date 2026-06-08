@@ -4,11 +4,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/feed/data/post_repository.dart';
+import 'package:meep/features/friend/data/friend_repository.dart';
 
 class FirebasePostRepository implements PostRepository {
-  FirebasePostRepository(this._db);
+  FirebasePostRepository(this._db, {FriendRepository? friendRepository})
+      : _friendRepository = friendRepository;
 
   final FirebaseFirestore _db;
+  final FriendRepository? _friendRepository;
 
   static const _posts = 'posts';
 
@@ -260,8 +263,14 @@ class FirebasePostRepository implements PostRepository {
   }
 
   /// Fetch friend UIDs from /friendships where members contains [uid].
-  /// Does NOT use FriendRepository (which is stub UnimplementedError).
+  /// Production path delegates to [FriendRepository] so friend-graph ownership
+  /// stays in the Friend module. Tests may omit it and use the local fallback.
   Future<List<String>> _getFriendUids(String uid) async {
+    final friendRepository = _friendRepository;
+    if (friendRepository != null) {
+      return friendRepository.getFriendUids(uid);
+    }
+
     final snap = await _db
         .collection('friendships')
         .where('members', arrayContains: uid)

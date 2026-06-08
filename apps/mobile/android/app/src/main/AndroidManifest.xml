@@ -47,6 +47,16 @@
                 <data android:scheme="https"
                       android:host="meep-staging.web.app"/>
             </intent-filter>
+            <!-- Meep app links: invite/profile share URLs -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="meep"
+                      android:host="invite"/>
+                <data android:scheme="meep"
+                      android:host="profile"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

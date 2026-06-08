@@ -56,7 +56,6 @@ dependencies:
 
   # Auth providers
   google_sign_in: ^6.2.2
-  sign_in_with_apple: ^6.1.4
 
   # Logging
   logger: ^2.4.0

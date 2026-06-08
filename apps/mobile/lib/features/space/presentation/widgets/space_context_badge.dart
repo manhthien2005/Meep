@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
-import 'package:meep/core/utils/hex_color.dart';
+import 'package:meep/core/theme/hex_color.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 
 /// Pill nhỏ "Đang gửi: [SpaceName]" hiện trên Camera khi user đang ở Space
@@ -20,7 +20,7 @@ class SpaceContextBadge extends ConsumerWidget {
     final space = ref.watch(currentSpaceProvider);
     if (space == null) return const SizedBox.shrink();
 
-    final accent = parseHexColor(space.colorHex) ?? AppColors.turquoise500;
+    final accent = tryHexToColor(space.colorHex) ?? AppColors.turquoise500;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

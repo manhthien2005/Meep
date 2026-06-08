@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -31,7 +32,6 @@ import 'package:meep/features/feed/presentation/capture_preview_screen.dart';
 import 'package:meep/features/feed/presentation/grid_view_screen.dart';
 import 'package:meep/features/feed/presentation/home_screen.dart';
 import 'package:meep/features/space/application/space_controller.dart';
-import 'package:meep/features/home/presentation/home_page.dart';
 import 'package:meep/features/notification/application/notification_controller.dart';
 import 'package:meep/features/notification/application/notification_state.dart';
 import 'package:meep/features/profile/presentation/edit_profile_screen.dart';
@@ -78,15 +78,6 @@ String? authRedirect({
 
   // Password reset deep link: bypass toàn bộ auth guard
   if (location == '/login/reset-password' || location.startsWith('/__/auth/')) {
-    return null;
-  }
-
-  // DEV(C/#142): cho phép test luồng Chat FE không cần login (bypass cả 2 chiều
-  // — uid null không bị đá về /intro, uid có không bị đá về /home). Bỏ khi auth
-  // wire xong + có home-shell điều hướng Inbox sau đăng nhập.
-  if (location.startsWith('/inbox') ||
-      location.startsWith('/chat') ||
-      location.startsWith('/group-chat')) {
     return null;
   }
 
@@ -171,6 +162,27 @@ String routeForNotification(Map<String, String> data) {
   }
 }
 
+/// Normalize platform deep links to GoRouter paths.
+///
+/// Android delivers custom scheme links as full URIs where `profile`/`invite`
+/// is the host, e.g. `meep://invite/u1`. GoRouter routes are path-based, so
+/// the host must become the first path segment: `/invite/u1`.
+String? routeFromExternalUri(Uri uri) {
+  final query = uri.hasQuery ? '?${uri.query}' : '';
+  if (uri.scheme == 'meep' && uri.host.isNotEmpty) {
+    final suffix = uri.path.isEmpty || uri.path == '/' ? '' : uri.path;
+    return '/${uri.host}$suffix$query';
+  }
+  if (uri.host.isNotEmpty) {
+    final path = uri.path;
+    if (path.isNotEmpty && path != '/') return '$path$query';
+  }
+  if (uri.path.startsWith('/__/auth/')) {
+    return '${uri.path}$query';
+  }
+  return null;
+}
+
 /// ChangeNotifier kích hoạt GoRouter redirect re-evaluation khi auth state thay đổi.
 /// Không recreate GoRouter (tránh navigation stack reset).
 ///
@@ -208,12 +220,9 @@ GoRouter appRouter(Ref ref) {
 
     if (rawRoute.isNotEmpty && rawRoute != '/') {
       final uri = Uri.tryParse(rawRoute);
-      if (uri != null && uri.host.isNotEmpty) {
-        final path = uri.path;
-        final query = uri.hasQuery ? '?${uri.query}' : '';
-        if (path.isNotEmpty && path != '/') {
-          initialLocation = '$path$query';
-        }
+      final route = uri == null ? null : routeFromExternalUri(uri);
+      if (route != null) {
+        initialLocation = route;
       } else if (rawRoute.startsWith('/')) {
         initialLocation = rawRoute;
       }
@@ -230,18 +239,7 @@ GoRouter appRouter(Ref ref) {
       final uri = state.uri;
 
       String? target;
-      if (uri.host.isNotEmpty) {
-        // Warm start: full URL → strip host
-        final path = uri.path;
-        final query = uri.hasQuery ? '?${uri.query}' : '';
-        if (path.isNotEmpty && path != '/') target = '$path$query';
-      } else if (uri.path.startsWith('/__/auth/')) {
-        // Cold start: host đã stripped nhưng chưa có route match
-        // (xảy ra khi refreshListenable trigger trước route được register)
-        final path = uri.path;
-        final query = uri.hasQuery ? '?${uri.query}' : '';
-        target = '$path$query';
-      }
+      target = routeFromExternalUri(uri);
 
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => router.go(target ?? '/intro'),
@@ -261,13 +259,13 @@ GoRouter appRouter(Ref ref) {
         _ => null,
       };
 
-      // Strip scheme+host nếu GoRouter nhận full URL từ Android deep link
+      // Strip scheme+host nếu GoRouter nhận full URL từ Android deep link.
+      // VD: meep://invite/u1 → /invite/u1.
       // VD: https://meep-staging.firebaseapp.com/__/auth/action?... → /__/auth/action?...
       final rawUri = state.uri;
-      if (rawUri.host.isNotEmpty) {
-        final path = rawUri.path;
-        final query = rawUri.hasQuery ? '?${rawUri.query}' : '';
-        return '$path$query';
+      final externalRoute = routeFromExternalUri(rawUri);
+      if (externalRoute != null) {
+        return externalRoute;
       }
 
       return authRedirect(
@@ -373,7 +371,7 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: '/invite/:uid',
-        builder: (_, __) => const HomePage(),
+        builder: (_, __) => const HomeScreen(openFriendSheet: true),
       ),
       GoRoute(
         path: '/capture-preview',
@@ -412,6 +410,11 @@ GoRouter appRouter(Ref ref) {
             initialIndex: (extra as int?) ?? 0,
           );
         },
+      ),
+      GoRoute(
+        path: '/profile/:uid',
+        builder: (_, state) =>
+            FriendProfileScreen(uid: state.pathParameters['uid'] ?? ''),
       ),
       // Grid view (HomeScreen Taskbar) → tap photo → mở PhotoDetailScreen với
       // viền màu Space khi post thuộc Space. Khác `/profile/photo/:postId` ở
@@ -470,10 +473,11 @@ GoRouter appRouter(Ref ref) {
         ),
       ),
       GoRoute(path: '/streak', builder: (_, __) => const StreakScreen()),
-      GoRoute(
-        path: '/dev/widgets',
-        builder: (_, __) => const WidgetCatalogPage(),
-      ),
+      if (kDebugMode)
+        GoRoute(
+          path: '/dev/widgets',
+          builder: (_, __) => const WidgetCatalogPage(),
+        ),
     ],
   );
 

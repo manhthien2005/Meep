@@ -80,32 +80,13 @@ class SettingsController extends _$SettingsController {
     final auth = ref.read(authRepositoryProvider);
     final uid = auth.currentUid;
     if (uid != null) {
-      try {
-        // TODO(N/T1/KhoaLND): notificationRepositoryProvider throws
-        // UnimplementedError. Settings swallow lỗi nhưng FCM token KHÔNG bị
-        // xóa → user vẫn nhận push sau logout. Notification module = empty
-        // scaffold. KhoaLND build N/T1 FirestoreNotificationRepository +
-        // impl deleteFcmToken khi đến scope Notification.
-        await ref.read(notificationRepositoryProvider).deleteFcmToken(uid);
-      } catch (_) {
-        // Swallow: FCM cleanup là best-effort, không block logout.
-      }
-
-      // Clear widget cache — best-effort, không block logout.
-      try {
-        await ref.read(widgetDataServiceProvider).clearData();
-      } catch (_) {
-        // Swallow: widget cleanup is best-effort.
-      }
+      await _deleteFcmToken(uid);
+      await _clearWidgetCache();
     }
     // Reset FCM listeners + `_fcmInitialized` cờ BEFORE signOut. Nếu user B
     // login lại trên cùng device sau đó, initFcm() sẽ chạy lại từ đầu thay
     // vì early-return → token user B mới được lưu, listener mới được wire.
-    try {
-      await ref.read(notificationControllerProvider.notifier).resetForLogout();
-    } catch (_) {
-      // Swallow: notification cleanup is best-effort.
-    }
+    await _resetNotificationSession();
     try {
       await auth.signOut();
       state = state.copyWith(isLoading: false);
@@ -136,24 +117,37 @@ class SettingsController extends _$SettingsController {
       return;
     }
     try {
-      // TODO(N/T1/KhoaLND): notificationRepositoryProvider throws
-      // UnimplementedError. Settings swallow lỗi nhưng FCM token KHÔNG bị
-      // xóa → user vẫn nhận push sau delete account. Same gap như logout.
-      await ref.read(notificationRepositoryProvider).deleteFcmToken(uid);
-    } catch (_) {
-      // Swallow: FCM cleanup là best-effort, không block delete.
-    }
-    // Reset FCM listeners + flag — match logout flow (N2).
-    try {
-      await ref.read(notificationControllerProvider.notifier).resetForLogout();
-    } catch (_) {
-      // Swallow: notification cleanup is best-effort.
-    }
-    try {
+      await _deleteFcmToken(uid);
+      // Reset FCM listeners + flag — match logout flow (N2).
+      await _resetNotificationSession();
       await auth.deleteAccountCascade();
       state = state.copyWith(isLoading: false);
     } catch (e) {
       state = _afterFailure(e);
+    }
+  }
+
+  Future<void> _deleteFcmToken(String uid) async {
+    try {
+      await ref.read(notificationRepositoryProvider).deleteFcmToken(uid);
+    } catch (_) {
+      // Swallow: FCM cleanup là best-effort, không block account exit.
+    }
+  }
+
+  Future<void> _clearWidgetCache() async {
+    try {
+      await ref.read(widgetDataServiceProvider).clearData();
+    } catch (_) {
+      // Swallow: widget cleanup is best-effort.
+    }
+  }
+
+  Future<void> _resetNotificationSession() async {
+    try {
+      await ref.read(notificationControllerProvider.notifier).resetForLogout();
+    } catch (_) {
+      // Swallow: notification cleanup is best-effort.
     }
   }
 

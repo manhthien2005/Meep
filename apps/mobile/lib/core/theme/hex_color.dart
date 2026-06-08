@@ -13,3 +13,14 @@ Color hexToColor(String hex, {Color fallback = const Color(0xFF656C6D)}) {
   if (value == null) return fallback;
   return Color(0xFF000000 | value);
 }
+
+/// Parse hex color string to [Color], returning null when malformed.
+Color? tryHexToColor(String? hex) {
+  if (hex == null) return null;
+  var cleaned = hex.trim();
+  if (cleaned.startsWith('#')) cleaned = cleaned.substring(1);
+  if (cleaned.length != 6) return null;
+  final value = int.tryParse(cleaned, radix: 16);
+  if (value == null) return null;
+  return Color(0xFF000000 | value);
+}

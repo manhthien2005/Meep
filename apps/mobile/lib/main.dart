@@ -98,6 +98,8 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
   final notifPrefs = NotificationPreferences(prefs: prefs);
+  final firestore = FirebaseFirestore.instance;
+  final friendRepo = FirebaseFriendRepository(firestore);
 
   final authRepo = FirebaseAuthRepository(
     auth: FirebaseAuth.instance,
@@ -118,11 +120,9 @@ void main() async {
         userRepositoryProvider.overrideWithValue(
           FirebaseUserRepository(firestore: FirebaseFirestore.instance),
         ),
-        friendRepositoryProvider.overrideWithValue(
-          FirebaseFriendRepository(FirebaseFirestore.instance),
-        ),
+        friendRepositoryProvider.overrideWithValue(friendRepo),
         postRepositoryProvider.overrideWithValue(
-          FirebasePostRepository(FirebaseFirestore.instance),
+          FirebasePostRepository(firestore, friendRepository: friendRepo),
         ),
         storageRepositoryProvider.overrideWithValue(
           FirebaseStorageRepository(FirebaseStorage.instance),
