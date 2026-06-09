@@ -2,6 +2,40 @@ import { onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 
+export interface DeletedFriendshipUids {
+  uid1: string;
+  uid2: string;
+}
+
+export function parseDeletedFriendshipUids(
+  friendshipData: FirebaseFirestore.DocumentData | undefined,
+): DeletedFriendshipUids | null {
+  if (!friendshipData) return null;
+
+  const { uid1, uid2 } = friendshipData;
+  if (
+    typeof uid1 !== "string" ||
+    uid1.length === 0 ||
+    typeof uid2 !== "string" ||
+    uid2.length === 0
+  ) {
+    return null;
+  }
+
+  return { uid1, uid2 };
+}
+
+export function shouldDeleteCrossFeedEntry(
+  entry: { authorId?: unknown; spaceIds?: unknown },
+  formerFriendUid: string,
+): boolean {
+  return (
+    entry.authorId === formerFriendUid &&
+    Array.isArray(entry.spaceIds) &&
+    entry.spaceIds.length === 0
+  );
+}
+
 /**
  * Clean up friend-related data when a friendship is deleted.
  *
@@ -21,14 +55,14 @@ export const onFriendshipDeleted = onDocumentDeleted(
   async (event) => {
     const pairId = event.params.pairId;
     const friendshipData = event.data?.data();
+    const uids = parseDeletedFriendshipUids(friendshipData);
 
-    if (!friendshipData) {
+    if (!uids) {
       logger.warn(`onFriendshipDeleted: no data for ${pairId}`);
       return;
     }
 
-    const uid1 = String(friendshipData.uid1);
-    const uid2 = String(friendshipData.uid2);
+    const { uid1, uid2 } = uids;
     const db = getFirestore();
 
     // Step 1: Decrement friendCount for both users (idempotent with FieldValue.increment)

@@ -52,6 +52,7 @@ class DiaryCanvasScreen extends ConsumerStatefulWidget {
     this.initialContent,
     this.initialImageUrl,
     this.entryDate,
+    this.ownerActionsEnabled = true,
   });
 
   final DiaryCanvasMode mode;
@@ -71,6 +72,10 @@ class DiaryCanvasScreen extends ConsumerStatefulWidget {
   /// Ngày của entry — hiển thị ở topbar center. Khi null (create mode) →
   /// dùng `DateTime.now()` tự động.
   final DateTime? entryDate;
+
+  /// Read mode dùng chung cho own diary và diary public của bạn bè.
+  /// Khi false, ẩn menu edit/delete/share của owner.
+  final bool ownerActionsEnabled;
 
   @override
   ConsumerState<DiaryCanvasScreen> createState() => _DiaryCanvasScreenState();
@@ -266,6 +271,8 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
   /// Create mode: cover = '' (mood asset là visual, không upload).
   /// Inline images — upload tuần tự nếu user đã pick.
   Future<void> _handleSave() async {
+    if (ref.read(diaryControllerProvider).isSaving) return;
+
     final mood = _loadedMood ?? widget.moodTemplate;
     if (mood == null) {
       unawaited(Navigator.of(context).maybePop());
@@ -280,7 +287,8 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
       return;
     }
 
-    final uid = ref.read(currentUidProvider).valueOrNull;
+    final uid = await ref.read(currentUidProvider.future);
+    if (!mounted) return;
     if (uid == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Bạn cần đăng nhập để lưu nhật ký')),
@@ -380,7 +388,10 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
     if (widget.mode == DiaryCanvasMode.create) {
       unawaited(_clearDraft());
     }
-    unawaited(Navigator.of(context).maybePop());
+    setState(() => _allowPop = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(Navigator.of(context).maybePop());
+    });
   }
 
   /// Build content blocks: text block + ImageBlock cho mỗi inline ảnh.
@@ -479,6 +490,8 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
 
   /// Mở Menu nhật ký (read mode topbar ellipsis) — Chỉnh sửa / Xóa / Chia sẻ.
   Future<void> _openMenu() async {
+    if (!widget.ownerActionsEnabled) return;
+
     final action = await DiaryMenuSheet.show(context);
     if (action == null || !mounted) return;
 
@@ -526,6 +539,10 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isSaving = ref.watch(
+      diaryControllerProvider.select((s) => s.isSaving),
+    );
+
     // Read/edit mode: listen currentEntry → sync controllers + local state
     // khi loadEntry hoàn thành (initState fire postFrame).
     if (widget.mode != DiaryCanvasMode.create) {
@@ -556,22 +573,32 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
       },
       child: Scaffold(
         backgroundColor: _canvasBg,
-        body: SafeArea(
-          child: Column(
-            children: [
-              _buildTopbar(),
-              // Box border đen + dots — hug content vertically, width fixed
-              // theo margin ngoài. Scroll cả màn khi content vượt screen height.
-              Expanded(
-                child: SingleChildScrollView(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  child: _buildCanvasBox(),
-                ),
+        body: Stack(
+          children: [
+            SafeArea(
+              child: Column(
+                children: [
+                  _buildTopbar(),
+                  // Box border đen + dots — hug content vertically, width fixed
+                  // theo margin ngoài. Scroll cả màn khi content vượt screen height.
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      child: _buildCanvasBox(),
+                    ),
+                  ),
+                  if (!_isReadOnly) _buildToolbar(),
+                ],
               ),
-              if (!_isReadOnly) _buildToolbar(),
-            ],
-          ),
+            ),
+            if (isSaving)
+              const Positioned.fill(
+                child: _SavingOverlay(),
+              ),
+          ],
         ),
       ),
     );
@@ -643,11 +670,13 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: _isReadOnly
-                  ? _SvgIconBtn(
-                      asset: 'assets/icons/ic_diary_ellipsis.svg',
-                      semanticLabel: 'Tùy chọn',
-                      onTap: _openMenu,
-                    )
+                  ? widget.ownerActionsEnabled
+                      ? _SvgIconBtn(
+                          asset: 'assets/icons/ic_diary_ellipsis.svg',
+                          semanticLabel: 'Tùy chọn',
+                          onTap: _openMenu,
+                        )
+                      : const SizedBox(width: 44, height: 44)
                   : Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -890,4 +919,29 @@ class _DiaryCanvasScreenState extends ConsumerState<DiaryCanvasScreen> {
     color: AppColors.bw900,
     height: 24 / 16,
   );
+}
+
+class _SavingOverlay extends StatelessWidget {
+  const _SavingOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return AbsorbPointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.bw900.withValues(alpha: 0.18),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 36,
+            height: 36,
+            child: CircularProgressIndicator(
+              color: AppColors.turquoise500,
+              strokeWidth: 3,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

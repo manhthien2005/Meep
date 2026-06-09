@@ -21,6 +21,9 @@ class CalendarDayCell extends StatelessWidget {
     required this.isToday,
     this.imageUrl,
     this.onTap,
+    this.isLoading = false,
+    this.width = 37,
+    this.height = 35,
   });
 
   /// Day thuộc tháng đang xem (false = padding day từ tháng khác).
@@ -32,26 +35,36 @@ class CalendarDayCell extends StatelessWidget {
   /// URL ảnh thumbnail nếu day có post; null = no post.
   final String? imageUrl;
 
+  /// Render placeholder thay vì trạng thái thật trong lúc tải tháng.
+  final bool isLoading;
+
+  final double width;
+  final double height;
+
   /// Tap handler:
   /// - Day có post → mở PhotoDetailScreen.
   /// - Today no-post → điều hướng về `/home` (camera).
   /// - Day khác no-post → null (cell không tappable).
   final VoidCallback? onTap;
 
-  static const _dotColor = Color(0x6E585754);
-  static const _todayStroke = Color(0xFF656565);
-
   @override
   Widget build(BuildContext context) {
     if (!isInMonth) {
-      return const SizedBox(width: 37, height: 35);
+      return SizedBox(width: width, height: height);
     }
 
     final hasPost = imageUrl != null && imageUrl!.isNotEmpty;
     final showTodayCta = isToday && !hasPost;
     Widget content;
 
-    if (hasPost) {
+    if (isLoading) {
+      content = DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.bw700.withValues(alpha: 0.48),
+          borderRadius: BorderRadius.circular(7),
+        ),
+      );
+    } else if (hasPost) {
       content = ClipRRect(
         borderRadius: BorderRadius.circular(7),
         child: CachedNetworkImage(
@@ -66,11 +79,12 @@ class CalendarDayCell extends StatelessWidget {
     } else if (showTodayCta) {
       content = DecoratedBox(
         decoration: BoxDecoration(
-          color: AppColors.turquoise600,
+          color: AppColors.bw800.withValues(alpha: 0.86),
           borderRadius: BorderRadius.circular(7),
+          border: Border.all(color: AppColors.turquoise500, width: 1.2),
         ),
         child: const Center(
-          child: Icon(Icons.add, size: 18, color: AppColors.bw100),
+          child: Icon(Icons.add, size: 18, color: AppColors.turquoise400),
         ),
       );
     } else {
@@ -79,7 +93,7 @@ class CalendarDayCell extends StatelessWidget {
           width: 11,
           height: 11,
           decoration: BoxDecoration(
-            color: _dotColor,
+            color: AppColors.bw700.withValues(alpha: 0.72),
             borderRadius: BorderRadius.circular(7),
           ),
         ),
@@ -88,11 +102,11 @@ class CalendarDayCell extends StatelessWidget {
 
     // Stroke chỉ vẽ khi today có post — để phân biệt ngày hôm nay trong dãy
     // thumbnail. Today CTA đã có màu turquoise nổi bật, không cần stroke.
-    final showStroke = isToday && hasPost;
+    final showStroke = isToday && hasPost && !isLoading;
 
     final cell = SizedBox(
-      width: 37,
-      height: 35,
+      width: width,
+      height: height,
       child: Stack(
         children: [
           Positioned.fill(child: content),
@@ -100,7 +114,7 @@ class CalendarDayCell extends StatelessWidget {
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  border: Border.all(color: _todayStroke, width: 1),
+                  border: Border.all(color: AppColors.turquoise500, width: 1),
                   borderRadius: BorderRadius.circular(7),
                 ),
               ),
@@ -109,7 +123,7 @@ class CalendarDayCell extends StatelessWidget {
       ),
     );
 
-    if (onTap == null) return cell;
+    if (isLoading || onTap == null) return cell;
     final label = showTodayCta ? 'Chụp khoảnh khắc hôm nay' : 'Xem ảnh ngày';
     return Semantics(
       button: true,

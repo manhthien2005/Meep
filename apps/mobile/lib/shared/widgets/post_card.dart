@@ -5,6 +5,7 @@ import 'package:meep/core/theme/app_proportions.dart';
 import 'package:meep/shared/models/post.dart';
 import 'package:meep/shared/widgets/app_note_pill.dart';
 import 'package:meep/shared/widgets/app_photo_frame.dart';
+import 'package:meep/shared/widgets/dual_post_image.dart';
 
 /// Full-width post card showing photo + optional note overlay.
 /// Used by feed (friend + own variants), profile gallery detail, grid detail.
@@ -35,10 +36,6 @@ class PostCard extends StatefulWidget {
 }
 
 class _PostCardState extends State<PostCard> {
-  // Dual mode: which lens occupies the primary (large) slot. Back-first
-  // matches capture order; tap swaps to front.
-  bool _primaryIsFront = false;
-
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
@@ -53,9 +50,6 @@ class _PostCardState extends State<PostCard> {
       children: [
         GestureDetector(
           onLongPress: widget.onLongPress,
-          onTap: post.isDualCamera
-              ? () => setState(() => _primaryIsFront = !_primaryIsFront)
-              : null,
           child: AppPhotoFrame(
             borderColor: widget.borderColor,
             overlay: hasCaption
@@ -70,10 +64,10 @@ class _PostCardState extends State<PostCard> {
                   )
                 : null,
             child: post.isDualCamera
-                ? _DualPostImage(
+                ? DualPostImage(
+                    key: ValueKey('post-card-dual-${post.postId}'),
                     backImageUrl: post.backImageUrl ?? '',
                     frontImageUrl: post.frontImageUrl ?? '',
-                    primaryIsFront: _primaryIsFront,
                   )
                 : CachedNetworkImage(
                     imageUrl: post.coverImageUrl,
@@ -94,78 +88,6 @@ class _PostCardState extends State<PostCard> {
           widget.footer!,
         ],
       ],
-    );
-  }
-}
-
-/// Dual-camera PiP layout for the feed: back camera full-frame as background,
-/// front camera small overlay at top-right. Tap swaps which lens is primary.
-/// Mirrors the capture preview so the feed matches what the author saw.
-class _DualPostImage extends StatelessWidget {
-  const _DualPostImage({
-    required this.backImageUrl,
-    required this.frontImageUrl,
-    required this.primaryIsFront,
-  });
-
-  final String backImageUrl;
-  final String frontImageUrl;
-  final bool primaryIsFront;
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = primaryIsFront ? frontImageUrl : backImageUrl;
-    final secondary = primaryIsFront ? backImageUrl : frontImageUrl;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final frameSize = constraints.maxWidth;
-        final pipSize = AppProportions.pipSize(frameSize);
-        final pipMargin = AppProportions.pipMargin(frameSize);
-
-        return Stack(
-          children: [
-            // Primary (back camera by default) — full frame
-            Positioned.fill(
-              child: _NetworkImage(url: primary),
-            ),
-            // Secondary (front camera by default) — PiP top-right
-            Positioned(
-              top: pipMargin,
-              right: pipMargin,
-              child: ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(AppProportions.pipCornerRadius),
-                child: SizedBox(
-                  width: pipSize,
-                  height: pipSize,
-                  child: _NetworkImage(url: secondary),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _NetworkImage extends StatelessWidget {
-  const _NetworkImage({required this.url});
-
-  final String url;
-
-  @override
-  Widget build(BuildContext context) {
-    return CachedNetworkImage(
-      imageUrl: url,
-      fit: BoxFit.cover,
-      width: double.infinity,
-      placeholder: (_, __) => const ColoredBox(color: AppColors.bw800),
-      errorWidget: (_, __, ___) => const ColoredBox(
-        color: AppColors.bw800,
-        child: Icon(Icons.broken_image, color: AppColors.bw600),
-      ),
     );
   }
 }

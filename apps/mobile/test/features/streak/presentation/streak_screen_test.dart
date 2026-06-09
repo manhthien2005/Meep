@@ -10,19 +10,33 @@ import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/streak/application/streak_controller.dart';
 import 'package:meep/features/streak/data/streak_repository.dart';
 import 'package:meep/features/streak/presentation/streak_screen.dart';
+import 'package:meep/features/streak/presentation/widgets/calendar_day_cell.dart';
 import 'package:meep/features/streak/presentation/widgets/empty_state_overlay.dart';
 import 'package:meep/features/streak/presentation/widgets/streak_calendar.dart';
 import 'package:meep/features/streak/presentation/widgets/streak_stats_pill.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 
 class FakeStreakRepo implements StreakRepository {
-  FakeStreakRepo({this.allDates = const [], this.monthPostsMap = const {}});
+  FakeStreakRepo({
+    this.allDates = const [],
+    this.monthPostsMap = const {},
+    this.getAllDatesOverride,
+  });
 
   final List<DateTime> allDates;
   final Map<DateTime, List<Post>> monthPostsMap;
+  final FutureOr<List<DateTime>> Function(String uid)? getAllDatesOverride;
+  int getAllDatesCalls = 0;
 
   @override
-  Future<List<DateTime>> getUserAllDates(String uid) async => allDates;
+  Future<List<DateTime>> getUserAllDates(String uid) async {
+    getAllDatesCalls++;
+    final override = getAllDatesOverride;
+    if (override != null) {
+      return await override(uid);
+    }
+    return allDates;
+  }
 
   @override
   Stream<List<Post>> watchUserMonth(String uid, DateTime month) {
@@ -99,6 +113,51 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(StreakArrowDown), findsOneWidget);
+  });
+
+  testWidgets('loading state không render empty state', (tester) async {
+    final completer = Completer<List<DateTime>>();
+    final repo = FakeStreakRepo(
+      getAllDatesOverride: (_) => completer.future,
+    );
+
+    await tester.pumpWidget(host(repo: repo, profile: fakeProfile()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1));
+
+    expect(find.byType(EmptyStateOverlay), findsNothing);
+    expect(find.byType(StreakCalendar), findsOneWidget);
+    expect(
+      tester
+          .widgetList<CalendarDayCell>(find.byType(CalendarDayCell))
+          .any((cell) => cell.isLoading),
+      isTrue,
+    );
+
+    completer.complete(const []);
+    await pumpUntilSettled(tester);
+  });
+
+  testWidgets('error banner có nút retry gọi init lại', (tester) async {
+    var attempts = 0;
+    final repo = FakeStreakRepo(
+      getAllDatesOverride: (_) async {
+        attempts++;
+        if (attempts == 1) throw Exception('boom');
+        return const [];
+      },
+    );
+
+    await tester.pumpWidget(host(repo: repo, profile: fakeProfile()));
+    await pumpUntilSettled(tester);
+
+    expect(find.text('Không thể tải Kỷ niệm'), findsOneWidget);
+    expect(find.text('Thử lại'), findsOneWidget);
+
+    await tester.tap(find.text('Thử lại'));
+    await pumpUntilSettled(tester);
+
+    expect(repo.getAllDatesCalls, greaterThanOrEqualTo(2));
   });
 
   testWidgets('empty state ẩn khi có ít nhất 1 post', (tester) async {

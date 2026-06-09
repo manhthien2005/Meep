@@ -14,6 +14,7 @@ import 'package:meep/shared/models/post.dart';
 /// đúng đường repository, KHÔNG bind Firebase.
 class _FakePostRepo implements PostRepository {
   int newPostIdCalls = 0;
+  Post? createdPost;
 
   @override
   String newPostId() {
@@ -22,7 +23,10 @@ class _FakePostRepo implements PostRepository {
   }
 
   @override
-  Future<Post> createPost(Post post) async => post;
+  Future<Post> createPost(Post post) async {
+    createdPost = post;
+    return post;
+  }
 
   @override
   Stream<List<Post>> watchFeed(String uid, {String? spaceId}) =>
@@ -100,6 +104,52 @@ void main() {
         'Chọn ít nhất 1 người nhận hoặc 1 Space',
       );
       expect(postRepo.newPostIdCalls, 0);
+    });
+
+    test('returns false + error when select audience only contains self',
+        () async {
+      final container = makeContainer();
+      await container.read(currentUidProvider.future);
+
+      final notifier = container.read(postControllerProvider.notifier)
+        ..setPendingImage('/tmp/photo.jpg')
+        ..setAudience(AudienceType.select, const ['uid1']);
+
+      final ok = await notifier.submit();
+
+      expect(ok, isFalse);
+      expect(container.read(postControllerProvider).selectedUids, isEmpty);
+      expect(
+        container.read(postControllerProvider).errorMessage,
+        'Chọn ít nhất 1 người nhận hoặc 1 Space',
+      );
+      expect(postRepo.newPostIdCalls, 0);
+    });
+  });
+
+  group('PostController.setAudience', () {
+    test('dedupes recipients and removes current uid', () async {
+      final container = makeContainer();
+      await container.read(currentUidProvider.future);
+
+      final notifier = container.read(postControllerProvider.notifier)
+        ..setAudience(
+          AudienceType.select,
+          const ['uid1', 'friend-1', 'friend-1', ''],
+        );
+
+      expect(
+        container.read(postControllerProvider).selectedUids,
+        ['friend-1'],
+      );
+      expect(
+        container.read(postControllerProvider).audienceType,
+        AudienceType.select,
+      );
+      expect(postRepo.newPostIdCalls, 0);
+      expect(postRepo.createdPost, isNull);
+      // Keep notifier referenced so provider stays alive until assertions read.
+      expect(notifier, isNotNull);
     });
   });
 

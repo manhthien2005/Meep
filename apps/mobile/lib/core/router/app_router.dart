@@ -364,10 +364,17 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: '/diary/:entryId',
-        builder: (_, state) => DiaryCanvasScreen(
-          mode: DiaryCanvasMode.read,
-          entryId: state.pathParameters['entryId'],
-        ),
+        builder: (_, state) {
+          final extra = state.extra;
+          final ownerActionsEnabled = extra is Map<String, dynamic>
+              ? extra['ownerActionsEnabled'] as bool? ?? true
+              : true;
+          return DiaryCanvasScreen(
+            mode: DiaryCanvasMode.read,
+            entryId: state.pathParameters['entryId'],
+            ownerActionsEnabled: ownerActionsEnabled,
+          );
+        },
       ),
       GoRoute(
         path: '/invite/:uid',

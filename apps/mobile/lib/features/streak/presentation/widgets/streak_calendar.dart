@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:meep/core/theme/app_colors.dart';
+import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/shared/models/post.dart';
 import 'package:meep/features/streak/presentation/widgets/calendar_day_cell.dart';
 
@@ -11,14 +13,15 @@ import 'package:meep/features/streak/presentation/widgets/calendar_day_cell.dart
 /// - Tuần bắt đầu CN (col 0 = Sunday) — match Figma layout
 ///
 /// Swipe horizontal:
-/// - Right→Left (drag end velocity > 0) = swipePrev → tháng cũ hơn
-/// - Left→Right = swipeNext → tháng mới hơn (controller cap tại tháng hiện tại)
+/// - Kéo phải→trái = swipePrev → tháng cũ hơn
+/// - Kéo trái→phải = swipeNext → tháng mới hơn (controller cap tháng hiện tại)
 class StreakCalendar extends StatelessWidget {
   const StreakCalendar({
     super.key,
     required this.viewingMonth,
     required this.monthPosts,
     required this.today,
+    this.isLoading = false,
     this.onTapDay,
     this.onTapToday,
     this.onSwipePrev,
@@ -35,6 +38,9 @@ class StreakCalendar extends StatelessWidget {
   /// Ngày hôm nay (local timezone) — dùng để highlight ô today.
   final DateTime today;
 
+  /// Render skeleton cells trong lúc controller đang tải dữ liệu.
+  final bool isLoading;
+
   /// Tap handler khi user tap ô có post. Receives index trong [monthPosts]
   /// (sort theo createdAt ASC). Null = no-op.
   final ValueChanged<int>? onTapDay;
@@ -47,10 +53,6 @@ class StreakCalendar extends StatelessWidget {
   final VoidCallback? onSwipePrev;
   final VoidCallback? onSwipeNext;
 
-  static const _bgFill = Color(0x6E585754);
-  static const _headerFill = Color(0x6E838383);
-  static const _columnGap = 8.0;
-  static const _rowGap = 4.0;
   static const _columns = 7;
   static const _rows = 6;
 
@@ -82,41 +84,67 @@ class StreakCalendar extends StatelessWidget {
       onHorizontalDragEnd: (details) {
         final v = details.primaryVelocity ?? 0;
         if (v < -200) {
-          // swipe right→left = next month (controller cap)
-          onSwipeNext?.call();
-        } else if (v > 200) {
-          // swipe left→right = prev month
+          // Kéo phải→trái = tháng cũ hơn.
           onSwipePrev?.call();
+        } else if (v > 200) {
+          // Kéo trái→phải = tháng mới hơn.
+          onSwipeNext?.call();
         }
       },
       child: Container(
         decoration: BoxDecoration(
-          color: _bgFill,
+          color: AppColors.bw800.withValues(alpha: 0.74),
           borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: AppColors.bw700.withValues(alpha: 0.46),
+          ),
         ),
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _MonthHeader(
-              month: viewingMonth,
-              fill: _headerFill,
-            ),
-            const SizedBox(height: 10),
-            _Grid(
-              leadingEmpty: leadingEmpty,
-              daysInMonth: daysInMonth,
-              todayDay: todayInMonth ? today.day : null,
-              dayToPostIndex: dayToPostIndex,
-              postsForDay: (day) {
-                final i = dayToPostIndex[day];
-                if (i == null) return null;
-                return monthPosts[i].coverImageUrl;
-              },
-              onTapDay: onTapDay,
-              onTapToday: onTapToday,
-            ),
-          ],
+        clipBehavior: Clip.antiAlias,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final maxWidth = constraints.maxWidth;
+            final horizontalPadding = maxWidth < 330 ? 10.0 : 14.0;
+            final columnGap = maxWidth < 330 ? 4.0 : 6.0;
+            const rowGap = 6.0;
+            final gridWidth = maxWidth - horizontalPadding * 2;
+            final cellWidth =
+                (gridWidth - columnGap * (_columns - 1)) / _columns;
+            final cellHeight = (cellWidth * 0.92).clamp(30.0, 42.0);
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _MonthHeader(month: viewingMonth),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    0,
+                    horizontalPadding,
+                    12,
+                  ),
+                  child: _Grid(
+                    leadingEmpty: leadingEmpty,
+                    daysInMonth: daysInMonth,
+                    todayDay: todayInMonth ? today.day : null,
+                    dayToPostIndex: dayToPostIndex,
+                    postsForDay: (day) {
+                      final i = dayToPostIndex[day];
+                      if (i == null) return null;
+                      return monthPosts[i].coverImageUrl;
+                    },
+                    onTapDay: onTapDay,
+                    onTapToday: onTapToday,
+                    isLoading: isLoading,
+                    cellWidth: cellWidth,
+                    cellHeight: cellHeight.toDouble(),
+                    columnGap: columnGap,
+                    rowGap: rowGap,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -124,29 +152,22 @@ class StreakCalendar extends StatelessWidget {
 }
 
 class _MonthHeader extends StatelessWidget {
-  const _MonthHeader({required this.month, required this.fill});
+  const _MonthHeader({required this.month});
 
   final DateTime month;
-  final Color fill;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: fill,
+        color: AppColors.bw700.withValues(alpha: 0.82),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
       ),
       padding: const EdgeInsets.fromLTRB(16, 11, 16, 11),
       child: Text(
         _format(month),
-        style: const TextStyle(
-          fontFamily: 'Inter',
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFFFFFFFF),
-          height: 17 / 14,
-        ),
+        style: AppTextStyles.smSemiBold.copyWith(color: AppColors.bw100),
       ),
     );
   }
@@ -166,6 +187,11 @@ class _Grid extends StatelessWidget {
     required this.postsForDay,
     required this.onTapDay,
     required this.onTapToday,
+    required this.isLoading,
+    required this.cellWidth,
+    required this.cellHeight,
+    required this.columnGap,
+    required this.rowGap,
   });
 
   final int leadingEmpty;
@@ -175,6 +201,11 @@ class _Grid extends StatelessWidget {
   final String? Function(int day) postsForDay;
   final ValueChanged<int>? onTapDay;
   final VoidCallback? onTapToday;
+  final bool isLoading;
+  final double cellWidth;
+  final double cellHeight;
+  final double columnGap;
+  final double rowGap;
 
   @override
   Widget build(BuildContext context) {
@@ -201,15 +232,18 @@ class _Grid extends StatelessWidget {
             isToday: isTodayCell,
             imageUrl: url,
             onTap: tapHandler,
+            isLoading: isLoading,
+            width: cellWidth,
+            height: cellHeight,
           ),
         );
         if (j < StreakCalendar._columns - 1) {
-          row.add(const SizedBox(width: StreakCalendar._columnGap));
+          row.add(SizedBox(width: columnGap));
         }
       }
       cells.add(Row(mainAxisSize: MainAxisSize.min, children: row));
       if (i < StreakCalendar._rows - 1) {
-        cells.add(const SizedBox(height: StreakCalendar._rowGap));
+        cells.add(SizedBox(height: rowGap));
       }
     }
 

@@ -22,7 +22,40 @@ let testEnv: RulesTestEnvironment;
 const RULES_PATH = resolve(__dirname, '../../storage.rules');
 const FIRESTORE_RULES_PATH = resolve(__dirname, '../../firestore.rules');
 
+function emulatorEndpoint(
+  envNames: string[],
+  fallback: { host: string; port: number },
+): { host: string; port: number } {
+  for (const envName of envNames) {
+    const value = process.env[envName];
+    if (!value) {
+      continue;
+    }
+
+    try {
+      const url = new URL(value.match(/^https?:\/\//) ? value : `http://${value}`);
+      const port = Number.parseInt(url.port, 10);
+      if (url.hostname && Number.isFinite(port)) {
+        return { host: url.hostname, port };
+      }
+    } catch {
+      // Fall back to the default emulator endpoint below.
+    }
+  }
+
+  return fallback;
+}
+
 beforeAll(async () => {
+  const storage = emulatorEndpoint(
+    ['FIREBASE_STORAGE_EMULATOR_HOST', 'STORAGE_EMULATOR_HOST'],
+    { host: '127.0.0.1', port: 9199 },
+  );
+  const firestore = emulatorEndpoint(['FIRESTORE_EMULATOR_HOST'], {
+    host: '127.0.0.1',
+    port: 9999,
+  });
+
   testEnv = await initializeTestEnvironment({
     // Project ID khớp emulator launch (--project demo-meep-test) +
     // singleProjectMode để cross-service firestore.get/exists từ storage rule
@@ -30,21 +63,21 @@ beforeAll(async () => {
     projectId: 'demo-meep-test',
     storage: {
       rules: readFileSync(RULES_PATH, 'utf8'),
-      host: '127.0.0.1',
-      port: 9199,
+      host: storage.host,
+      port: storage.port,
     },
     // Storage rules đọc cross-service /posts + /diary + /friendships để mirror
     // friend boundary (STORAGE-001/002) → cần firestore emulator chạy cùng.
     firestore: {
       rules: readFileSync(FIRESTORE_RULES_PATH, 'utf8'),
-      host: '127.0.0.1',
-      port: 9999,
+      host: firestore.host,
+      port: firestore.port,
     },
   });
 });
 
 afterAll(async () => {
-  await testEnv.cleanup();
+  await testEnv?.cleanup();
 });
 
 beforeEach(async () => {

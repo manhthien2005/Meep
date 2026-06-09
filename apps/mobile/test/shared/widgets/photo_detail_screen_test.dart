@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +19,19 @@ void main() {
       caption: caption,
       audienceType: AudienceType.all,
       createdAt: createdAt ?? DateTime.utc(2026, 5, 10, 17, 3),
+    );
+  }
+
+  Post dualPost({String id = 'p1'}) {
+    return Post(
+      postId: id,
+      authorId: 'uid-alice',
+      authorName: 'Alice',
+      backImageUrl: 'https://cdn/$id-back.jpg',
+      frontImageUrl: 'https://cdn/$id-front.jpg',
+      isDualCamera: true,
+      audienceType: AudienceType.all,
+      createdAt: DateTime.utc(2026, 5, 10, 17, 3),
     );
   }
 
@@ -92,6 +106,39 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Feeling toasty!'), findsOneWidget);
+  });
+
+  testWidgets('renders dual-camera detail và tap đổi ảnh chính',
+      (tester) async {
+    await tester.pumpWidget(
+      host(
+        PhotoDetailScreen(
+          postId: 'p1',
+          posts: [dualPost()],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    List<String> imageUrls() => tester
+        .widgetList<CachedNetworkImage>(find.byType(CachedNetworkImage))
+        .map((w) => w.imageUrl)
+        .toList();
+
+    expect(imageUrls(), contains('https://cdn/p1-back.jpg'));
+    expect(imageUrls(), contains('https://cdn/p1-front.jpg'));
+    expect(
+      imageUrls().take(2),
+      ['https://cdn/p1-back.jpg', 'https://cdn/p1-front.jpg'],
+    );
+
+    await tester.tap(find.byKey(const ValueKey('photo-detail-dual-p1')));
+    await tester.pump();
+
+    expect(
+      imageUrls().take(2),
+      ['https://cdn/p1-front.jpg', 'https://cdn/p1-back.jpg'],
+    );
   });
 
   testWidgets('borderColorFor non-null → render border quanh ảnh active',

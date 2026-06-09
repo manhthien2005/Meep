@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import 'package:meep/core/theme/app_colors.dart';
+import 'package:meep/core/theme/app_text_styles.dart';
+
 /// Empty state cho StreakScreen (chưa post lần nào).
 ///
 /// Match Figma `269:1985`:
@@ -15,17 +18,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 class EmptyStateOverlay extends StatelessWidget {
   const EmptyStateOverlay({super.key});
 
-  static const _muted = Color(0x7AFFFFFF);
-  static const _labelStyle = TextStyle(
-    fontFamily: 'Nunito',
-    fontSize: 14,
-    fontWeight: FontWeight.w700,
-    height: 18 / 14,
-    color: _muted,
-  );
-
   @override
   Widget build(BuildContext context) {
+    final muted = AppColors.bw100.withValues(alpha: 0.64);
+
     return IgnorePointer(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -33,19 +29,16 @@ class EmptyStateOverlay extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 16),
-            const Text(
+            Text(
               'Gửi khoảnh khắc đầu tiên của bạn tại Meep !',
               textAlign: TextAlign.center,
-              style: _labelStyle,
+              style: AppTextStyles.smSemiBold.copyWith(color: muted),
             ),
-            const SizedBox(height: 12),
-            // Arrow lên: subtitle → Taskbar send icon (icon nhỏ ở dưới)
-            // Render send icon + curved arrow chỉ về phía Taskbar.
+            const SizedBox(height: 10),
             Center(
               child: SizedBox(
-                width: 80,
-                height: 85,
+                width: 72,
+                height: 66,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -53,16 +46,16 @@ class EmptyStateOverlay extends StatelessWidget {
                       top: 0,
                       child: SvgPicture.asset(
                         'assets/icons/ic_send.svg',
-                        width: 24,
-                        height: 24,
-                        colorFilter: const ColorFilter.mode(
-                          _muted,
+                        width: 22,
+                        height: 22,
+                        colorFilter: ColorFilter.mode(
+                          muted,
                           BlendMode.srcIn,
                         ),
                       ),
                     ),
                     CustomPaint(
-                      size: const Size(40, 85),
+                      size: const Size(36, 66),
                       painter: _CurvedArrowPainter(direction: _Direction.down),
                     ),
                   ],
@@ -85,7 +78,7 @@ class StreakArrowDown extends StatelessWidget {
   Widget build(BuildContext context) {
     return IgnorePointer(
       child: CustomPaint(
-        size: const Size(30, 65),
+        size: const Size(24, 46),
         painter: _CurvedArrowPainter(direction: _Direction.up),
       ),
     );
@@ -99,12 +92,10 @@ class _CurvedArrowPainter extends CustomPainter {
 
   final _Direction direction;
 
-  static const _stroke = Color(0x7AFFFFFF);
-
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = _stroke
+      ..color = AppColors.bw100.withValues(alpha: 0.5)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
       ..strokeCap = StrokeCap.round;

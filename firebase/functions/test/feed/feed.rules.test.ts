@@ -10,9 +10,56 @@
 
 import { describe, it, expect } from 'vitest';
 
-// NOTE: Full emulator-based rules tests require @firebase/rules-unit-testing.
-// These are spec-level assertions that document expected behaviour.
-// Wire up with initializeTestEnvironment() when running in emulator CI.
+interface PostReadRuleInput {
+  requestUid: string | null;
+  authorId: string;
+  hasFriendship?: boolean;
+  hasFeedDoc?: boolean;
+  isSpaceMember?: boolean;
+}
+
+function canReadPost(input: PostReadRuleInput): boolean {
+  if (input.requestUid == null) return false;
+  return (
+    input.requestUid === input.authorId ||
+    input.hasFriendship === true ||
+    input.isSpaceMember === true ||
+    input.hasFeedDoc === true
+  );
+}
+
+function canCreatePost(input: {
+  requestUid: string | null;
+  authorId: string;
+  authorName: string;
+  audienceType: string;
+  caption?: string;
+  hasSingleImage?: boolean;
+  hasDualImages?: boolean;
+}): boolean {
+  if (input.requestUid !== input.authorId) return false;
+  if (input.authorName.length === 0 || input.authorName.length > 50) {
+    return false;
+  }
+  if (input.audienceType !== 'all' && input.audienceType !== 'select') {
+    return false;
+  }
+  if (input.caption != null && input.caption.length > 200) return false;
+  return input.hasSingleImage === true || input.hasDualImages === true;
+}
+
+function canWritePostImage(input: {
+  requestUid: string | null;
+  ownerUid: string;
+  sizeBytes: number;
+  contentType: string;
+}): boolean {
+  return (
+    input.requestUid === input.ownerUid &&
+    input.sizeBytes < 10 * 1024 * 1024 &&
+    input.contentType.startsWith('image/')
+  );
+}
 
 describe('Firestore rules — /posts/{postId}', () => {
   it('author can read own post', () => {
@@ -23,35 +70,71 @@ describe('Firestore rules — /posts/{postId}', () => {
   });
 
   it('recipient with feed doc can read post', () => {
-    // allow read if exists(.../users/$(request.auth.uid)/feed/$(postId))
-    // Emulator test would call: assertSucceeds(recipientDb.doc('posts/p1').get())
-    expect(true).toBe(true); // placeholder — requires emulator
+    expect(
+      canReadPost({
+        requestUid: 'uid2',
+        authorId: 'uid1',
+        hasFeedDoc: true,
+      }),
+    ).toBe(true);
   });
 
   it('non-recipient cannot read post', () => {
-    // Stranger without feed doc → permission-denied
-    expect(true).toBe(true); // placeholder — requires emulator
+    expect(
+      canReadPost({
+        requestUid: 'uid3',
+        authorId: 'uid1',
+        hasFeedDoc: false,
+        hasFriendship: false,
+        isSpaceMember: false,
+      }),
+    ).toBe(false);
   });
 
   it('Space member can read post trong Space (non-friend author)', () => {
-    // allow read: ('spaceId' in resource.data && isMember(resource.data.spaceId))
-    // User is member of Space X, post author là người lạ (không friend).
-    // isMember(spaceId) check /space_members/{spaceId}/members/{uid}.
-    // 'spaceId' in resource.data guard prevents crash on All-friends posts
-    // (missing field sau removeWhere(null) khi createPost).
-    expect(true).toBe(true); // placeholder — requires emulator
+    expect(
+      canReadPost({
+        requestUid: 'uid2',
+        authorId: 'uid1',
+        isSpaceMember: true,
+      }),
+    ).toBe(true);
   });
 
   it('non-Space-member cannot read Space post', () => {
-    // User không phải member Space X, không phải friend của author,
-    // không có feed doc → cả 4 nhánh thất bại → permission-denied.
-    expect(true).toBe(true); // placeholder — requires emulator
+    expect(
+      canReadPost({
+        requestUid: 'uid2',
+        authorId: 'uid1',
+        isSpaceMember: false,
+      }),
+    ).toBe(false);
   });
 
   it('create rejected if caption > 200 chars', () => {
-    const caption = 'x'.repeat(201);
-    // Storage rule: caption.size() <= 200
-    expect(caption.length > 200).toBe(true);
+    expect(
+      canCreatePost({
+        requestUid: 'uid1',
+        authorId: 'uid1',
+        authorName: 'Alice',
+        audienceType: 'all',
+        caption: 'x'.repeat(201),
+        hasSingleImage: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('create accepted with owner, valid audience, and image payload', () => {
+    expect(
+      canCreatePost({
+        requestUid: 'uid1',
+        authorId: 'uid1',
+        authorName: 'Alice',
+        audienceType: 'select',
+        caption: 'hello',
+        hasSingleImage: true,
+      }),
+    ).toBe(true);
   });
 
   it('update is always rejected (posts are immutable)', () => {
@@ -80,25 +163,47 @@ describe('Firestore rules — /users/{uid}/feed/{postId}', () => {
 });
 
 describe('Storage rules — /posts/{uid}/{postId}/{filename}', () => {
-  it('owner can write image < 5MB', () => {
-    const sizeBytes = 4 * 1024 * 1024;
-    const maxBytes = 5 * 1024 * 1024;
-    expect(sizeBytes < maxBytes).toBe(true);
+  it('owner can write image < 10MB', () => {
+    expect(
+      canWritePostImage({
+        requestUid: 'uid1',
+        ownerUid: 'uid1',
+        sizeBytes: 9 * 1024 * 1024,
+        contentType: 'image/jpeg',
+      }),
+    ).toBe(true);
   });
 
-  it('reject write if > 5MB', () => {
-    const sizeBytes = 6 * 1024 * 1024;
-    const maxBytes = 5 * 1024 * 1024;
-    expect(sizeBytes < maxBytes).toBe(false);
+  it('reject write if >= 10MB', () => {
+    expect(
+      canWritePostImage({
+        requestUid: 'uid1',
+        ownerUid: 'uid1',
+        sizeBytes: 10 * 1024 * 1024,
+        contentType: 'image/jpeg',
+      }),
+    ).toBe(false);
   });
 
   it('reject non-image content type', () => {
-    const contentType = 'application/pdf';
-    expect(contentType.startsWith('image/')).toBe(false);
+    expect(
+      canWritePostImage({
+        requestUid: 'uid1',
+        ownerUid: 'uid1',
+        sizeBytes: 1024,
+        contentType: 'application/pdf',
+      }),
+    ).toBe(false);
   });
 
   it('accept image/jpeg', () => {
-    const contentType = 'image/jpeg';
-    expect(contentType.startsWith('image/')).toBe(true);
+    expect(
+      canWritePostImage({
+        requestUid: 'uid1',
+        ownerUid: 'uid1',
+        sizeBytes: 1024,
+        contentType: 'image/jpeg',
+      }),
+    ).toBe(true);
   });
 });

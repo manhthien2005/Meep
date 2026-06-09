@@ -8,6 +8,11 @@ import 'package:go_router/go_router.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/auth/data/firebase_auth_repository.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/diary/application/diary_controller.dart';
+import 'package:meep/features/diary/data/diary_content_block.dart';
+import 'package:meep/features/diary/data/diary_entry.dart';
+import 'package:meep/features/diary/data/diary_repository.dart';
+import 'package:meep/features/diary/presentation/diary_canvas_screen.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/data/firebase_post_repository.dart';
 import 'package:meep/features/friend/application/friend_controller.dart';
@@ -34,6 +39,53 @@ class _FakeProfileRepository implements ProfileRepository {
 
   @override
   Future<void> removeAvatar(String uid) async {}
+}
+
+class _FakeDiaryRepository implements DiaryRepository {
+  _FakeDiaryRepository(this.entries);
+
+  final List<DiaryEntry> entries;
+
+  @override
+  Future<List<DiaryEntry>> getPublicEntries(String authorUid) async =>
+      entries.where((e) => e.authorUid == authorUid).toList();
+
+  @override
+  Stream<List<DiaryEntry>> watchEntries(String authorUid) =>
+      Stream.value(entries.where((e) => e.authorUid == authorUid).toList());
+
+  @override
+  Future<DiaryEntry?> getEntry(String entryId) async {
+    for (final entry in entries) {
+      if (entry.entryId == entryId) return entry;
+    }
+    return null;
+  }
+
+  @override
+  Future<List<DiaryEntry>> searchEntries({
+    required String authorUid,
+    required String query,
+  }) async =>
+      const [];
+
+  @override
+  String reserveEntryId() => 'reserved-id';
+
+  @override
+  Future<DiaryEntry> createEntry(DiaryEntry entry) async => entry;
+
+  @override
+  Future<void> updateEntry(DiaryEntry entry) async {}
+
+  @override
+  Future<void> updatePrivacy({
+    required String entryId,
+    required DiaryPrivacy privacy,
+  }) async {}
+
+  @override
+  Future<void> deleteEntry(String entryId) async {}
 }
 
 void main() {
@@ -73,6 +125,7 @@ void main() {
   Widget makeApp({
     UserProfile? profile,
     bool seedFriend = true,
+    _FakeDiaryRepository? diaryRepository,
   }) {
     final mockAuth = MockFirebaseAuth(
       mockUser: MockUser(uid: currentUid),
@@ -99,6 +152,20 @@ void main() {
           builder: (_, __) => const Scaffold(body: Text('DIARY_PLACEHOLDER')),
         ),
         GoRoute(
+          path: '/diary/:entryId',
+          builder: (_, state) {
+            final extra = state.extra;
+            final ownerActionsEnabled = extra is Map<String, dynamic>
+                ? extra['ownerActionsEnabled'] as bool? ?? true
+                : true;
+            return DiaryCanvasScreen(
+              mode: DiaryCanvasMode.read,
+              entryId: state.pathParameters['entryId'],
+              ownerActionsEnabled: ownerActionsEnabled,
+            );
+          },
+        ),
+        GoRoute(
           path: '/home',
           builder: (_, __) => const Scaffold(body: Text('HOME_PLACEHOLDER')),
         ),
@@ -123,10 +190,30 @@ void main() {
             .overrideWithValue(FirebasePostRepository(firestore)),
         friendRepositoryProvider
             .overrideWithValue(FirebaseFriendRepository(firestore)),
+        diaryRepositoryProvider.overrideWithValue(
+          diaryRepository ?? _FakeDiaryRepository(const []),
+        ),
       ],
       child: MaterialApp.router(routerConfig: router),
     );
   }
+
+  DiaryEntry diaryEntry({
+    required String entryId,
+    required String title,
+    required DateTime createdAt,
+  }) =>
+      DiaryEntry(
+        entryId: entryId,
+        authorUid: friendUid,
+        moodTemplate: MoodTemplate.happy,
+        coverImageUrl: '',
+        moodCaption: title,
+        content: const [DiaryContentBlock.text(value: 'Friend public body')],
+        privacy: DiaryPrivacy.public,
+        createdAt: createdAt,
+        updatedAt: createdAt,
+      );
 
   testWidgets('hiện gate khi chưa là bạn bè', (tester) async {
     await tester.pumpWidget(makeApp(profile: bobProfile, seedFriend: false));
@@ -180,5 +267,36 @@ void main() {
     await tester.pumpWidget(makeApp(profile: bobProfile));
     await tester.pumpAndSettle();
     expect(find.text('Chưa có ảnh nào'), findsOneWidget);
+  });
+
+  testWidgets('Diary tab render public diary và mở read-only không owner menu',
+      (tester) async {
+    await seedFriendship();
+    final diaryRepository = _FakeDiaryRepository([
+      diaryEntry(
+        entryId: 'e-friend',
+        title: 'Nhật ký của Bob',
+        createdAt: DateTime.utc(2026, 5, 22),
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      makeApp(
+        profile: bobProfile,
+        diaryRepository: diaryRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Tab nhật ký'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nhật ký của Bob'), findsOneWidget);
+
+    await tester.tap(find.text('Nhật ký của Bob'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Friend public body'), findsOneWidget);
+    expect(find.bySemanticsLabel('Tùy chọn'), findsNothing);
   });
 }

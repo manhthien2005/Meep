@@ -48,18 +48,21 @@ class _StreakScreenState extends ConsumerState<StreakScreen> {
     final totalUnread =
         unreadCounts.values.fold<int>(0, (sum, val) => sum + val);
 
-    final hasNoPosts = state.allPostDates.isEmpty;
     final nowLocal = ref.watch(nowProvider)();
     final viewingMonth =
         state.viewingMonth ?? DateTime(nowLocal.year, nowLocal.month);
+    final isCalendarLoading = state.isLoading || state.viewingMonth == null;
+    final showEmpty = !isCalendarLoading &&
+        state.allPostDates.isEmpty &&
+        state.monthPosts.isEmpty;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0804),
+      backgroundColor: AppColors.bw900,
       body: SafeArea(
         child: Stack(
           children: [
             SingleChildScrollView(
-              physics: const NeverScrollableScrollPhysics(),
+              physics: const ClampingScrollPhysics(),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   minHeight: MediaQuery.of(context).size.height -
@@ -69,18 +72,23 @@ class _StreakScreenState extends ConsumerState<StreakScreen> {
                   children: [
                     const _Topbar(),
                     if (state.errorMessage != null)
-                      _ErrorBanner(message: state.errorMessage!),
-                    if (hasNoPosts) ...[
-                      const SizedBox(height: 36),
+                      _ErrorBanner(
+                        message: state.errorMessage!,
+                        onRetry: () =>
+                            ref.read(streakControllerProvider.notifier).init(),
+                      ),
+                    if (showEmpty) ...[
+                      const SizedBox(height: 24),
                       const EmptyStateOverlay(),
                     ] else
-                      const SizedBox(height: 90),
+                      const SizedBox(height: 72),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 41),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: StreakCalendar(
                         viewingMonth: viewingMonth,
                         monthPosts: state.monthPosts,
                         today: nowLocal,
+                        isLoading: isCalendarLoading,
                         onTapDay: (index) => _openPhotoDetail(context, index),
                         onTapToday: () => context.go('/home'),
                         onSwipePrev: () => ref
@@ -91,18 +99,17 @@ class _StreakScreenState extends ConsumerState<StreakScreen> {
                             .swipeNext(),
                       ),
                     ),
-                    if (hasNoPosts) ...[
-                      const SizedBox(height: 16),
+                    if (showEmpty) ...[
+                      const SizedBox(height: 12),
                       const StreakArrowDown(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                     ] else
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 24),
                     StreakStatsPill(
                       totalMoments: totalMoments,
                       currentStreak: state.currentStreak,
                     ),
-                    // Spacer cuối để Taskbar floating không đè lên pill
-                    const SizedBox(height: 100),
+                    const SizedBox(height: 132),
                   ],
                 ),
               ),
@@ -189,8 +196,7 @@ class _Topbar extends StatelessWidget {
               child: Text(
                 'Kỷ niệm',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.baseBold
-                    .copyWith(color: const Color(0xFFFFFFFF)),
+                style: AppTextStyles.baseBold.copyWith(color: AppColors.bw100),
               ),
             ),
             const AppTopAvatar(),
@@ -204,20 +210,38 @@ class _Topbar extends StatelessWidget {
 // ─── Error banner ─────────────────────────────────────────────────────────────
 
 class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
+  const _ErrorBanner({
+    required this.message,
+    required this.onRetry,
+  });
 
   final String message;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      color: AppColors.error700.withValues(alpha: 0.9),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Text(
-        message,
-        textAlign: TextAlign.center,
-        style: AppTextStyles.smSemiBold.copyWith(color: AppColors.bw100),
+      color: AppColors.error800.withValues(alpha: 0.92),
+      padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              style: AppTextStyles.smSemiBold.copyWith(color: AppColors.bw100),
+            ),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.bw100,
+              minimumSize: const Size(64, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+            child: const Text('Thử lại'),
+          ),
+        ],
       ),
     );
   }

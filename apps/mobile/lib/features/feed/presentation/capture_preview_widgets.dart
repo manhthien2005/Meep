@@ -57,21 +57,13 @@ class _AudienceRow extends ConsumerWidget {
 
   static const double _tileGap = 12.0;
 
-  void _onAllTap(String currentUid) {
-    if (audienceType == AudienceType.all) {
-      // Đang "Tất cả" → bỏ, tự chọn "Bạn" (bản thân)
-      onAudienceChanged(AudienceType.select, [currentUid]);
-    } else {
-      // Chọn "Tất cả" → unselect hết friend đã pick lẻ
-      onAudienceChanged(AudienceType.all, const []);
-    }
+  void _onAllTap() {
+    if (audienceType == AudienceType.all) return;
+    // Chọn "Tất cả" → unselect hết friend đã pick lẻ
+    onAudienceChanged(AudienceType.all, const []);
   }
 
-  void _onSelfTap(String currentUid) {
-    onAudienceChanged(AudienceType.select, [currentUid]);
-  }
-
-  void _onFriendTap(String currentUid, String friendUid) {
+  void _onFriendTap(String friendUid) {
     if (audienceType == AudienceType.all) {
       // Từ "Tất cả" → chọn riêng friend này
       onAudienceChanged(AudienceType.select, [friendUid]);
@@ -104,9 +96,8 @@ class _AudienceRow extends ConsumerWidget {
         : ref.watch(
             spaceControllerProvider(currentUid).select((s) => s.spaces),
           );
-    final profile = ref.watch(currentUserProfileProvider).valueOrNull;
 
-    // Build ordered tile list: Spaces → Tất cả → Bạn → Friends
+    // Build ordered tile list: Spaces → Tất cả → Friends
     final tileWidgets = <Widget>[];
     for (final space in spaces) {
       tileWidgets.add(
@@ -126,25 +117,10 @@ class _AudienceRow extends ConsumerWidget {
         isSelected: isAll,
         avatarSize: avatarSize,
         labelSize: labelSize,
-        onTap: () => _onAllTap(currentUid),
+        onTap: _onAllTap,
       ),
     );
     tileWidgets.add(const SizedBox(width: _tileGap));
-    // Bạn tile (author/self)
-    if (profile != null) {
-      tileWidgets.add(
-        _SelfAudienceTile(
-          profile: profile,
-          isSelected: audienceType == AudienceType.select &&
-              selectedUids.length == 1 &&
-              selectedUids.first == currentUid,
-          avatarSize: avatarSize,
-          labelSize: labelSize,
-          onTap: () => _onSelfTap(currentUid),
-        ),
-      );
-      tileWidgets.add(const SizedBox(width: _tileGap));
-    }
     // Friends
     for (final friend in friends) {
       tileWidgets.add(
@@ -153,7 +129,7 @@ class _AudienceRow extends ConsumerWidget {
           isSelected: selectedUids.contains(friend.uid),
           avatarSize: avatarSize,
           labelSize: labelSize,
-          onTap: () => _onFriendTap(currentUid, friend.uid),
+          onTap: () => _onFriendTap(friend.uid),
         ),
       );
       tileWidgets.add(const SizedBox(width: _tileGap));
@@ -268,72 +244,6 @@ class _AllAudienceTile extends StatelessWidget {
               fontWeight: FontWeight.w800,
               fontFamily: 'Nunito',
               height: 1.1,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// "Bạn" tile — author/self. Selected khi audienceType=select và chỉ có
-/// mỗi currentUid trong selectedUids.
-class _SelfAudienceTile extends StatelessWidget {
-  const _SelfAudienceTile({
-    required this.profile,
-    required this.isSelected,
-    required this.avatarSize,
-    required this.labelSize,
-    required this.onTap,
-  });
-
-  final UserProfile profile;
-  final bool isSelected;
-  final double avatarSize;
-  final double labelSize;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = isSelected ? AppColors.turquoise500 : AppColors.bw100;
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: avatarSize,
-            height: avatarSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isSelected ? AppColors.turquoise500 : AppColors.bw600,
-                width: 1.5,
-              ),
-            ),
-            child: AppAvatar(
-              imageUrl: profile.avatarUrl,
-              size: avatarSize,
-              fallbackText: profile.displayName.isNotEmpty
-                  ? profile.displayName[0].toUpperCase()
-                  : null,
-            ),
-          ),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: avatarSize + 8,
-            child: Text(
-              'Bạn',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: accent,
-                fontSize: labelSize,
-                fontWeight: FontWeight.w900,
-                fontFamily: 'Nunito',
-                height: 1.1,
-              ),
             ),
           ),
         ],

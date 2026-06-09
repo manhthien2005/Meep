@@ -88,6 +88,31 @@ void main() {
       expect(snap.data()!['audienceUids'], ['uid2', 'uid3']);
     });
 
+    test('select audience strips author uid and duplicates', () async {
+      final post = _makePost(
+        authorId: 'uid1',
+        audience: AudienceType.select,
+        uids: ['uid1', 'uid2', 'uid2', ' '],
+      );
+      final created = await repo.createPost(post);
+
+      final snap = await db.collection('posts').doc('p1').get();
+      expect(created.audienceUids, ['uid2']);
+      expect(snap.data()!['audienceUids'], ['uid2']);
+    });
+
+    test('select audience with only author uid throws ArgumentError', () async {
+      final post = _makePost(
+        authorId: 'uid1',
+        audience: AudienceType.select,
+        uids: ['uid1'],
+      );
+      await expectLater(
+        () => repo.createPost(post),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
     test('strips null fields so Firestore rule does not reject the create',
         () async {
       // Single-camera post WITHOUT a caption — used to write

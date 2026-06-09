@@ -5,9 +5,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/friend/application/friend_controller.dart';
+import 'package:meep/features/friend/application/friend_state.dart';
 import 'package:meep/features/settings/presentation/widget_confirm_sheet.dart';
 import 'package:meep/features/widget/application/widget_data_service.dart';
+
+class _FakeFriendController extends FriendController {
+  _FakeFriendController(this._state);
+
+  final FriendState _state;
+
+  @override
+  FriendState build(String uid) => _state;
+}
 
 UserProfile _profile({int friendCount = 15}) {
   return UserProfile(
@@ -20,6 +32,13 @@ UserProfile _profile({int friendCount = 15}) {
     updatedAt: DateTime(2026, 1, 1),
   );
 }
+
+PublicProfile _friend(String uid) => PublicProfile(
+      uid: uid,
+      displayName: 'Friend $uid',
+      username: uid,
+      updatedAt: DateTime(2026, 6, 1),
+    );
 
 /// Controls what [WidgetDataService.requestPinAppWidget] returns in tests.
 bool _mockPinSupported = true;
@@ -47,10 +66,20 @@ void main() {
       testWidgetDataService = WidgetDataService(prefs: prefs);
     });
 
-    Widget harness() => ProviderScope(
+    Widget harness({
+      UserProfile? profile,
+      List<PublicProfile> friends = const [],
+    }) =>
+        ProviderScope(
           overrides: [
+            currentUidProvider.overrideWith(
+              (ref) => Stream<String?>.value('user1'),
+            ),
             currentUserProfileProvider.overrideWith(
-              (ref) => Stream<UserProfile?>.value(_profile()),
+              (ref) => Stream<UserProfile?>.value(profile ?? _profile()),
+            ),
+            friendControllerProvider('user1').overrideWith(
+              () => _FakeFriendController(FriendState(friends: friends)),
             ),
             widgetDataServiceProvider.overrideWith(
               (ref) => testWidgetDataService,
@@ -87,6 +116,22 @@ void main() {
       expect(find.text('Thêm vào màn hình chờ?'), findsOneWidget);
       expect(find.text('Thêm'), findsOneWidget);
       expect(find.text('Huỷ'), findsOneWidget);
+    });
+
+    testWidgets(
+        'preview lấy số bạn từ friends stream, không dùng profile drift',
+        (tester) async {
+      await tester.pumpWidget(
+        harness(
+          profile: _profile(friendCount: 15),
+          friends: [_friend('friend-1'), _friend('friend-2')],
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 người bạn'), findsOneWidget);
+      expect(find.text('15 người bạn'), findsNothing);
     });
 
     testWidgets(

@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -97,10 +99,10 @@ class WidgetDataService {
       final result = await _channel.invokeMethod<bool>('requestPinAppWidget');
       return result ?? false;
     } on PlatformException catch (e, st) {
-      debugPrint('[WidgetDataService] requestPinAppWidget failed: $e\n$st');
+      _log('requestPinAppWidget failed', e, st);
       return false;
     } on MissingPluginException catch (e, st) {
-      debugPrint('[WidgetDataService] requestPinAppWidget missing: $e\n$st');
+      _log('requestPinAppWidget missing', e, st);
       return false;
     }
   }
@@ -132,10 +134,20 @@ class WidgetDataService {
     try {
       await _channel.invokeMethod(method);
     } on PlatformException catch (e, st) {
-      debugPrint('[WidgetDataService] $method failed: $e\n$st');
+      _log('$method failed', e, st);
     } on MissingPluginException catch (e, st) {
-      debugPrint('[WidgetDataService] $method missing: $e\n$st');
+      _log('$method missing', e, st);
     }
+  }
+
+  void _log(String message, Object error, StackTrace stackTrace) {
+    if (!kDebugMode) return;
+    developer.log(
+      message,
+      name: 'widget',
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 }
 
