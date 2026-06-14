@@ -134,10 +134,9 @@ class _CameraSectionState extends ConsumerState<CameraSection> {
 
     return Column(
       children: [
-        // Spacer above the photo, balanced by the spacer below the dots, so
-        // the (photo + dots) cluster sits vertically centered in the space
-        // between the top bar and the action bar.
-        const Spacer(),
+        // Topbar is overlaid on Home, so the viewfinder needs extra breathing
+        // room above while the lower controls stay clear of the taskbar.
+        const Spacer(flex: 2),
         _ViewfinderArea(
           camState: camState,
           borderColor: null,

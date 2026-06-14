@@ -19,6 +19,7 @@ jobs:
   validate-branch-name:
     name: Branch name format
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Check branch name matches <type>/<DevName>/<desc>
         run: |
@@ -36,6 +37,7 @@ jobs:
   validate-commits:
     name: Commit message format
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -62,6 +64,7 @@ jobs:
   flutter:
     name: Flutter (mobile app)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: apps/mobile
@@ -118,6 +121,7 @@ jobs:
   functions:
     name: Cloud Functions (TypeScript)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: firebase/functions
@@ -153,6 +157,7 @@ jobs:
   firestore-rules:
     name: Firestore security rules tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: firebase/functions

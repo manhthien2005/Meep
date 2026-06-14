@@ -99,7 +99,9 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             child: Align(
               alignment: Alignment.bottomCenter,
               child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).size.height * 0.045,
+                ),
                 child: AppTaskbar(
                   activeTab: TaskbarTab.diary,
                   onTabSelected: (tab) {
@@ -155,7 +157,9 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
 
                 // FAB — toggle [+] ↔ [x]
                 Positioned(
-                  bottom: 90,
+                  bottom: AppTaskbar.height +
+                      MediaQuery.of(context).size.height * 0.045 +
+                      20,
                   left: 0,
                   right: 0,
                   child: Center(child: _buildFab()),

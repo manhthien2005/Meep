@@ -4,13 +4,25 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
 import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/friend/application/friend_controller.dart';
+import 'package:meep/features/friend/application/friend_state.dart';
 import 'package:meep/features/settings/presentation/settings_sheet.dart';
 import 'package:meep/features/space/application/space_controller.dart';
 import 'package:meep/features/space/data/space.dart';
 import 'package:meep/features/space/data/space_repository.dart';
 
 class MockSpaceRepository extends Mock implements SpaceRepository {}
+
+class _FakeFriendController extends FriendController {
+  _FakeFriendController(this._state);
+
+  final FriendState _state;
+
+  @override
+  FriendState build(String uid) => _state;
+}
 
 UserProfile _profile({
   String uid = 'user1',
@@ -31,6 +43,13 @@ UserProfile _profile({
   );
 }
 
+PublicProfile _friend(String uid) => PublicProfile(
+      uid: uid,
+      displayName: 'Friend $uid',
+      username: uid,
+      updatedAt: DateTime(2026, 6, 1),
+    );
+
 void main() {
   late MockSpaceRepository spaceRepo;
 
@@ -44,6 +63,7 @@ void main() {
   Widget harness({
     String? currentUid = 'user1',
     List<Space>? spacesStream,
+    List<PublicProfile> friends = const [],
     UserProfile? profile,
     bool useNullProfile = false,
   }) {
@@ -58,6 +78,10 @@ void main() {
         currentUidProvider.overrideWith(
           (ref) => Stream.value(currentUid),
         ),
+        if (currentUid != null)
+          friendControllerProvider(currentUid).overrideWith(
+            () => _FakeFriendController(FriendState(friends: friends)),
+          ),
         currentUserProfileProvider.overrideWith(
           (ref) => Stream<UserProfile?>.value(
             useNullProfile ? null : (profile ?? _profile()),
@@ -83,12 +107,27 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('friendCount hiển thị từ profile thật (7 → "7 người bạn")',
+    testWidgets(
+        'friendCount drift trên profile doc → hiển thị 0 khi stream rỗng',
         (tester) async {
       await tester.pumpWidget(harness(profile: _profile(friendCount: 7)));
       await tester.pump();
 
-      expect(find.text('7 người bạn'), findsOneWidget);
+      expect(find.text('0 người bạn'), findsOneWidget);
+      expect(find.text('7 người bạn'), findsNothing);
+    });
+
+    testWidgets('friendCount lấy từ friends stream khi có bạn', (tester) async {
+      await tester.pumpWidget(
+        harness(
+          profile: _profile(friendCount: 7),
+          friends: [_friend('friend-1'), _friend('friend-2')],
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('2 người bạn'), findsOneWidget);
+      expect(find.text('7 người bạn'), findsNothing);
     });
 
     testWidgets(

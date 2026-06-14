@@ -23,6 +23,32 @@ interface PostData {
   createdAt: FirebaseFirestore.Timestamp;
 }
 
+export function postNotificationRecipients(
+  authorId: string,
+  recipientUids: string[],
+): string[] {
+  const seen = new Set<string>();
+  const sanitized: string[] = [];
+
+  for (const uid of recipientUids) {
+    const trimmed = uid.trim();
+    if (trimmed.length === 0 || trimmed === authorId || seen.has(trimmed)) {
+      continue;
+    }
+    seen.add(trimmed);
+    sanitized.push(trimmed);
+  }
+
+  return sanitized;
+}
+
+export function postFeedRecipients(
+  authorId: string,
+  recipientUids: string[],
+): string[] {
+  return [authorId, ...postNotificationRecipients(authorId, recipientUids)];
+}
+
 /**
  * Fan-out feed + increment postCount + FCM notification.
  *
@@ -70,12 +96,16 @@ export const onPostCreated = onDocumentCreated(
 
     // 3. Determine recipients — friends/selected audience PLUS the author
     //    themselves, so the author always sees their own post in their feed.
-    const friendUids = audienceType === 'select'
+    const candidateFriendUids = audienceType === 'select'
       ? audienceUids
       : await _getFriendUids(db, authorId);
+    const friendUids = postNotificationRecipients(
+      authorId,
+      candidateFriendUids,
+    );
 
-    // Dedupe in case the author already appears in the audience list.
-    const recipientUids = [...new Set([authorId, ...friendUids])];
+    // Feed includes the author for own-feed visibility; FCM never does.
+    const recipientUids = postFeedRecipients(authorId, friendUids);
 
     if (recipientUids.length === 0) return;
 

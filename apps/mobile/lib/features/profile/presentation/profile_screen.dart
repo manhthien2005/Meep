@@ -6,6 +6,8 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
 import 'package:meep/features/chat/application/chat_providers.dart';
+import 'package:meep/features/friend/application/friend_controller.dart';
+import 'package:meep/features/friend/presentation/friend_sheet.dart';
 import 'package:meep/features/profile/application/profile_controller.dart';
 import 'package:meep/features/profile/application/profile_posts_provider.dart';
 import 'package:meep/features/profile/presentation/widgets/diary_tab_content.dart';
@@ -36,11 +38,20 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   int _activeTab = 0;
 
+  void _openFriendSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: const Color(0x73000000),
+      builder: (_) => const FriendSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final effectiveUid = widget.uid.isEmpty
-        ? ref.watch(currentUidProvider).valueOrNull ?? ''
-        : widget.uid;
+    final currentUid = ref.watch(currentUidProvider).valueOrNull;
+    final effectiveUid = widget.uid.isEmpty ? currentUid ?? '' : widget.uid;
     final state = ref.watch(profileControllerProvider(effectiveUid));
     final unreadCounts = ref.watch(unreadCountsProvider);
     final totalUnread =
@@ -74,6 +85,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
     }
 
+    final friendCount = currentUid != null && effectiveUid == currentUid
+        ? ref.watch(
+            friendControllerProvider(currentUid).select(
+              (s) => s.friends.length,
+            ),
+          )
+        : profile.friendCount;
+
+    // "Khoảnh khắc" lấy từ số post thật (grid bên dưới), không phải counter
+    // `profile.postCount` vốn drift được (CF miss/race — xem _StatItem note).
+    // Chỉ áp cho profile của chính mình; fallback counter khi posts đang load.
+    final momentCount = currentUid != null && effectiveUid == currentUid
+        ? ref.watch(profilePostsProvider(effectiveUid)).valueOrNull?.length ??
+            profile.postCount
+        : profile.postCount;
+
     return Scaffold(
       backgroundColor: _cBg,
       body: SafeArea(
@@ -97,11 +124,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           const SizedBox(width: 25),
                           Expanded(
                             child: _StatsRow(
-                              postCount: profile.postCount,
-                              friendCount: profile.friendCount,
+                              postCount: momentCount,
+                              friendCount: friendCount,
                               spaceCount: profile.spaceCount,
                               onFriendTap: () {
-                                // TODO(P/T3/HanDHG): open FriendSheet
+                                if (currentUid == null ||
+                                    effectiveUid != currentUid) {
+                                  return;
+                                }
+                                _openFriendSheet(context);
                               },
                             ),
                           ),
@@ -138,7 +169,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               label: 'Chia sẻ trang cá nhân',
                               onTap: () => ShareProfileSheet.show(
                                 context,
-                                uid: widget.uid,
+                                uid: effectiveUid,
                                 username: profile.username,
                               ),
                             ),
@@ -156,8 +187,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const SizedBox(height: 10),
                 Expanded(
                   child: _activeTab == 0
-                      ? _PhotosTab(uid: widget.uid)
-                      : const DiaryTabContent(),
+                      ? _PhotosTab(uid: effectiveUid)
+                      : DiaryTabContent(uid: effectiveUid),
                 ),
               ],
             ),
@@ -234,6 +265,7 @@ class _PhotosTab extends ConsumerWidget {
                 posts.map((p) => p.coverImageUrl).toList(growable: false);
             return PhotoGrid(
               photos: photos,
+              posts: posts,
               onTap: (index) {
                 final post = posts[index];
                 context.push(

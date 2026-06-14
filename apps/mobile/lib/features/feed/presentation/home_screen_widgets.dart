@@ -1,5 +1,11 @@
 part of 'home_screen.dart';
 
+const Key _homePageViewKey = ValueKey('homePageView');
+const Key _homeTopBarKey = ValueKey('homeTopBar');
+const Key _homeTaskbarKey = ValueKey('homeTaskbar');
+
+const double _topbarPillAlpha = 0.4;
+
 extension _HomeScreenStateWidgets on _HomeScreenState {
   /// Derive màu ring cho AppTaskbar từ Space đầu tiên trong post hiện tại.
   /// Multi-Space post pick first (visual hint dùng 1 màu).
@@ -17,6 +23,7 @@ extension _HomeScreenStateWidgets on _HomeScreenState {
   Widget _buildTaskbar(int chatBadgeCount, Color? ringColor) {
     if (_currentPage >= 1) {
       return Padding(
+        key: _homeTaskbarKey,
         padding: EdgeInsets.fromLTRB(
           16,
           12,
@@ -35,6 +42,7 @@ extension _HomeScreenStateWidgets on _HomeScreenState {
       );
     }
     return Padding(
+      key: _homeTaskbarKey,
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).size.height * 0.045,
       ),
@@ -56,21 +64,25 @@ extension _HomeScreenStateWidgets on _HomeScreenState {
     final postCount = (isLoading || isError || posts == null || posts.isEmpty)
         ? 1
         : posts.length;
+    final bottomChromePadding =
+        AppTaskbar.height + MediaQuery.of(context).size.height * 0.045 + 8;
 
     return PageView.builder(
+      key: _homePageViewKey,
       controller: _pageController,
       scrollDirection: Axis.vertical,
       onPageChanged: _onPageChanged,
       itemCount: 1 + postCount,
       itemBuilder: (context, index) {
-        if (index == 0) return CameraSection(onGoToFeed: _goToFeed);
-        if (isLoading) {
-          return const Center(
+        Widget page;
+        if (index == 0) {
+          page = CameraSection(onGoToFeed: _goToFeed);
+        } else if (isLoading) {
+          page = const Center(
             child: CircularProgressIndicator(color: AppColors.turquoise500),
           );
-        }
-        if (isError) {
-          return FeedErrorView(
+        } else if (isError) {
+          page = FeedErrorView(
             onRetry: () {
               final sel = ref.read(feedFilterControllerProvider);
               ref.invalidate(
@@ -82,13 +94,18 @@ extension _HomeScreenStateWidgets on _HomeScreenState {
               );
             },
           );
-        }
-        if (posts == null || posts.isEmpty) {
-          return _EmptyFeedPage(
+        } else if (posts == null || posts.isEmpty) {
+          page = _EmptyFeedPage(
             onCapture: () => _pageController.jumpToPage(0),
           );
+        } else {
+          page = _PostPage(post: posts[index - 1]);
         }
-        return _PostPage(post: posts[index - 1]);
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: bottomChromePadding),
+          child: page,
+        );
       },
     );
   }
@@ -165,6 +182,7 @@ class _HomeTopBar extends ConsumerWidget {
           );
 
     return Padding(
+      key: _homeTopBarKey,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
@@ -214,7 +232,7 @@ class _HomeTopBar extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.bw700.withValues(alpha: 0.08),
+          color: AppColors.bw700.withValues(alpha: _topbarPillAlpha),
           borderRadius: BorderRadius.circular(40),
         ),
         child: Row(
@@ -249,7 +267,7 @@ class _HomeTopBar extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.bw700.withValues(alpha: 0.08),
+          color: AppColors.bw700.withValues(alpha: _topbarPillAlpha),
           borderRadius: BorderRadius.circular(40),
         ),
         child: Row(

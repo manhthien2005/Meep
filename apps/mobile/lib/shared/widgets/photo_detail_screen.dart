@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/shared/models/post.dart';
+import 'package:meep/shared/widgets/dual_post_image.dart';
 import 'package:meep/shared/widgets/share_photo_sheet.dart';
 
 /// Full-screen photo viewer with PageView swipe + thumbnail strip.
@@ -341,12 +342,19 @@ class _PhotoCarousel extends StatelessWidget {
           final post = posts[index];
           final image = ClipRRect(
             borderRadius: BorderRadius.circular(_cornerRadius),
-            child: CachedNetworkImage(
-              imageUrl: post.coverImageUrl,
-              fit: BoxFit.cover,
-              errorWidget: (_, __, ___) => Container(color: AppColors.bw700),
-              placeholder: (_, __) => Container(color: AppColors.bw800),
-            ),
+            child: post.isDualCamera
+                ? DualPostImage(
+                    key: ValueKey('photo-detail-dual-${post.postId}'),
+                    backImageUrl: post.backImageUrl ?? '',
+                    frontImageUrl: post.frontImageUrl ?? '',
+                  )
+                : CachedNetworkImage(
+                    imageUrl: post.coverImageUrl,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) =>
+                        Container(color: AppColors.bw700),
+                    placeholder: (_, __) => Container(color: AppColors.bw800),
+                  ),
           );
           return AnimatedContainer(
             duration: const Duration(milliseconds: 200),
@@ -524,7 +532,7 @@ class _ThumbnailStrip extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius:
                           BorderRadius.circular(_thumbRadius - _ringPadding),
-                      child: _thumbImage(posts[index].coverImageUrl),
+                      child: _thumbImage(posts[index]),
                     ),
                   ),
                 ),
@@ -558,9 +566,17 @@ class _ThumbnailStrip extends StatelessWidget {
     }
   }
 
-  Widget _thumbImage(String url) {
+  Widget _thumbImage(Post post) {
+    if (post.isDualCamera) {
+      return DualPostImage(
+        key: ValueKey('photo-detail-thumb-dual-${post.postId}'),
+        backImageUrl: post.backImageUrl ?? '',
+        frontImageUrl: post.frontImageUrl ?? '',
+        enableSwapOnTap: false,
+      );
+    }
     return CachedNetworkImage(
-      imageUrl: url,
+      imageUrl: post.coverImageUrl,
       fit: BoxFit.cover,
       errorWidget: (_, __, ___) => Container(color: AppColors.bw700),
       placeholder: (_, __) => Container(color: AppColors.bw800),

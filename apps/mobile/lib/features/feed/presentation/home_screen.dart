@@ -269,29 +269,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       // TextField. Sheet đã tự lift bằng MediaQuery.viewInsets — Scaffold
       // không cần can thiệp.
       resizeToAvoidBottomInset: false,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _HomeTopBar(
-              isFeedMode: _currentPage >= 1,
-              selectedLabel: filterSelection.label,
-              onFilterSelected: _onFilterSelected,
-              onSpaceFilterSelected: _onSpaceFilterSelected,
-              spaceId: widget.spaceId,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: feedAsync.when(
+              loading: () => _buildPageView(null, isLoading: true),
+              error: (e, st) => _buildPageView(null, isError: true),
+              data: (state) {
+                _posts = state.posts;
+                return _buildPageView(state.posts);
+              },
             ),
-            Expanded(
-              child: feedAsync.when(
-                loading: () => _buildPageView(null, isLoading: true),
-                error: (e, st) => _buildPageView(null, isError: true),
-                data: (state) {
-                  _posts = state.posts;
-                  return _buildPageView(state.posts);
-                },
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: _HomeTopBar(
+                isFeedMode: _currentPage >= 1,
+                selectedLabel: filterSelection.label,
+                onFilterSelected: _onFilterSelected,
+                onSpaceFilterSelected: _onSpaceFilterSelected,
+                spaceId: widget.spaceId,
               ),
             ),
-            _buildTaskbar(totalUnread, _ringColor),
-          ],
-        ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: _buildTaskbar(totalUnread, _ringColor),
+            ),
+          ),
+        ],
       ),
     );
   }

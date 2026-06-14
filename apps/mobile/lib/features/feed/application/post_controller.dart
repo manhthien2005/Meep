@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -16,6 +18,32 @@ part 'post_controller.g.dart';
 
 @Riverpod(keepAlive: false)
 CaptionService captionService(Ref ref) => CaptionServiceImpl();
+
+typedef PostImageCompressor = Future<List<int>?> Function(String path);
+
+@Riverpod(keepAlive: false)
+PostImageCompressor postImageCompressor(Ref ref) {
+  return (path) async {
+    final result = await FlutterImageCompress.compressWithFile(
+      path,
+      minWidth: PostController._maxWidthPx,
+      minHeight: PostController._maxWidthPx,
+      quality: PostController._compressQuality,
+      format: CompressFormat.jpeg,
+    );
+    if (result == null) return null;
+    if (result.length > PostController._maxSizeBytes) {
+      return FlutterImageCompress.compressWithFile(
+        path,
+        minWidth: PostController._maxWidthPx,
+        minHeight: PostController._maxWidthPx,
+        quality: 60,
+        format: CompressFormat.jpeg,
+      );
+    }
+    return result;
+  };
+}
 
 @riverpod
 class PostController extends _$PostController {
@@ -61,7 +89,11 @@ class PostController extends _$PostController {
   }
 
   void setAudience(AudienceType type, List<String> uids) {
-    state = state.copyWith(audienceType: type, selectedUids: uids);
+    final currentUid = ref.read(currentUidProvider).valueOrNull;
+    final selectedUids = type == AudienceType.all
+        ? const <String>[]
+        : _sanitizeAudienceUids(uids, currentUid: currentUid);
+    state = state.copyWith(audienceType: type, selectedUids: selectedUids);
   }
 
   /// Toggle 1 Space trong `selectedSpaceIds`. KHÔNG ảnh hưởng `selectedUids`
@@ -93,8 +125,16 @@ class PostController extends _$PostController {
       return false;
     }
 
+    final selectedAudienceUids = state.audienceType == AudienceType.all
+        ? const <String>[]
+        : _sanitizeAudienceUids(state.selectedUids, currentUid: uid);
     if (state.audienceType == AudienceType.select &&
-        state.selectedUids.isEmpty &&
+        !listEquals(state.selectedUids, selectedAudienceUids)) {
+      state = state.copyWith(selectedUids: selectedAudienceUids);
+    }
+
+    if (state.audienceType == AudienceType.select &&
+        selectedAudienceUids.isEmpty &&
         state.selectedSpaceIds.isEmpty) {
       state = state.copyWith(
         errorMessage: 'Chọn ít nhất 1 người nhận hoặc 1 Space',
@@ -217,7 +257,7 @@ class PostController extends _$PostController {
         captionType: state.captionType,
         audienceType: state.audienceType,
         audienceUids:
-            state.audienceType == AudienceType.all ? [] : state.selectedUids,
+            state.audienceType == AudienceType.all ? [] : selectedAudienceUids,
         spaceIds: selectedSpaceIds,
         memberIds: memberIdsUnion,
         createdAt: DateTime.now(),
@@ -270,8 +310,12 @@ class PostController extends _$PostController {
         : detail is FirebaseException
             ? ' [${detail.runtimeType} code=${detail.code} msg=${detail.message}]'
             : ' [${detail.runtimeType}] $detail';
-    debugPrint('[PostController.submit] $message$detailStr');
-    if (st != null) debugPrint(st.toString());
+    developer.log(
+      '$message$detailStr',
+      name: 'post.submit',
+      error: detail,
+      stackTrace: st,
+    );
   }
 
   Future<void> deletePost(String postId) async {
@@ -281,27 +325,23 @@ class PostController extends _$PostController {
 
   Future<List<int>?> _compress(String path) async {
     try {
-      final result = await FlutterImageCompress.compressWithFile(
-        path,
-        minWidth: _maxWidthPx,
-        minHeight: _maxWidthPx,
-        quality: _compressQuality,
-        format: CompressFormat.jpeg,
-      );
-      if (result == null) return null;
-      if (result.length > _maxSizeBytes) {
-        // Re-compress at lower quality
-        return FlutterImageCompress.compressWithFile(
-          path,
-          minWidth: _maxWidthPx,
-          minHeight: _maxWidthPx,
-          quality: 60,
-          format: CompressFormat.jpeg,
-        );
-      }
-      return result;
+      return await ref.read(postImageCompressorProvider)(path);
     } catch (_) {
       return null;
     }
+  }
+
+  List<String> _sanitizeAudienceUids(
+    List<String> uids, {
+    required String? currentUid,
+  }) {
+    final seen = <String>{};
+    final sanitized = <String>[];
+    for (final uid in uids) {
+      final trimmed = uid.trim();
+      if (trimmed.isEmpty || trimmed == currentUid) continue;
+      if (seen.add(trimmed)) sanitized.add(trimmed);
+    }
+    return sanitized;
   }
 }

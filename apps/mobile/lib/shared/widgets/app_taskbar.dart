@@ -39,6 +39,9 @@ class AppTaskbar extends StatelessWidget {
     this.ringColor,
   });
 
+  /// Fixed visual height used by screens that overlay the taskbar on content.
+  static const double height = _Const.height;
+
   /// Tab đang active. `null` = không tab nào active (ẩn indicator).
   final TaskbarTab? activeTab;
   final ValueChanged<TaskbarTab> onTabSelected;
@@ -201,11 +204,9 @@ class _EmbeddedTaskbar extends StatelessWidget {
             onTap: onGridTap,
           ),
           Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.bw800.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(_Const.embeddedRadius),
-              ),
+            child: AppGlassSurface(
+              height: _Const.height,
+              borderRadius: _Const.embeddedRadius,
               child: Stack(
                 alignment: Alignment.center,
                 children: [

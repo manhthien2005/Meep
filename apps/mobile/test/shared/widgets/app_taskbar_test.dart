@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:meep/shared/widgets/app_glass_surface.dart';
 import 'package:meep/shared/widgets/app_taskbar.dart';
 
 void main() {
@@ -22,6 +23,7 @@ void main() {
       await tester.pumpWidget(
         wrap(AppTaskbar(activeTab: TaskbarTab.home, onTabSelected: noop)),
       );
+      expect(find.byType(AppGlassSurface), findsOneWidget);
       expect(find.byKey(const Key('taskbarPillIndicator')), findsOneWidget);
     });
 
@@ -98,6 +100,7 @@ void main() {
           ),
         ),
       );
+      expect(find.byType(AppGlassSurface), findsOneWidget);
       expect(find.byKey(const Key('taskbarRingIndicator')), findsOneWidget);
       expect(find.byKey(const Key('taskbarPillIndicator')), findsNothing);
     });

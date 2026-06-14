@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'package:meep/core/theme/app_colors.dart';
+import 'package:meep/core/theme/app_text_styles.dart';
+
 /// Pill stats bottom của StreakScreen — match Figma `269:1992`.
 ///
-/// Layout: " N Meep | Xd chuỗi"
+/// Layout: " N Khoảnh khắc | Xd chuỗi"
 /// - Số (N / Xd): WHITE Nunito Bold 12
-/// - Chữ (Meep / chuỗi): WHITE 48% alpha Nunito Bold 12
+/// - Chữ (Khoảnh khắc / chuỗi): WHITE 48% alpha Nunito Bold 12
 /// - Separator "|": Inter SemiBold 10 WHITE 48% alpha
 /// - Container: bg `#5857546e`, cornerRadius 12, padding 8/11
 class StreakStatsPill extends StatelessWidget {
@@ -17,51 +20,39 @@ class StreakStatsPill extends StatelessWidget {
   final int totalMoments;
   final int currentStreak;
 
-  static const _bgFill = Color(0x6E585754);
-  static const _muted = Color(0x7AFFFFFF); // white 48%
-
-  static const _numberStyle = TextStyle(
-    fontFamily: 'Nunito',
-    fontSize: 12,
-    fontWeight: FontWeight.w700,
-    height: 16 / 12,
-    color: Color(0xFFFFFFFF),
-  );
-
-  static const _labelStyle = TextStyle(
-    fontFamily: 'Nunito',
-    fontSize: 12,
-    fontWeight: FontWeight.w700,
-    height: 16 / 12,
-    color: _muted,
-  );
-
-  static const _sepStyle = TextStyle(
-    fontFamily: 'Inter',
-    fontSize: 10,
-    fontWeight: FontWeight.w600,
-    color: _muted,
-  );
-
   @override
   Widget build(BuildContext context) {
+    final muted = AppColors.bw100.withValues(alpha: 0.58);
+    final numberStyle = AppTextStyles.xsSemiBold.copyWith(
+      color: AppColors.bw100,
+      fontWeight: FontWeight.w700,
+    );
+    final labelStyle = AppTextStyles.xsSemiBold.copyWith(
+      color: muted,
+      fontWeight: FontWeight.w700,
+    );
+    final sepStyle = AppTextStyles.xsSemiBold.copyWith(color: muted);
+
     return Semantics(
-      label: '$totalMoments Meep, chuỗi $currentStreak ngày',
+      label: '$totalMoments khoảnh khắc, chuỗi $currentStreak ngày',
       child: Container(
         decoration: BoxDecoration(
-          color: _bgFill,
+          color: AppColors.bw800.withValues(alpha: 0.78),
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.bw700.withValues(alpha: 0.5),
+          ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: RichText(
           text: TextSpan(
-            style: _numberStyle,
+            style: numberStyle,
             children: [
               TextSpan(text: ' $totalMoments'),
-              const TextSpan(text: ' Meep ', style: _labelStyle),
-              const TextSpan(text: '|', style: _sepStyle),
+              TextSpan(text: ' Khoảnh khắc ', style: labelStyle),
+              TextSpan(text: '|', style: sepStyle),
               TextSpan(text: ' ${currentStreak}d'),
-              const TextSpan(text: ' chuỗi ', style: _labelStyle),
+              TextSpan(text: ' chuỗi ', style: labelStyle),
             ],
           ),
         ),

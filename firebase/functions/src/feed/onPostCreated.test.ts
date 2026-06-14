@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
 
+import {
+  postFeedRecipients,
+  postNotificationRecipients,
+} from './onPostCreated.js';
+
 // Lightweight unit test — we test the pure fan-out logic, not the CF wrapper.
 // Integration tests require emulators; these run in CI without them.
 
@@ -49,7 +54,7 @@ describe('onPostCreated logic', () => {
   it('recipients always include the author (own-feed visibility)', () => {
     const authorId = 'uid1';
     const friendUids = ['friend1', 'friend2'];
-    const recipientUids = [...new Set([authorId, ...friendUids])];
+    const recipientUids = postFeedRecipients(authorId, friendUids);
     expect(recipientUids).toContain(authorId);
     expect(recipientUids).toHaveLength(3);
   });
@@ -57,15 +62,15 @@ describe('onPostCreated logic', () => {
   it('author appears once even if already in audience (dedupe)', () => {
     const authorId = 'uid1';
     const friendUids = ['uid1', 'friend2'];
-    const recipientUids = [...new Set([authorId, ...friendUids])];
+    const recipientUids = postFeedRecipients(authorId, friendUids);
     expect(recipientUids).toEqual(['uid1', 'friend2']);
   });
 
   it('FCM excludes the author — only friends are notified', () => {
     const authorId = 'uid1';
-    const friendUids = ['friend1', 'friend2'];
-    // FCM uses friendUids, not recipientUids (which includes the author).
-    expect(friendUids).not.toContain(authorId);
+    const friendUids = ['friend1', 'uid1', 'friend2', 'friend2'];
+    const recipientUids = postNotificationRecipients(authorId, friendUids);
+    expect(recipientUids).toEqual(['friend1', 'friend2']);
   });
 
   it('feed doc (friend fan-out) includes spaceIds=[]', () => {

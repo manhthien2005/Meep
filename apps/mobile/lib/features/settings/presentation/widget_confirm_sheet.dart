@@ -7,6 +7,7 @@ import 'package:meep/core/theme/app_colors.dart';
 import 'package:meep/core/theme/app_spacing.dart';
 import 'package:meep/core/theme/app_text_styles.dart';
 import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/friend/application/friend_controller.dart';
 import 'package:meep/features/widget/application/widget_data_service.dart';
 import 'package:meep/shared/widgets/app_bottom_sheet.dart';
 
@@ -15,8 +16,14 @@ class WidgetConfirmSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final friendCount =
-        ref.watch(currentUserProfileProvider).valueOrNull?.friendCount ?? 0;
+    final currentUid = ref.watch(currentUidProvider).valueOrNull;
+    final friendCount = currentUid == null
+        ? 0
+        : ref.watch(
+            friendControllerProvider(currentUid).select(
+              (s) => s.friends.length,
+            ),
+          );
     return AppBottomSheet(
       child: SingleChildScrollView(
         child: Padding(

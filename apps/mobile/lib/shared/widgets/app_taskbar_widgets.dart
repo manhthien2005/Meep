@@ -158,7 +158,7 @@ class _PillIndicator extends StatelessWidget {
       width: _Const.pillWidth,
       height: _Const.pillHeight,
       decoration: BoxDecoration(
-        color: AppColors.bw500.withValues(alpha: 0.6),
+        color: AppColors.bw500.withValues(alpha: 0.32),
         borderRadius: BorderRadius.circular(_Const.pillRadius),
       ),
     );
@@ -196,9 +196,9 @@ class _RingIndicator extends StatelessWidget {
           Container(
             width: _Const.ringInner,
             height: _Const.ringInner,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.bw100,
+              color: AppColors.bw100.withValues(alpha: 0.94),
             ),
           ),
         ],

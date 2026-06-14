@@ -4,7 +4,7 @@ part of 'feed_section.dart';
 /// the avatar + `<name> d thg M`; own variant shows just `Bạn d thg M` (no
 /// avatar — the user already sees themselves on every screen, so it would
 /// just be visual noise).
-class PostHeaderRow extends StatelessWidget {
+class PostHeaderRow extends ConsumerWidget {
   const PostHeaderRow({
     super.key,
     required this.post,
@@ -19,8 +19,22 @@ class PostHeaderRow extends StatelessWidget {
   static String _formatDate(DateTime dt) => '${dt.day} thg ${dt.month}';
 
   @override
-  Widget build(BuildContext context) {
-    final nameText = isOwn ? 'Bạn' : post.authorName;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final postAvatarUrl = post.authorAvatarUrl;
+    final needsAuthorLookup = !isOwn &&
+        ((postAvatarUrl == null || postAvatarUrl.isEmpty) ||
+            post.authorName.trim().isEmpty);
+    final authorProfile = needsAuthorLookup
+        ? ref.watch(_authorProfileProvider(post.authorId)).valueOrNull
+        : null;
+    final authorName = post.authorName.trim().isNotEmpty
+        ? post.authorName.trim()
+        : authorProfile?.displayName.trim() ?? '';
+    final nameText = isOwn
+        ? 'Bạn'
+        : authorName.isNotEmpty
+            ? authorName
+            : 'Người dùng';
     final dateText = ' ${_formatDate(post.createdAt)}';
     final label = Text.rich(
       TextSpan(
@@ -48,7 +62,10 @@ class PostHeaderRow extends StatelessWidget {
       return Center(child: label);
     }
     final avatar = _AuthorAvatar(
-      post: post,
+      avatarUrl: postAvatarUrl != null && postAvatarUrl.isNotEmpty
+          ? postAvatarUrl
+          : authorProfile?.avatarUrl,
+      fallbackText: avatarFallbackFromName(authorName) ?? '?',
       onTap: onAvatarTap,
     );
     return Row(
@@ -63,29 +80,25 @@ class PostHeaderRow extends StatelessWidget {
   }
 }
 
-/// Resolves the author's avatar: uses [Post.authorAvatarUrl] when available,
-/// otherwise falls back to the author's current Firestore profile avatar.
-class _AuthorAvatar extends ConsumerWidget {
-  const _AuthorAvatar({required this.post, this.onTap});
+/// Author avatar for friend posts. Caller resolves denormalized post data plus
+/// public-profile fallback before passing values here.
+class _AuthorAvatar extends StatelessWidget {
+  const _AuthorAvatar({
+    required this.avatarUrl,
+    required this.fallbackText,
+    this.onTap,
+  });
 
-  final Post post;
+  final String? avatarUrl;
+  final String fallbackText;
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Ưu tiên authorAvatarUrl từ post (đã có sẵn từ lúc tạo post).
-    // Nếu null (post cũ, email signup), lookup từ profile author hiện tại.
-    String? avatarUrl = post.authorAvatarUrl;
-    if (avatarUrl == null || avatarUrl.isEmpty) {
-      avatarUrl =
-          ref.watch(_authorAvatarUrlProvider(post.authorId)).valueOrNull;
-    }
-
+  Widget build(BuildContext context) {
     final child = AppAvatar(
       imageUrl: avatarUrl,
       size: 28,
-      fallbackText:
-          post.authorName.isNotEmpty ? post.authorName[0].toUpperCase() : null,
+      fallbackText: fallbackText,
     );
 
     if (onTap != null) {
@@ -95,11 +108,10 @@ class _AuthorAvatar extends ConsumerWidget {
   }
 }
 
-/// Fetches a user's current avatar URL from their public Firestore profile.
-final _authorAvatarUrlProvider =
-    FutureProvider.family<String?, String>((ref, uid) async {
-  final profile = await ref.read(userRepositoryProvider).getPublicProfile(uid);
-  return profile?.avatarUrl;
+/// Fetches a user's current public profile for old posts missing denormalized
+/// author fields.
+final _authorProfileProvider = FutureProvider.family((ref, String uid) async {
+  return ref.read(userRepositoryProvider).getPublicProfile(uid);
 });
 
 /// Activity pill — own posts only. Two states:

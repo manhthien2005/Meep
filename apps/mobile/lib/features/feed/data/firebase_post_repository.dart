@@ -22,9 +22,16 @@ class FirebasePostRepository implements PostRepository {
 
   @override
   Future<Post> createPost(Post post) async {
-    if (post.audienceType == AudienceType.select && post.audienceUids.isEmpty) {
+    final audienceUids = post.audienceType == AudienceType.all
+        ? const <String>[]
+        : _sanitizeAudienceUids(
+            post.audienceUids,
+            authorId: post.authorId,
+          );
+    if (post.audienceType == AudienceType.select && audienceUids.isEmpty) {
       throw ArgumentError('select audience requires at least one uid');
     }
+    final sanitizedPost = post.copyWith(audienceUids: audienceUids);
 
     final ref = _db.collection(_posts).doc(post.postId);
     // Strip null fields BEFORE writing: Firestore rule `/posts/{postId}` requires
@@ -32,12 +39,12 @@ class FirebasePostRepository implements PostRepository {
     // explicit `caption: null` (or other null fields) in the payload trips a
     // permission-denied. Removing the keys makes the rule's `!('caption' in data)`
     // branch satisfy instead.
-    final data = post.toJson()
+    final data = sanitizedPost.toJson()
       ..removeWhere((_, value) => value == null)
       ..['createdAt'] = FieldValue
           .serverTimestamp(); // spec: serverTimestamp, not device clock
     await ref.set(data);
-    return post;
+    return sanitizedPost;
   }
 
   @override
@@ -213,5 +220,19 @@ class FirebasePostRepository implements PostRepository {
     final doc = await _db.collection(_posts).doc(postId).get();
     if (!doc.exists) return null;
     return Post.fromJson({...doc.data()!, 'postId': doc.id});
+  }
+
+  List<String> _sanitizeAudienceUids(
+    List<String> uids, {
+    required String authorId,
+  }) {
+    final seen = <String>{};
+    final sanitized = <String>[];
+    for (final uid in uids) {
+      final trimmed = uid.trim();
+      if (trimmed.isEmpty || trimmed == authorId) continue;
+      if (seen.add(trimmed)) sanitized.add(trimmed);
+    }
+    return sanitized;
   }
 }

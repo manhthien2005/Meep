@@ -15,10 +15,10 @@ void main() {
         createdAt: createdAt,
       );
 
-  Widget host(Widget child) => MaterialApp(
+  Widget host(Widget child, {double width = 330}) => MaterialApp(
         home: Scaffold(
           body: Center(
-            child: SizedBox(width: 330, child: child),
+            child: SizedBox(width: width, child: child),
           ),
         ),
       );
@@ -90,7 +90,7 @@ void main() {
     expect(tappedIndex, isIn([0, 1]));
   });
 
-  testWidgets('swipe trái → phải = swipePrev fires', (tester) async {
+  testWidgets('kéo phải→trái = swipePrev fires', (tester) async {
     var prevCalled = false;
     await tester.pumpWidget(
       host(
@@ -103,12 +103,12 @@ void main() {
       ),
     );
     final container = find.byType(StreakCalendar);
-    await tester.fling(container, const Offset(300, 0), 800);
+    await tester.fling(container, const Offset(-300, 0), 800);
     await tester.pumpAndSettle();
     expect(prevCalled, isTrue);
   });
 
-  testWidgets('swipe phải → trái = swipeNext fires', (tester) async {
+  testWidgets('kéo trái→phải = swipeNext fires', (tester) async {
     var nextCalled = false;
     await tester.pumpWidget(
       host(
@@ -121,9 +121,27 @@ void main() {
       ),
     );
     final container = find.byType(StreakCalendar);
-    await tester.fling(container, const Offset(-300, 0), 800);
+    await tester.fling(container, const Offset(300, 0), 800);
     await tester.pumpAndSettle();
     expect(nextCalled, isTrue);
+  });
+
+  testWidgets('calendar không overflow ở mobile widths phổ biến',
+      (tester) async {
+    for (final width in [320.0, 360.0, 430.0]) {
+      await tester.pumpWidget(
+        host(
+          StreakCalendar(
+            viewingMonth: DateTime(2026, 5),
+            monthPosts: const [],
+            today: DateTime(2026, 5, 22),
+          ),
+          width: width,
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull, reason: 'width=$width');
+    }
   });
 
   testWidgets('today highlight chỉ khi viewingMonth chứa today',
@@ -162,22 +180,35 @@ void main() {
 
   testWidgets('today no-post + onTapToday → tap fires CTA callback',
       (tester) async {
-    var ctaCalled = false;
-    await tester.pumpWidget(
-      host(
-        StreakCalendar(
-          viewingMonth: DateTime(2026, 5),
-          monthPosts: const [],
-          today: DateTime(2026, 5, 22),
-          onTapToday: () => ctaCalled = true,
+    final semantics = tester.ensureSemantics();
+    try {
+      var ctaCalled = false;
+      await tester.pumpWidget(
+        host(
+          StreakCalendar(
+            viewingMonth: DateTime(2026, 5),
+            monthPosts: const [],
+            today: DateTime(2026, 5, 22),
+            onTapToday: () => ctaCalled = true,
+          ),
         ),
-      ),
-    );
-    final todayCell = find.byWidgetPredicate(
-      (w) => w is CalendarDayCell && w.isToday,
-    );
-    await tester.tap(todayCell);
-    expect(ctaCalled, isTrue);
+      );
+      final todayCell = find.byWidgetPredicate(
+        (w) => w is CalendarDayCell && w.isToday,
+      );
+      await tester.tap(todayCell);
+      expect(ctaCalled, isTrue);
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is Semantics &&
+              w.properties.label == 'Chụp khoảnh khắc hôm nay',
+        ),
+        findsOneWidget,
+      );
+    } finally {
+      semantics.dispose();
+    }
   });
 
   testWidgets('today có post → tap mở photo detail (onTapDay), không CTA',

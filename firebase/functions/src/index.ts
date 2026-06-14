@@ -74,6 +74,7 @@ export const sendFriendRequest = onCall((request) => {
 
 export { acceptFriendRequest } from "./friend/acceptFriendRequest.js";
 export { onFriendshipDeleted } from "./friend/onFriendshipDeleted.js";
+export { searchUserByUsername } from "./friend/searchUserByUsername.js";
 
 // ===== Settings module stubs =====
 

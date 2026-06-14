@@ -37,9 +37,14 @@ class FirebaseUserRepository implements UserRepository {
 
   @override
   Future<PublicProfile?> getPublicProfile(String uid) async {
-    final snap = await _firestore.doc('users/$uid/public/profile').get();
-    if (!snap.exists) return null;
-    return PublicProfile.fromFirestore(snap);
+    final publicSnap = await _firestore.doc('users/$uid/public/profile').get();
+    if (publicSnap.exists) return PublicProfile.fromFirestore(publicSnap);
+
+    final userSnap = await _getUserDocForPublicFallback(uid);
+    if (userSnap == null) return null;
+    final data = userSnap.data();
+    if (!userSnap.exists || data == null) return null;
+    return _publicProfileFromUserData(uid, data);
   }
 
   @override
@@ -60,9 +65,41 @@ class FirebaseUserRepository implements UserRepository {
 
   @override
   Stream<PublicProfile?> watchPublicProfile(String uid) {
-    return _firestore.doc('users/$uid/public/profile').snapshots().map((snap) {
-      if (!snap.exists) return null;
-      return PublicProfile.fromFirestore(snap);
+    return _firestore.doc('users/$uid/public/profile').snapshots().asyncMap(
+      (snap) async {
+        if (snap.exists) return PublicProfile.fromFirestore(snap);
+
+        final userSnap = await _getUserDocForPublicFallback(uid);
+        if (userSnap == null) return null;
+        final data = userSnap.data();
+        if (!userSnap.exists || data == null) return null;
+        return _publicProfileFromUserData(uid, data);
+      },
+    );
+  }
+
+  Future<DocumentSnapshot<Map<String, dynamic>>?> _getUserDocForPublicFallback(
+    String uid,
+  ) async {
+    try {
+      return _firestore.doc('users/$uid').get();
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') return null;
+      rethrow;
+    }
+  }
+
+  PublicProfile? _publicProfileFromUserData(
+    String uid,
+    Map<String, dynamic> data,
+  ) {
+    final updatedAt = data['updatedAt'] ?? data['createdAt'];
+    if (updatedAt == null) return null;
+
+    return PublicProfile.fromJson({
+      ...data,
+      'uid': data['uid'] ?? uid,
+      'updatedAt': updatedAt,
     });
   }
 }

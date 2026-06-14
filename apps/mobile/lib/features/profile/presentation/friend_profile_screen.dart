@@ -239,7 +239,10 @@ class _FriendProfileBody extends ConsumerWidget {
             Expanded(
               child: activeTab == 0
                   ? _FriendPhotosTab(friendUid: friendUid)
-                  : const DiaryTabContent(),
+                  : DiaryTabContent(
+                      uid: friendUid,
+                      ownerActionsEnabled: false,
+                    ),
             ),
           ],
         ),
@@ -306,6 +309,7 @@ class _FriendPhotosTab extends ConsumerWidget {
             final urls = posts.map((p) => p.coverImageUrl).toList();
             return PhotoGrid(
               photos: urls,
+              posts: posts,
               onTap: (index) {
                 final post = posts[index];
                 context.push(

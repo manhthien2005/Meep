@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
@@ -142,8 +143,9 @@ class AppCameraController extends _$AppCameraController {
       state = state.copyWith(isCapturing: true);
       try {
         final file = await _cameraCtrl!.takePicture();
-        debugPrint(
-          '[CameraCapture] takePicture done → ${file.path} | front=${state.isFrontCamera}',
+        _log(
+          'takePicture done',
+          {'path': file.path, 'front': state.isFrontCamera},
         );
         if (state.isFrontCamera) {
           await flipImageHorizontallyInPlace(file.path);
@@ -151,8 +153,8 @@ class AppCameraController extends _$AppCameraController {
           await fixOrientationInPlace(file.path);
         }
         return file.path;
-      } catch (e) {
-        debugPrint('capture error: $e');
+      } catch (e, st) {
+        _log('capture error', e, st);
         return null;
       } finally {
         state = state.copyWith(isCapturing: false);
@@ -191,8 +193,8 @@ class AppCameraController extends _$AppCameraController {
       }
 
       return path;
-    } catch (e) {
-      debugPrint('dual capture error: $e');
+    } catch (e, st) {
+      _log('dual capture error', e, st);
       return null;
     } finally {
       state = state.copyWith(isCapturing: false);
@@ -316,6 +318,16 @@ class AppCameraController extends _$AppCameraController {
   void resumePreview() => _cameraCtrl?.resumePreview();
 
   CameraController? get cameraController => _cameraCtrl;
+
+  void _log(String message, [Object? error, StackTrace? stackTrace]) {
+    if (!kDebugMode) return;
+    developer.log(
+      message,
+      name: 'camera',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
 
   Future<void> _disposeController() async {
     await _cameraCtrl?.dispose();

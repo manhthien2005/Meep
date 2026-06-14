@@ -16,7 +16,7 @@ class AppGlassSurface extends StatelessWidget {
     required this.child,
     this.height,
     this.borderRadius,
-    this.blurSigma = 5,
+    this.blurSigma = 8,
     this.disableBlur = false,
   });
 
@@ -29,7 +29,7 @@ class AppGlassSurface extends StatelessWidget {
   /// Cường độ blur nền. Tinh chỉnh khi xem trên device.
   final double blurSigma;
 
-  /// Embedded: không blur, chỉ màu đơn 20% opacity (đúng Figma SVG).
+  /// Embedded legacy path: không blur, chỉ màu đơn opacity thấp.
   final bool disableBlur;
 
   @override
@@ -48,18 +48,18 @@ class AppGlassSurface extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppColors.bw800.withValues(alpha: 0.1),
-                    AppColors.bw800.withValues(alpha: 0),
+                    AppColors.bw800.withValues(alpha: 0.06),
+                    AppColors.bw800.withValues(alpha: 0.015),
                   ],
                 ),
-          color: disableBlur ? AppColors.bw800.withValues(alpha: 0.2) : null,
+          color: disableBlur ? AppColors.bw800.withValues(alpha: 0.08) : null,
           boxShadow: disableBlur
               ? null
               : const [
                   BoxShadow(
-                    color: Color(0x40000000),
-                    offset: Offset(0, 4),
-                    blurRadius: 4,
+                    color: Color(0x26000000),
+                    offset: Offset(0, 3),
+                    blurRadius: 10,
                   ),
                 ],
         ),
@@ -108,7 +108,7 @@ class _GlassBorderPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          AppColors.glassBorder.withValues(alpha: 0.8),
+          AppColors.glassBorder.withValues(alpha: 0.45),
           const Color(0x00FFFFFF),
         ],
       ).createShader(rect);

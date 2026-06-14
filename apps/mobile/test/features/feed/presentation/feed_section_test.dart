@@ -6,6 +6,9 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:meep/features/auth/application/auth_providers.dart';
+import 'package:meep/features/auth/data/public_profile.dart';
+import 'package:meep/features/auth/data/user_profile.dart';
+import 'package:meep/features/auth/data/user_repository.dart';
 import 'package:meep/features/feed/application/feed_controller.dart';
 import 'package:meep/features/feed/data/post_repository.dart';
 import 'package:meep/features/feed/data/storage_repository.dart';
@@ -31,6 +34,32 @@ class _FakeStorageRepo implements StorageRepository {
 
   @override
   Future<void> deleteImage(String storagePath) async {}
+}
+
+class _FakeUserRepository implements UserRepository {
+  _FakeUserRepository(this.publicProfiles);
+
+  final Map<String, PublicProfile> publicProfiles;
+
+  @override
+  Future<void> createProfile(UserProfile profile) async {}
+
+  @override
+  Future<UserProfile?> getProfile(String uid) async => null;
+
+  @override
+  Future<PublicProfile?> getPublicProfile(String uid) async =>
+      publicProfiles[uid];
+
+  @override
+  Future<bool> isUsernameAvailable(String username) async => true;
+
+  @override
+  Stream<UserProfile?> watchProfile(String uid) => Stream.value(null);
+
+  @override
+  Stream<PublicProfile?> watchPublicProfile(String uid) =>
+      Stream.value(publicProfiles[uid]);
 }
 
 /// Repo điều khiển được watchFeed cho từng case (data/empty/error). newPostId
@@ -59,13 +88,31 @@ class _StubPostRepo implements PostRepository {
   Future<Post?> getPost(String postId) async => null;
 }
 
-Post _post({required String postId, required String authorId}) => Post(
+Post _post({
+  required String postId,
+  required String authorId,
+  String authorName = 'Author',
+}) =>
+    Post(
       postId: postId,
       authorId: authorId,
-      authorName: 'Author',
+      authorName: authorName,
       imageUrl: 'https://example.com/$postId.jpg',
       audienceType: AudienceType.all,
       createdAt: DateTime(2026, 5, 27),
+    );
+
+PublicProfile _publicProfile({
+  required String uid,
+  required String displayName,
+  String? avatarUrl,
+}) =>
+    PublicProfile(
+      uid: uid,
+      displayName: displayName,
+      username: displayName.toLowerCase(),
+      avatarUrl: avatarUrl,
+      updatedAt: DateTime(2026, 5, 27),
     );
 
 void main() {
@@ -83,7 +130,11 @@ void main() {
 
   const myUid = 'uid-me';
 
-  Future<void> pump(WidgetTester tester, Stream<List<Post>> feed) async {
+  Future<void> pump(
+    WidgetTester tester,
+    Stream<List<Post>> feed, {
+    Map<String, PublicProfile> publicProfiles = const {},
+  }) async {
     tester.view.physicalSize = const Size(900, 1600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -112,6 +163,9 @@ void main() {
         overrides: [
           // LAYER-001: uid qua currentUidProvider — KHÔNG bind FirebaseAuth.
           currentUidProvider.overrideWith((ref) => Stream.value(myUid)),
+          userRepositoryProvider.overrideWithValue(
+            _FakeUserRepository(publicProfiles),
+          ),
           postRepositoryProvider.overrideWithValue(_StubPostRepo(feed)),
           storageRepositoryProvider.overrideWithValue(_FakeStorageRepo()),
           reactionRepositoryProvider.overrideWithValue(reactionRepo),
@@ -142,6 +196,32 @@ void main() {
     await tester.pump();
     expect(find.byType(FriendPostCard), findsOneWidget);
     expect(find.byType(OwnPostCard), findsNothing);
+  });
+
+  testWidgets('friend post thiếu avatar → fallback chữ cái từ authorName',
+      (tester) async {
+    await pump(
+      tester,
+      Stream.value([_post(postId: 'p2', authorId: 'friend-1')]),
+    );
+    await tester.pump();
+    expect(find.text('A'), findsOneWidget);
+  });
+
+  testWidgets('post cũ thiếu authorName → fallback từ public profile',
+      (tester) async {
+    await pump(
+      tester,
+      Stream.value([
+        _post(postId: 'p2', authorId: 'friend-1', authorName: ''),
+      ]),
+      publicProfiles: {
+        'friend-1': _publicProfile(uid: 'friend-1', displayName: 'Bob Tran'),
+      },
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Bob Tran'), findsOneWidget);
+    expect(find.text('B'), findsOneWidget);
   });
 
   testWidgets('empty feed → "Chưa có ảnh nào"', (tester) async {
