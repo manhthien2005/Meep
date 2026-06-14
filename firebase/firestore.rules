@@ -147,7 +147,7 @@ service cloud.firestore {
     // ===== /users/{uid} =====
     match /users/{uid} {
       allow get: if isOwner(uid) || isFriend(uid);
-      allow list: if false;
+      allow list: if isAuthed() && request.query.limit <= 1;
       allow create: if isOwner(uid) && isValidUserCreate(uid);
       allow update: if isOwner(uid) && isValidUserUpdate();
       allow delete: if false; // use deleteAccount CF

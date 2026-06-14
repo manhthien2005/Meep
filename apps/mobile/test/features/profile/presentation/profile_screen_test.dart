@@ -17,6 +17,7 @@ import 'package:meep/features/friend/application/friend_state.dart';
 import 'package:meep/features/profile/application/profile_controller.dart';
 import 'package:meep/features/profile/data/profile_repository.dart';
 import 'package:meep/features/profile/presentation/profile_screen.dart';
+import 'package:meep/shared/models/post.dart';
 
 class _FakeProfileRepository implements ProfileRepository {
   _FakeProfileRepository(this.profile);
@@ -125,6 +126,20 @@ void main() {
         updatedAt: DateTime.utc(2026, 1, 1),
       );
 
+  Future<void> seedPosts(int count, {String authorUid = 'uid-alice'}) async {
+    for (var i = 0; i < count; i++) {
+      final post = Post(
+        postId: 'p$i',
+        authorId: authorUid,
+        authorName: 'Alice',
+        imageUrl: 'https://cdn/p$i.jpg',
+        audienceType: AudienceType.all,
+        createdAt: DateTime.utc(2026, 5, 10, 12).add(Duration(minutes: i)),
+      );
+      await firestore.doc('posts/${post.postId}').set(post.toJson());
+    }
+  }
+
   Widget makeApp({
     UserProfile? profile,
     String currentUid = 'uid-alice',
@@ -201,6 +216,7 @@ void main() {
 
   testWidgets('renders displayName/bio/stats từ ProfileState + friend stream',
       (tester) async {
+    await seedPosts(7);
     await tester.pumpWidget(
       makeApp(
         profile: aliceProfile,
@@ -211,7 +227,7 @@ void main() {
 
     expect(find.text('alice'), findsOneWidget); // username
     expect(find.text('Hello world'), findsOneWidget); // bio
-    expect(find.text('7'), findsOneWidget); // postCount
+    expect(find.text('7'), findsOneWidget); // Khoảnh khắc = 7 post thật
     expect(find.text('2'), findsOneWidget); // friends.length
     expect(find.text('3'), findsOneWidget); // spaceCount
     expect(find.text('Khoảnh khắc'), findsOneWidget);
@@ -278,6 +294,7 @@ void main() {
   testWidgets('friendCount drift trên profile doc → hiển thị 0 khi stream rỗng',
       (tester) async {
     final driftProfile = aliceProfile.copyWith(friendCount: 1);
+    await seedPosts(7); // postCount=7 để '0' chỉ còn là friendCount
     await tester.pumpWidget(makeApp(profile: driftProfile));
     await tester.pumpAndSettle();
 
@@ -297,6 +314,23 @@ void main() {
 
     expect(find.text('1'), findsNothing);
     expect(find.text('2'), findsOneWidget);
+  });
+
+  testWidgets('Khoảnh khắc đếm post thật, bỏ qua postCount counter bị drift',
+      (tester) async {
+    // Bug: CF counter postCount=4 (miss 1 event) nhưng user có 5 post thật.
+    // Header phải hiển thị 5 = số post grid load, không phải 4.
+    final driftProfile = aliceProfile.copyWith(postCount: 4);
+    await seedPosts(5);
+    await tester.pumpWidget(makeApp(profile: driftProfile));
+    await tester.pumpAndSettle();
+
+    expect(find.text('5'), findsOneWidget);
+    expect(
+      find.text('4'),
+      findsNothing,
+      reason: 'counter drift 4 không được hiển thị, dùng số post thật',
+    );
   });
 
   testWidgets('action button "Chỉnh sửa" navigate /profile/edit',

@@ -63,10 +63,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  final functions = FirebaseFunctions.instanceFor(region: 'asia-southeast1');
+
   if (_useEmulator) {
     await FirebaseAuth.instance.useAuthEmulator(_emulatorHost, 9099);
     FirebaseFirestore.instance.useFirestoreEmulator(_emulatorHost, 9999);
     await FirebaseStorage.instance.useStorageEmulator(_emulatorHost, 9199);
+    functions.useFunctionsEmulator(_emulatorHost, 5001);
   }
 
   // App Check chặn automated abuse traffic tới Firestore/Storage/Functions.
@@ -101,11 +104,14 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final notifPrefs = NotificationPreferences(prefs: prefs);
   final firestore = FirebaseFirestore.instance;
-  final friendRepo = FirebaseFriendRepository(firestore);
+  final friendRepo = FirebaseFriendRepository(
+    firestore,
+    functions: functions,
+  );
 
   final authRepo = FirebaseAuthRepository(
     auth: FirebaseAuth.instance,
-    functions: FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
+    functions: functions,
     googleSignIn: GoogleSignIn(
       serverClientId: AppConfig.googleServerClientId,
     ),
@@ -132,19 +138,19 @@ void main() async {
         friendRequestRepositoryProvider.overrideWithValue(
           FirebaseFriendRequestRepository(
             FirebaseFirestore.instance,
-            FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
+            functions,
           ),
         ),
         spaceRepositoryProvider.overrideWithValue(
           FirebaseSpaceRepository(
             FirebaseFirestore.instance,
-            FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
+            functions,
           ),
         ),
         blockRepositoryProvider.overrideWithValue(
           FirebaseBlockRepository(
             FirebaseFirestore.instance,
-            FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
+            functions,
           ),
         ),
         conversationRepositoryProvider.overrideWithValue(

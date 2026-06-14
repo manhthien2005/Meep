@@ -93,6 +93,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           )
         : profile.friendCount;
 
+    // "Khoảnh khắc" lấy từ số post thật (grid bên dưới), không phải counter
+    // `profile.postCount` vốn drift được (CF miss/race — xem _StatItem note).
+    // Chỉ áp cho profile của chính mình; fallback counter khi posts đang load.
+    final momentCount = currentUid != null && effectiveUid == currentUid
+        ? ref.watch(profilePostsProvider(effectiveUid)).valueOrNull?.length ??
+            profile.postCount
+        : profile.postCount;
+
     return Scaffold(
       backgroundColor: _cBg,
       body: SafeArea(
@@ -116,7 +124,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           const SizedBox(width: 25),
                           Expanded(
                             child: _StatsRow(
-                              postCount: profile.postCount,
+                              postCount: momentCount,
                               friendCount: friendCount,
                               spaceCount: profile.spaceCount,
                               onFriendTap: () {
